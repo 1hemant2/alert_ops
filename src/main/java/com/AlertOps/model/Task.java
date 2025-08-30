@@ -22,4 +22,6 @@ public class Task {
 
     @Column(name = "created_at", insertable = false)
     private Date createdAt;
+
+    private  Boolean deleted;
 }
