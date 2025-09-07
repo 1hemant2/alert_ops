@@ -1,17 +1,21 @@
 package com.AlertOps.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.FilterDef;
+import org.hibernate.annotations.Where;
 
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(name = "tasks")
+@Where(clause = "deleted = false")
+@Data
 public class Task {
     @Id
-    @GeneratedValue
-    private  long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private  Long id;
     private  String name;
     private String description;
 
@@ -22,6 +26,6 @@ public class Task {
 
     @Column(name = "created_at", insertable = false)
     private Date createdAt;
-
-    private  Boolean deleted;
+    @Column(nullable = false)
+    private  Boolean deleted = false;
 }
