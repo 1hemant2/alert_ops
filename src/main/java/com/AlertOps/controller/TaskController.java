@@ -1,13 +1,11 @@
 package com.AlertOps.controller;
 
-import com.AlertOps.dto.CreateTask;
+import com.AlertOps.dto.task.CreateTask;
 import com.AlertOps.dto.task.UpdateTaskRequestDTO;
 import com.AlertOps.model.Task;
 import com.AlertOps.service.TaskService;
-import com.AlertOps.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;

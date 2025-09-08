@@ -1,6 +1,6 @@
 package com.AlertOps.exception;
 
-import com.AlertOps.dto.ApiError;
+import com.AlertOps.dto.error.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

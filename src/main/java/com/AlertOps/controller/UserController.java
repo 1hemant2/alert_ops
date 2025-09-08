@@ -1,7 +1,7 @@
 package com.AlertOps.controller;
 
-import com.AlertOps.dto.GetUser;
-import com.AlertOps.dto.UpdateUserEmailByEmail;
+import com.AlertOps.dto.user.GetUser;
+import com.AlertOps.dto.user.UpdateUserEmailByEmail;
 import  com.AlertOps.model.User;
 import com.AlertOps.service.UserService;
 import org.slf4j.Logger;
