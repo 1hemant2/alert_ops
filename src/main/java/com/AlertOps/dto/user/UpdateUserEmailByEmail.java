@@ -1,4 +1,4 @@
-package com.AlertOps.dto;
+package com.AlertOps.dto.user;
 
 public class UpdateUserEmailByEmail {
     private  String email;
