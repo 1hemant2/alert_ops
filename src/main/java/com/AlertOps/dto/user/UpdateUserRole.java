@@ -4,7 +4,8 @@ import lombok.Data;
 
 @Data
 public class UpdateUserRole {
-    private  String userId;
-    private String updatedRole;
-    private String action;
+    private  Long userId;
+    private String existingRole;
+    private String newRole;
+
 }

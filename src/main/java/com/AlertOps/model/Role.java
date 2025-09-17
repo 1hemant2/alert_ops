@@ -1,21 +1,32 @@
 package com.AlertOps.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
+
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "roles")
+@Data
 public class Role {
     @Id
-    @GeneratedValue
-    private  long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; // use wrapper Long, not primitive long
+
     private  String name;
 
-    //tells JPA that many roles can belong to one user. LAZY: avoids loading the user unless needed
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false) //maps the foreign key column.
-    private User user;
+    private  String description;
 
     @Column(name = "created_at", insertable = false)
     private Date createdAt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "role_permissions", // auto-created join table
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    private Set<Permission> permissions = new HashSet<>();
 }

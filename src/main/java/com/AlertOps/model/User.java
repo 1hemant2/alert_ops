@@ -1,9 +1,8 @@
 package com.AlertOps.model;
 
 import jakarta.persistence.*;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+
+import java.util.*;
 
 import com.AlertOps.model.Role;
 
@@ -33,4 +32,12 @@ public class User {
     @Column(name = "created_at", updatable = false)
     @org.hibernate.annotations.CreationTimestamp // auto create a new date
     private Date createdAt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "user_roles", // auto-created join table
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
 }
