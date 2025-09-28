@@ -31,17 +31,9 @@ public class EscalationController {
     }
 
     @GetMapping("")
-    public ResponseEntity<?> getEscalationSteps(@RequestBody EscalationDto req) {
-        Long userId = req.getOwnerId();
-        boolean isFlowStart = req.isFlowStarted();
-        String startTime = req.getStartTime();
-        String flowName = req.getFlowName();
-        List<Long> taskAssigneeIds = req.getSteps();
-        int created =  escalationService.createEscalation(flowName, userId, taskAssigneeIds, isFlowStart, startTime);
-        if(created == 1) {
-            return ResponseEntity.ok("task created successfullly");
-        }
-        return ResponseEntity.status(400).body("something went wrong");
+    public ResponseEntity<?> getEscalationSteps(@RequestParam Long flowId) {
+
+        return  ResponseEntity.status(200).body(escalationService.getEscalationSteps(flowId));
     }
 
 }

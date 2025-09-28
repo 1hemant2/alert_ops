@@ -2,6 +2,7 @@ package com.AlertOps.service;
 
 import com.AlertOps.dto.Escalation.EscalationDto;
 import com.AlertOps.dto.Escalation.EscalationResDto;
+import com.AlertOps.dto.Escalation.EscalationStepDto;
 import com.AlertOps.model.Escalation;
 import com.AlertOps.model.EscalationStep;
 import com.AlertOps.model.User;
@@ -80,6 +81,27 @@ public class EscalationService {
         } catch (RuntimeException e) {
             log.error("❌ Error while creating escalation: {}", e.getMessage(), e);
             return 0;
+        }
+    }
+
+    public List<EscalationStepDto> getEscalationSteps(Long flowId) {
+        try {
+            Escalation e = escalationRepository.findById(flowId).orElseThrow();
+            List<EscalationStepDto> escalationSteps= new ArrayList<>();
+            List<EscalationStep> escalationSteps1 = e.getSteps();
+            for(EscalationStep es : escalationSteps1) {
+                EscalationStepDto escalationStepDto = new EscalationStepDto();
+                User us = es.getUser();
+                escalationStepDto.setUserId(us.getId());
+                escalationStepDto.setUserName(us.getUserName());
+                escalationStepDto.setEmail(us.getEmail());
+                escalationSteps.add(escalationStepDto);
+            }
+            return  escalationSteps;
+        } catch (RuntimeException e) {
+            log.error("❌ Error while getting escalation: {}", e.getMessage(), e);
+            List<EscalationStepDto> escalationSteps= new ArrayList<>();
+            return  escalationSteps;
         }
     }
 
