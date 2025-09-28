@@ -1,0 +1,23 @@
+# application-dev.yml
+app:
+  default-role: user
+db:
+  username: dev_user
+  password: dev_pass
+
+spring:
+  application:
+    name: AlertOps
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/alert_ops
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update # don't auto-update the schema
+    show-sql: true
+    properties:
+      hibernate.format_sql: true

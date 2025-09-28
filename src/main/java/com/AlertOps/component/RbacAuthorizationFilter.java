@@ -24,7 +24,7 @@ public class RbacAuthorizationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
        // String username = request.getUserPrincipal().getName(); // from JWT or session
-        String userName = "hem7";
+        String userName = "root";
         Set<String> permissions = userService.getUserPermissions(userName);
 
         String httpMethod = request.getMethod();        // GET, POST, DELETE
@@ -32,7 +32,7 @@ public class RbacAuthorizationFilter extends OncePerRequestFilter {
 
         String requiredPermission = Controller_Permission.mapToPermission(httpMethod, path);
         Boolean isOpenRoute = Controller_Permission.isOpenRoute(httpMethod, path);
-        if (isOpenRoute || permissions.contains(requiredPermission) || permissions.contains("SUPER_ADMIN")) {
+        if (isOpenRoute || permissions.contains(requiredPermission) || permissions.contains("super_admin")) {
             filterChain.doFilter(request, response);
         } else {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied");
