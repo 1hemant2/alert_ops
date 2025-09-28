@@ -3,6 +3,7 @@ package com.AlertOps.controller;
 import com.AlertOps.dto.user.*;
 import com.AlertOps.model.Role;
 import  com.AlertOps.model.User;
+import com.AlertOps.service.EscalationService;
 import com.AlertOps.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class UserController {
 
     private static final Logger log = LoggerFactory.getLogger(UserController.class);
@@ -68,7 +69,7 @@ public class UserController {
             String  email = request.getEmail();
             String newEmail = request.getNewEmail();
             userService.updateUserEmail(email, newEmail);
-            User newUser = userService.getUser(null, null,email);
+            UserDto newUser = userService.getUser(null, null,email);
             return ResponseEntity.ok(newUser); // 200 with body
         } catch (RuntimeException e) {
             return ResponseEntity
@@ -78,7 +79,7 @@ public class UserController {
     }
 
     @DeleteMapping("/user")
-    public ResponseEntity<?> deleteUser(@RequestBody GetUser req) {
+    public ResponseEntity<?> deleteUser(@RequestBody UserDto req) {
         try {
             String email = req.getEmail();
             String userName = req.getUserName();
@@ -140,6 +141,15 @@ public class UserController {
             return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error occured while updating user role" + e.getMessage());
         }
     }
+
+
+    @GetMapping("/user/escalations")
+    public ResponseEntity<?> getEsclationByUserId(@RequestParam Long userId) {
+     //   return ResponseEntity.ok(userService.getEscalation(userId));
+
+        return  ResponseEntity.ok(userService.getEscalation(userId));
+    }
+
 
 }
 

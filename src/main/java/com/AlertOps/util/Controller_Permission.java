@@ -6,8 +6,10 @@ public class Controller_Permission {
         if (method.equals("GET") && path.startsWith("/users")) return "READ_USER";
         if (method.equals("POST") && path.startsWith("/users")) return "WRITE_USER";
         if (method.equals("DELETE") && path.startsWith("/users")) return "DELETE_USER";
-        if(method.equals("GET") && path.startsWith("/api/v1/tasks")) return  "READ_TASK";
-        if(method.equals("GET") && path.startsWith("/api/v1/task")) return "READ_TASK";
+        if(method.equals("GET") && path.startsWith("/api/v1/tasks")) return  "read_task";
+        if(method.equals("GET") && path.startsWith("/api/v1/task")) return "write_task";
+        if(method.equals("POST") && path.equals("/api/v1/escalation")) return "create_flow";
+        if(method.equals("GET") && path.equals("/api/v1/escalation")) return "read_flow";
         return "UNKNOWN";
     }
 

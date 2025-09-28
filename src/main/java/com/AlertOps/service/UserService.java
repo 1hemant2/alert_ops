@@ -1,19 +1,26 @@
 package com.AlertOps.service;
 
+import com.AlertOps.component.AppConfig;
+import com.AlertOps.dto.Escalation.EscalationDto;
+import com.AlertOps.dto.Escalation.EscalationResDto;
+import com.AlertOps.dto.user.UserDto;
+import com.AlertOps.model.Escalation;
 import com.AlertOps.model.Permission;
 import com.AlertOps.model.Role;
 import com.AlertOps.model.User;
 import com.AlertOps.repository.RoleRepository;
 import com.AlertOps.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.swing.text.html.Option;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -23,14 +30,18 @@ public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
     private final UserRepository userRepository;
     private  final RoleRepository roleRepository;
+    private final AppConfig appConfig;
 
-    public UserService(UserRepository userRepository, RoleRepository roleRepository) {
+
+    public UserService(UserRepository userRepository, RoleRepository roleRepository, AppConfig appConfig) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
+        this.appConfig = appConfig;
     }
 
 
     public User loadUserByUsername(String username) {
+
         return userRepository.findByUserName(username);
                // .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
@@ -47,7 +58,8 @@ public class UserService {
 
     public User createUser(User user) {
         try {
-            Role role = roleRepository.findByName("USER");
+            String defaultRole = appConfig.getDefaultRole();
+            Role role = roleRepository.findByName(defaultRole);
             user.getRoles().add(role);
             User saved = userRepository.save(user);
             log.info("✅ User created successfully: {}", saved);
@@ -69,19 +81,32 @@ public class UserService {
         }
     }
 
-    public User getUser(Long id, String userName, String email) {
+    public UserDto getUser(Long id, String userName, String email) {
         try {
+            UserDto userRes = new UserDto();
             if(id != null) {// findById returns Optional<User>
-                return userRepository.findById(id)
-                        .orElse(null); // return null if not found
+                 User user = userRepository.findById(id)
+                        .orElse(null);
+                userRes.setName(user.getName());
+                userRes.setRoles(user.getRoles());
+                userRes.setId(user.getId());
+                userRes.setUserName(user.getUserName());
             }
             if(userName != null) {
-                return userRepository.findByUserName(userName);
+                User user = userRepository.findByUserName(userName);
+                userRes.setName(user.getName());
+                userRes.setRoles(user.getRoles());
+                userRes.setId(user.getId());
+                userRes.setUserName(user.getUserName());
             }
             if(email != null) {
-                return  userRepository.findByEmail(email);
+                User user =  userRepository.findByEmail(email);
+                userRes.setName(user.getName());
+                userRes.setRoles(user.getRoles());
+                userRes.setId(user.getId());
+                userRes.setUserName(user.getUserName());
             }
-            return  null;
+            return  userRes;
         } catch (Exception e) {
             log.error("❌ Error while Fetching user user", e);
             throw new RuntimeException("Failed to fetch user", e);
@@ -173,7 +198,25 @@ public class UserService {
         }
     }
 
-
+    @Transactional
+    public Set<EscalationResDto> getEscalation(Long userId) {
+        try {
+            ZoneId zone = ZoneId.of("Asia/Kolkata");
+            User user = userRepository.findById(userId)
+                    .orElse(null);
+            Set<Escalation> es = user.getEscalations();
+            Set<EscalationResDto> escaltions = new HashSet<>();
+            for(Escalation e : es) {
+                escaltions.add(new EscalationResDto(e.getId(), e.getFlowName(), e.getStartFlow(), e.getStartTime().atZone(zone), e.getCreatedAt().toInstant().atZone(zone)));
+            }
+            return escaltions;
+        } catch (RuntimeException e) {
+            log.error("❌ Error while creating escalation DTOs: {}", e);
+            Set<EscalationResDto> escaltions = new HashSet<>();
+            return  escaltions;
+            //  return Collections.emptySet();  // return empty set instead of undefined variable
+        }
+    }
 }
 
 
