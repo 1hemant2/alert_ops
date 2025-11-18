@@ -13,8 +13,10 @@ public class Controller_Permission {
         return "UNKNOWN";
     }
 
-    public static Boolean isOpenRoute(String method, String path) {
-        return method.equals("POST") && path.startsWith("/api/user");
+    public static Boolean isOpenRoute(String method, String path) { 
+        if(method.equals("POST") && path.startsWith("/api/user")) return true;
+        if(method.equals("POST") && path.startsWith("/api/v1/scheduler")) return true;
+        return false;
     }
 
 }

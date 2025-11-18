@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 
 import java.util.*;
 
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 

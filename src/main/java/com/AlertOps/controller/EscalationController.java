@@ -1,12 +1,10 @@
 package com.AlertOps.controller;
 
 import com.AlertOps.dto.Escalation.EscalationDto;
-import com.AlertOps.repository.EscalationRepository;
 import com.AlertOps.service.EscalationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
 import java.util.List;
 
 @RestController
