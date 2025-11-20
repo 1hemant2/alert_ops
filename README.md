@@ -31,22 +31,13 @@ It demonstrates **production-grade backend design patterns**, **workflow automat
 
 ---
 
-## 🛠️ Work in Progress
 
-- **Scheduling Engine**
-    - Completed:
-        - APIs to save escalation chains in the database.
-        - Fetch all flows for the logged-in user by `userId`.
-        - Retrieve escalation steps (e.g., user1 → user2 → user3) by `flowId`.
-    - Current WIP:
-        - Implement scheduler to trigger escalation notifications based on configured delays (seconds/minutes/days).
 
 ---
 
 ## 📅 Upcoming
 
 - **Notification Service**
-    - Integrate with scheduler for automated escalation alerts.
     - Support email, Slack, or webhook-based notifications.
     - Real-time visibility for all users in the escalation chain.
 
@@ -62,7 +53,7 @@ It demonstrates **production-grade backend design patterns**, **workflow automat
 
 - **Backend**: Java 17, Spring Boot
 - **Database**: PostgreSQL + Flyway for schema migrations
-- **Scheduling**: Quartz (planned)
+- **Scheduling**: Rabbit MQ
 - **Messaging/Notifications**: Pluggable design (Email, Slack, Webhooks)
 - **ORM**: Hibernate/JPA
 
