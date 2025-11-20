@@ -9,8 +9,7 @@ import com.AlertOps.dto.Schedular.ScheduledEvent;
 import com.AlertOps.model.ScheduledTask;
 import com.AlertOps.repository.ScheduledTaskRepository;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+
 import java.util.Optional;
 
 
@@ -18,23 +17,24 @@ import java.util.Optional;
 public class MessageConsumer {
     private final MessageExecutor executor;
     private final ScheduledTaskRepository repo;
-    private final MessagePublisher publisher;
+   // private final MessagePublisher publisher;
 
 
     public MessageConsumer(MessageExecutor executor, ScheduledTaskRepository repo, MessagePublisher publisher) {
         this.executor = executor;
         this.repo = repo;
-        this.publisher = publisher;
+      //  this.publisher = publisher;
     }
 
 
     @RabbitListener(queues = RabbitMqConfig.FINAL_QUEUE)
+    @Transactional(readOnly = false)
     public void onMessage(ScheduledEvent event) {
         process(event.getId(), event.getEmail(), event.getMessage());
     }
 
 
-    @Transactional
+    @Transactional(readOnly = false, propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
     public void process(Long taskId, String email, String message) {
         Optional<ScheduledTask> opt = repo.findById(taskId);
         if (opt.isEmpty()) return; // nothing to do
@@ -58,27 +58,10 @@ public class MessageConsumer {
             repo.save(task);
             return;
         }
-
-
+        
         if (sent) {
-            // compute next schedule - placeholder (example: add 1 hour)
-            Instant next = Instant.now().plus(1, ChronoUnit.HOURS);
-            // sample termination criteria: after 5 attempts
-            if (task.getAttempts() >= 5) {
-                repo.save(task);
-                task.setStatus("DONE");
-                return;
-            }
-
-
-            // update task and re-publish
-            task.setNextFireAt(next);
-            task.setStatus("PENDING");
-            task.setQueued(false);
-            repo.save(task);
-            long delay = Math.max(0, next.toEpochMilli() - Instant.now().toEpochMilli());
-            publisher.publishWithDelay(new ScheduledEvent(task.getId(), task.getEmail(), task.getMessage()), delay);
-            task.setQueued(true);
+            task.setStatus("DONE");
+            task.setAttempts(task.getAttempts() + 1);
             repo.save(task);
         }
     }

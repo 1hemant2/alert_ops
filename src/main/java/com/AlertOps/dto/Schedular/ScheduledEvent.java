@@ -12,7 +12,9 @@ import lombok.Setter;
 @Getter
 @Setter
 @AllArgsConstructor
-public class ScheduledEvent {
+public class ScheduledEvent implements Serializable {
+    private static final long serialVersionUID = 1L;
+    
     private Long id;
     private String email;
     private String message;

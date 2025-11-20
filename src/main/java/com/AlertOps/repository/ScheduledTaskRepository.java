@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import com.AlertOps.model.ScheduledTask;
 import jakarta.persistence.LockModeType;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,7 +21,7 @@ public interface ScheduledTaskRepository extends JpaRepository<ScheduledTask, Lo
     List<ScheduledTask> findPendingToPublish(@Param("statuses") List<String> statuses);
     
     
-    List<ScheduledTask> findByStatusAndNextFireAtBefore(String status, Instant instant);
+    List<ScheduledTask> findByStatusAndNextFireAtBefore(String status, Long instant);
     
     
     @Lock(LockModeType.PESSIMISTIC_WRITE)

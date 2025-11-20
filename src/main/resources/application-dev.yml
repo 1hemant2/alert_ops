@@ -18,7 +18,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update # don't auto-update the schema
-    show-sql: true
+    #show-sql: true
+    open-in-view: false
     properties:
       hibernate.format_sql: true
   rabbitmq:

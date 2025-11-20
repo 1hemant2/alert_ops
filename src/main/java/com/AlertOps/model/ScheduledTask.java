@@ -2,7 +2,6 @@ package com.AlertOps.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -27,7 +26,7 @@ public class ScheduledTask {
     
     
     @Column(name = "next_fire_at")
-    private Instant nextFireAt;
+    private Long nextFireAt;
     
     
     private String status; // PENDING|QUEUED|PROCESSING|DONE|FAILED
