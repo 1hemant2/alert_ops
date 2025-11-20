@@ -1,7 +1,6 @@
 package com.AlertOps.service;
 
 import com.AlertOps.component.AppConfig;
-import com.AlertOps.dto.Escalation.EscalationDto;
 import com.AlertOps.dto.Escalation.EscalationResDto;
 import com.AlertOps.dto.user.UserDto;
 import com.AlertOps.model.Escalation;
@@ -11,14 +10,11 @@ import com.AlertOps.model.User;
 import com.AlertOps.repository.RoleRepository;
 import com.AlertOps.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.swing.text.html.Option;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;

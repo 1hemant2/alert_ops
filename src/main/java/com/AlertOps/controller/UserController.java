@@ -3,7 +3,6 @@ package com.AlertOps.controller;
 import com.AlertOps.dto.user.*;
 import com.AlertOps.model.Role;
 import  com.AlertOps.model.User;
-import com.AlertOps.service.EscalationService;
 import com.AlertOps.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
