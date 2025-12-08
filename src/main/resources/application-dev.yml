@@ -7,21 +7,20 @@ db:
 
 spring:
   application:
-    name: AlertOps
+    name: alertops
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/alert_ops
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://ep-falling-snow-a1oq1a43-pooler.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require&channel_binding=require
+    username: neondb_owner
+    password: npg_AKkZU1I7itaM
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update # don't auto-update the schema
-    #show-sql: true
-    open-in-view: false
+      ddl-auto: update
     properties:
-      hibernate.format_sql: true
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   rabbitmq:
     host: localhost
     port: 5672
@@ -29,4 +28,6 @@ spring:
     password: guest
 
 server:
-  port: 8080
+  port: 8082
+
+# psql ''
