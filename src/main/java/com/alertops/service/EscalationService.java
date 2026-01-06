@@ -1,10 +1,11 @@
+/*
 package com.alertops.service;
 
 import com.alertops.dto.escalation.EscalationResDto;
 import com.alertops.dto.escalation.EscalationStepDto;
 import com.alertops.model.Escalation;
 import com.alertops.model.EscalationStep;
-import com.alertops.model.User;
+import com.alertops.auth.model.User;
 import com.alertops.repository.EscalationRepository;
 import com.alertops.repository.UserRepository;
 //import lombok.extern.slf4j.Slf4j;
@@ -102,3 +103,4 @@ public class EscalationService {
     }
 
 }
+*/

@@ -1,3 +1,4 @@
+/*
 package com.alertops.configuration;
 
 
@@ -67,3 +68,4 @@ public class RabbitMqConfig {
                 .with(FINAL_ROUTING_KEY);
     }
 }
+*/

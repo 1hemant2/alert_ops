@@ -1,6 +1,7 @@
+/*
 package com.alertops.component;
 
-import com.alertops.service.UserService;
+import com.alertops.auth.service.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,3 +40,4 @@ public class RbacAuthorizationFilter extends OncePerRequestFilter {
         }
     }
 }
+*/

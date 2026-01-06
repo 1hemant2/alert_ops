@@ -1,3 +1,4 @@
+/*
 package com.alertops.service;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -58,11 +59,11 @@ public class MessageConsumer {
             repo.save(task);
             return;
         }
-        
+
         if (sent) {
             task.setStatus("DONE");
             task.setAttempts(task.getAttempts() + 1);
             repo.save(task);
         }
     }
-}
+}*/

@@ -1,3 +1,4 @@
+/*
 package com.alertops.component;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -12,3 +13,4 @@ public class AppConfig {
         return defaultRole;
     }
 }
+*/

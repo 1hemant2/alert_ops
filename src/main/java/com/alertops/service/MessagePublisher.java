@@ -1,3 +1,4 @@
+/*
 package com.alertops.service;
 
 // import com.example.scheduler.config.RabbitMQConfig;
@@ -31,4 +32,4 @@ public class MessagePublisher {
 
         System.out.println("Sent: " + " with delay " + delayMs + "ms");
     }
-}
+}*/

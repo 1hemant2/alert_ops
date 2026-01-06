@@ -1,5 +1,7 @@
+/*
 package com.alertops.model;
 
+import com.alertops.auth.model.User;
 import jakarta.persistence.*;
 
 
@@ -53,3 +55,4 @@ public class EscalationStep {
         this.stepOrder = stepOrder;
     }
 }
+*/

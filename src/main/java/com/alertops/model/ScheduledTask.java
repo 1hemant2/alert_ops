@@ -1,3 +1,4 @@
+/*
 package com.alertops.model;
 
 import jakarta.persistence.*;
@@ -103,3 +104,4 @@ public class ScheduledTask {
         this.lastError = lastError;
     }
 }
+*/

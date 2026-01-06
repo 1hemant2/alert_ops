@@ -1,3 +1,4 @@
+/*
 package com.alertops.service;
 
 import com.alertops.dto.schedular.ScheduledEvent;
@@ -37,3 +38,4 @@ public class SchedularService {
     }
 }
 
+*/

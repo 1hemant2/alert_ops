@@ -1,3 +1,4 @@
+/*
 package com.alertops.repository;
 
 
@@ -27,3 +28,4 @@ public interface ScheduledTaskRepository extends JpaRepository<ScheduledTask, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ScheduledTask> findById(Long id);
 }
+*/

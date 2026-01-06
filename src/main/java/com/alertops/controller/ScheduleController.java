@@ -1,3 +1,4 @@
+/*
 package com.alertops.controller;
 
 import org.springframework.http.ResponseEntity;
@@ -24,3 +25,4 @@ public class ScheduleController {
         return ResponseEntity.ok().build();
     }
 }
+*/
