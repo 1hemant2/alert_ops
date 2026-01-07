@@ -1,17 +1,18 @@
 package com.alertops.dto.task;
 
+import java.util.UUID;
 
 public class TaskResponseDto {
-    private Long id;
+    private UUID id;
     private String name;
     private String description; // fixed lowercase
-    private Long userId;
 
-    public Long getId() {
+
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
@@ -31,18 +32,9 @@ public class TaskResponseDto {
         this.description = description;
     }
 
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    public TaskResponseDto(Long id, String name, String description, Long userId) {
+    public TaskResponseDto(UUID id, String name, String description) {
         this.id = id;
         this.name = name;
         this.description = description;
-        this.userId = userId;
     }
 }

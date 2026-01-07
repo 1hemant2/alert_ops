@@ -1,15 +1,17 @@
 package com.alertops.dto.task;
 
+import java.util.UUID;
+
 public class UpdateTaskRequestDTO {
-    private  Long id;
+    private  UUID id;
     private  String name;
     private String Description;
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
