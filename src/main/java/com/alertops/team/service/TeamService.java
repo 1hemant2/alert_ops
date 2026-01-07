@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -219,11 +220,17 @@ public class TeamService {
 
     }
 
+    public List<Team> getUserTeams() {
+        try {
+            AuthContext ctx = AuthContextHolder.get();
 
+            if (ctx == null)  throw new RuntimeException("Unauthenticated");
 
-
-
-
+            return teamMemberRepository.findByUserId(ctx.getUserId());
+        } catch (RuntimeException e) {
+            throw  e;
+        }
+    }
 }
 
 

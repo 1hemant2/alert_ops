@@ -2,9 +2,6 @@ package com.alertops.team.model;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;
-
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 @Entity

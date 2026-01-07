@@ -98,6 +98,14 @@ public class TeamController {
     }
 
 
+    @GetMapping
+    public ResponseEntity<?> getUserTeams() {
+        try {
+            return ResponseEntity.ok(teamService.getUserTeams());
+        } catch (RuntimeException e) {
+            return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error occured while fetching user teams" + e.getMessage());
+        }
+    }
 
      /*   @GetMapping("/user")
     public  ResponseEntity<?> getUser(@RequestParam(required = false) Long id,
