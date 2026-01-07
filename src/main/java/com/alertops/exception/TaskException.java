@@ -24,4 +24,8 @@ public class TaskException extends AppException {
     public static TaskException getFailed(Throwable cause) {
         return new TaskException("TASK_GET_FAILED", "Failed to get task", HttpStatus.BAD_REQUEST, cause);
     }
+
+    public static TaskException updateFailed(Throwable cause) {
+        return new TaskException("TASK_UPDATE_FAILED", "Failed to update task", HttpStatus.BAD_REQUEST, cause);
+    }
 }
