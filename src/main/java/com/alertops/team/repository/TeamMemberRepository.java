@@ -14,4 +14,5 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
 
     @Query("SELECT t FROM Team t JOIN TeamMember tm ON t.id = tm.teamId WHERE tm.userId = :userId")
     List<Team> findByUserId(UUID userId);
+
 }
