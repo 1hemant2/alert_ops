@@ -189,22 +189,38 @@ public class FlowService {
                 }  
             }
             
-            System.out.println("New Position: " + newPosition);
-
-            if(newPosition.compareTo(BigInteger.valueOf(50)) < 50) {
-               // reindex
-            }
+            // System.out.println("New Position: " + newPosition);
 
             node.setPosition(newPosition);
             Node updatedNode = nodeRepository.save(node);
             flow.setUpdatedBy(flow.getId());
             flow.setUpdatedAt(Instant.now());
             flowRepository.updateFlow(flow);
+
+            if(newPosition.compareTo(BigInteger.valueOf(50)) < 50) {
+               reindexNodes(node.getFlowId());
+               Node newUpdatedNode = nodeRepository.findById(node.getId()).orElseThrow();
+               updatedNode.setPosition(newUpdatedNode.getPosition());
+            }
+            
             return updatedNode;
         } catch(Exception e) {
             throw e;
         }
     }
 
+    private void reindexNodes(UUID flowId) {
+        try {
+            List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
+            BigInteger position = BigInteger.valueOf(1000);
+            for(Node node : nodes) {
+                node.setPosition(position);
+                nodeRepository.save(node);
+                position = position.add(BigInteger.valueOf(1000));
+            }
+        } catch(Exception e) {
+            throw e;
+        }
+    }
 }
 
