@@ -1,5 +1,5 @@
-/*
-package com.alertops.service;
+package com.alertops.messaging;
+
 
 import org.springframework.stereotype.Service;
 
@@ -12,4 +12,4 @@ public class MessageExecutor {
         return true; // true => success
     }
 }
-*/
+

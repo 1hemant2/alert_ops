@@ -89,7 +89,7 @@ public class FlowService {
         }
     }
 
-    public Node createNode(UUID flowId, String nodeName, int durationInMinutes, UUID createdBy, BigInteger position) {
+    public Node createNode(UUID flowId, String nodeName, int durationInMinutes, UUID createdBy, BigInteger position, String email) {
         try {
 
             if(flowId == null) {
@@ -101,6 +101,7 @@ public class FlowService {
             node.setFlowId(flowId);
             node.setCreatedBy(createdBy);
             node.setDuration(java.time.Duration.ofMinutes(durationInMinutes));
+            node.setEmail(email);
 
             if(position.compareTo(BigInteger.ZERO) > 0) {
                 node.setPosition(position .add(BigInteger.valueOf(1000)));

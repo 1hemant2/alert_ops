@@ -34,8 +34,6 @@ public class Escalation {
 
     private String issueSolvedBy;
 
-    // id, name, taskId, flowId, status: (IDLE |RUNNING |TERMINAL), resolution_type: (SOLVED | STOPPED | EXHAUSTED), createdAt, updatedAt, issueSolvedBy
-
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();

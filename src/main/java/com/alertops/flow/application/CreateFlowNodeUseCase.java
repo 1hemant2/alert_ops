@@ -74,7 +74,8 @@ public class CreateFlowNodeUseCase {
                 request.getNodeName(),
                 request.getDurationInMinutes(),
                 authContext.getUserId(),
-                lastNode == null ? BigInteger.valueOf(0) : lastNode.getPosition()
+                lastNode == null ? BigInteger.valueOf(0) : lastNode.getPosition(),
+                request.getEmail()
             );
 
             if(node == null) {
