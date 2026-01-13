@@ -25,7 +25,7 @@ public class FlowExecutionStateService {
     @Transactional
     public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId) {
         try {
-
+            
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();
                 flowExecutionState.setExecutionState("PENDING");
@@ -36,6 +36,7 @@ public class FlowExecutionStateService {
                 flowExecutionState.setDuration(node.getDuration());
                 flowExecutionState.setPosition(node.getPosition());
                 flowExecutionState.setProcessId(escalationId);
+                flowExecutionState.setTaskId(node.getId());
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             // publishNodeToDelayQ(escalationId);   

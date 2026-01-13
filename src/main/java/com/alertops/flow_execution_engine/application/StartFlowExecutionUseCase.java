@@ -3,6 +3,8 @@ package com.alertops.flow_execution_engine.application;
 import java.util.List;
 import java.util.UUID;
 
+import javax.management.RuntimeErrorException;
+
 import org.springframework.stereotype.Service;
 
 import com.alertops.flow.repository.NodeRepository;
@@ -28,7 +30,7 @@ public class StartFlowExecutionUseCase {
         this.taskRepository = taskRepository;
     }
 
-    public void execute(FlowExecutionStateService flowExecutionStateService, UUID escalationId) {
+    public String  execute(FlowExecutionStateService flowExecutionStateService, UUID escalationId) {
         try {
             AuthContext authContext = AuthContextHolder.get();
             UUID teamId = authContext.getTeamId();
@@ -39,21 +41,29 @@ public class StartFlowExecutionUseCase {
               throw new RuntimeException("Escalation not found for id: " + escalationId);
             }
  
-            if(!"IDLE".equals(escalation.getStatus())) {
+            if("IDLE".equals(escalation.getStatus())) {
               throw new RuntimeException("Escalation is either IN_PROGRESS or COMPLETED for id: " + escalationId);
             }
             
             UUID flowId = escalation.getFlowId();
             List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
 
-            UUID taskId = escalation.getTeamId();
-            Task task = taskRepository.findByTaskId(taskId);
+            if(nodes.size() == 0) {
+                throw new RuntimeException("Must be at least single node to start the escalation");
+            }
 
-            flowExecutionStateService.startFlowExecution(task, nodes, escalationId);
+            UUID taskId = escalation.getTaskId();
+            Task task = taskRepository.findByTaskId(taskId);
+            System.out.println("taskId -> " + taskId);
+            if(task == null) {
+                throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
+            }
+
+            return flowExecutionStateService.startFlowExecution(task, nodes, escalationId);
 
             // saveNodeStates(escalation);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to start flow execution");
+            throw new RuntimeException(e.getMessage());
         }
     }
 }

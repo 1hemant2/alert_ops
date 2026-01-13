@@ -19,8 +19,11 @@ public class EscalationService {
        this.escalationRepository = escalationRepository;
     }
 
-    public Escalation createEscalation(String name, UUID taskId, UUID flowId, UUID teamId) {
+    public Escalation createEscalation(String name, UUID taskId, UUID flowId) {
         try {
+            AuthContext authContext = AuthContextHolder.get();
+            UUID teamId = authContext.getTeamId();
+
             Escalation escalation = new Escalation();
             escalation.setName(name);
             escalation.setTaskId(taskId);
