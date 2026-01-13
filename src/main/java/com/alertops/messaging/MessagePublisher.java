@@ -1,0 +1,34 @@
+// package com.alertops.messaging;
+
+
+// // import com.example.mes.RabbitMQConfig;
+// import com.example.scheduler.dto.ScheduledEvent;
+// import org.springframework.amqp.rabbit.core.RabbitTemplate;
+// import org.springframework.beans.factory.annotation.Autowired;
+// import org.springframework.stereotype.Service;
+
+// import com.alertops.configuration.RabbitMqConfig;
+// import com.alertops.dto.schedular.ScheduledEvent;
+
+
+// @Service
+// public class MessagePublisher {
+//     @Autowired
+//     RabbitTemplate rabbitTemplate;
+
+//     public void publishWithDelay(ScheduledEvent event, long delayMs) {
+
+//         rabbitTemplate.convertAndSend(
+//                 RabbitMqConfig.NORMAL_EXCHANGE,
+//                 RabbitMqConfig.DELAY_ROUTING_KEY,
+//                 event,
+//                 message -> {
+//                     message.getMessageProperties().setExpiration(String.valueOf(delayMs));
+//                     message.getMessageProperties().setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
+//                     return message;
+//                 }
+//         );
+
+//         System.out.println("Sent: " + " with delay " + delayMs + "ms");
+//     }
+// }

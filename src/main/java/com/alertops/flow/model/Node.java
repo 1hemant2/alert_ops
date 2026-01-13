@@ -36,6 +36,8 @@ public class Node {
     @Column(nullable = false)
     private Duration duration;
 
+    private String email;
+
     public UUID getId() {
         return id;
     }
@@ -89,4 +91,13 @@ public class Node {
         this.duration = duration;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    
 }

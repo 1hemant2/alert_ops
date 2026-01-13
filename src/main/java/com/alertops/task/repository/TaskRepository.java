@@ -20,6 +20,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t FROM Task t WHERE t.id = :taskId AND t.teamId = :teamId AND t.deleted = false")
     TaskView findById(UUID taskId, UUID teamId);
     
+    @Query("SELECT t from Task t where t.id = :taskId")
+    Task findByTaskId(UUID taskId);
+
     Page<TaskView> findByTeamId(UUID teamId, Pageable pageable);
 
     // update queries
