@@ -40,7 +40,8 @@ public class FlowExecutionStateService {
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             // publishNodeToDelayQ(escalationId);   
-           return "Started Flow Execution for escalationId: ";
+           escalationRepository.updateStatus(escalationId, "ACTIVE");
+           return "Started Flow Execution for escalationId: " + escalationId;
         } catch (RuntimeException e) {
             throw e;
         }
