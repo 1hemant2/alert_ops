@@ -1,4 +1,4 @@
-package com.alertops.dto.error;
+package com.alertops.errors;
 
 import java.time.LocalDateTime;
 

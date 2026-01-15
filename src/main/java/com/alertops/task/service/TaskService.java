@@ -1,12 +1,12 @@
 package com.alertops.task.service;
 
-import com.alertops.dto.task.TaskResponseDto;
 import com.alertops.exception.TaskException;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 import com.alertops.task.interfaces.TaskView;
 import com.alertops.task.model.Task;
 import com.alertops.task.repository.TaskRepository;
+import com.alertops.task.task.TaskResponseDto;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

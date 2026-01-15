@@ -1,10 +1,11 @@
 package com.alertops.exception;
 
-import com.alertops.dto.error.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.alertops.errors.ApiError;
 
 @RestControllerAdvice
 public class MainException {

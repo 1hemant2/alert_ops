@@ -5,7 +5,6 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.alertops.dto.schedular.ScheduledEvent;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
@@ -42,13 +41,6 @@ public class ReconcilerService {
                                                    .findFirstByProcessIdAndExecutionStateOrderByPositionAsc(escalation.getId(), "ACTIVE");
             messagePublisher.publishWithDelay(flowExecutionState);
         }
-        // for (ScheduledTask t : pending) {
-        //     Long delay =  t.getNextFireAt();
-        //     publisher.publishWithDelay(new ScheduledEvent(t.getId(), t.getEmail(), t.getMessage()), delay);
-        //     t.setQueued(true);
-        //     t.setStatus("QUEUED");
-        //     repo.save(t);
-        // }
     }
 }
 

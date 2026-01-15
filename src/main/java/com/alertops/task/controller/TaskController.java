@@ -1,10 +1,11 @@
 
 package com.alertops.task.controller;
 
-import com.alertops.dto.task.CreateTask;
-import com.alertops.dto.task.UpdateTaskRequestDTO;
 import com.alertops.task.model.Task;
 import com.alertops.task.service.TaskService;
+import com.alertops.task.task.CreateTask;
+import com.alertops.task.task.UpdateTaskRequestDTO;
+
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
