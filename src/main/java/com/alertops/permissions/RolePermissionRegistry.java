@@ -1,4 +1,4 @@
-package com.alertops.global;
+package com.alertops.permissions;
 
 import java.util.EnumMap;
 import java.util.EnumSet;

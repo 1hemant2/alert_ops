@@ -1,4 +1,4 @@
-package com.alertops.global;
+package com.alertops.permissions;
 
 import org.springframework.stereotype.Component;
 

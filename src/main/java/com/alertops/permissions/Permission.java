@@ -1,4 +1,4 @@
-package com.alertops.global;
+package com.alertops.permissions;
 
 public enum Permission {
     DELETE_TEAM,
