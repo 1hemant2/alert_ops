@@ -1,20 +1,20 @@
-package com.alertops.flow_execution_engine.service;
+package com.alertops.messaging;
 
 
 import jakarta.annotation.PostConstruct;
-import org.springframework.stereotype.Service;
+
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
-import com.alertops.messaging.MessagePublisher;
 
 import java.util.List;
 
 
-@Service
+@Component
 public class ReconcilerService {
     private final MessagePublisher messagePublisher;
     private final EscalationRepository escalationRepository;
