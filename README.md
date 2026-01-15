@@ -1,95 +1,118 @@
-# 🚨 AlertOps
+# AlertOps
 
-**AlertOps** is an internal **incident management and escalation platform** built with **Spring Boot + PostgreSQL**.  
-It tracks incidents, assigns ownership, and automates escalation flows — ensuring that critical issues are resolved on time.
+**AlertOps** is a multi-tenant backend alerting and escalation platform designed to model real-world incident flows—where alerts are delayed, retried, escalated, and recovered reliably under failure.
 
-The system is designed with a **scalable architecture**, **role-based access control (RBAC)**, and a roadmap toward **real-time notifications and scheduling**.  
-It demonstrates **production-grade backend design patterns**, **workflow automation**, and **database versioning** with Flyway.
+The system treats **time, retries, and ownership** as first-class concerns, using queue-driven execution instead of cron-based scheduling or in-memory timers.
 
 ---
 
-## ✨ Core Features
+## Why AlertOps Exists
 
-- **Incident Management**
-    - Create incidents with clear ownership and timelines.
-    - Track status from creation → escalation → resolution.
+In production systems, alerts rarely fail loudly.  
+They fail quietly—emails bounce, services restart, consumers crash.
 
-- **Role-based Access Control (RBAC)**
-    - Roles: **Admin**, **Engineer**, **Manager**.
-    - Fine-grained permissions on creating flows, assigning tasks, and resolving incidents.
+AlertOps exists to answer a single hard question:
 
-- **Escalation Flows**
-    - Define escalation chains independently from incidents.
-    - Attach flows to incidents for flexible handling.
-    - Pre-warns the next user in the chain before reassignment.
-    - Auto-escalates unresolved incidents → reassigns ownership and sends notifications.
-    - Ensures SLAs are met and responsibilities are clear at every stage.
+> **How do you guarantee escalation correctness when time and failure are unavoidable?**
 
-- **Notification-ready Design**
-    - Every escalation step triggers notifications.
-    - Everyone in the chain is informed before and after handoff.
+Rather than relying on periodic polling or best-effort schedulers, AlertOps models escalation as deterministic workflows backed by durable state and delayed message queues.
 
 ---
 
+## Core Concepts
 
+### Multi-Tenant Teams & Access Control
 
----
+- Users can register and authenticate using JWT.
+- A user can belong to multiple teams.
+- Teams enforce role-based access control (admin, member, etc.).
+- Team invitations are supported even if the invited user does not yet exist.
+- User intent is preserved and resolved when the invited user registers.
 
-## 📅 Upcoming
-
-- **Notification Service**
-    - Support email, Slack, or webhook-based notifications.
-    - Real-time visibility for all users in the escalation chain.
-
-- **Dashboards**
-    - Centralized UI to track incidents, escalations, and SLAs.
-
-- **Granular RBAC**
-    - Fine-grained permissions for enterprise scenarios.
+This mirrors how real SaaS systems handle collaboration and ownership.
 
 ---
 
-## 🚀 Tech Stack
+### Alert Flows
 
-- **Backend**: Java 17, Spring Boot
-- **Database**: PostgreSQL + Flyway for schema migrations
-- **Scheduling**: Rabbit MQ
-- **Messaging/Notifications**: Pluggable design (Email, Slack, Webhooks)
-- **ORM**: Hibernate/JPA
+An **alert flow** represents a deterministic escalation path.
 
----
+Each flow consists of ordered **nodes**, where every node defines:
+- the recipient (email / user)
+- delay duration before execution
+- retry behavior and limits
 
-## 💡 Why This Project Matters
+Nodes can be reordered or removed safely without corrupting the flow state.
 
-- Built a **production-style incident management system**, not just CRUD.
-- Showcases **real-world backend concepts**: workflow automation, RBAC, escalation chains.
-- Demonstrates **engineering skills**:
-    - Modular service design with clear separation of concerns.
-    - Stateful workflow handling with scheduling + notifications.
-    - Database versioning with Flyway.
-    - RBAC implementation for enterprise-grade access control.
-- Mirrors systems like **PagerDuty / OpsGenie** in core functionality.
+Escalation logic is modeled as **data**, not hardcoded control flow.
 
 ---
 
-## 🚦 Getting Started
+### Delayed Execution & Escalation
 
-### Prerequisites
-- Java 17+
-- Maven
-- PostgreSQL
+AlertOps uses **RabbitMQ delayed queues** to schedule alert execution.
 
-### Setup
-```bash
-# Clone repo
-git clone https://github.com/your-username/alert_ops.git
-cd alert_ops
+This enables:
+- precise delays without active polling
+- retry handling without duplicate sends
+- clean separation between scheduling and execution
 
-# Configure DB and environment in application.yml
-# Example: DATABASE_URL, APP_PORT, credentials
+Escalation becomes event-driven rather than time-loop-driven.
 
-# Run migrations with Flyway
-./mvnw flyway:migrate
+---
 
-# Start the Spring Boot app
-./mvnw spring-boot:run
+### Reliability & Recovery
+
+AlertOps assumes that failures will happen.
+
+On application startup:
+- in-progress alert executions are recovered
+- pending nodes are revalidated
+- escalation resumes without manual intervention
+
+This prevents silent drops and duplicate executions after restarts.
+
+---
+
+## High-Level Architecture
+
+- Java & Spring Boot backend
+- JWT-based authentication and authorization
+- RabbitMQ for delayed execution and retries
+- Postgres for data storage
+- Persistent database-backed state
+- Event-driven processing model
+
+The system favors explicit state transitions over implicit timing assumptions.
+
+---
+
+## Design Tradeoffs
+
+- Delayed queues were chosen over cron jobs to avoid polling and race conditions.
+- State is persisted aggressively to enable crash-safe recovery.
+- Additional complexity is accepted in favor of correctness under failure.
+
+AlertOps optimizes for **reliability and determinism**, not minimal code.
+
+---
+
+## What This Project Is (and Is Not)
+
+### It Is
+- A backend-focused system design project
+- A practical exploration of alerting and escalation workflows
+- A demonstration of queue-based, time-aware execution
+
+### It Is Not
+- A UI-centric application
+- A simple notification sender
+
+---
+## Project Status
+
+AlertOps is an actively evolving system. Core escalation workflows,
+delayed execution, and recovery mechanisms are implemented.
+
+Additional delivery channels and operational controls are explored
+incrementally as part of the project’s evolution.
