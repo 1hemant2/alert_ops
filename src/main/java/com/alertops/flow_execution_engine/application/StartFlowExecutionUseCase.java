@@ -41,7 +41,7 @@ public class StartFlowExecutionUseCase {
               throw new RuntimeException("Escalation not found for id: " + escalationId);
             }
  
-            if("IDLE".equals(escalation.getStatus())) {
+            if(!"IDLE".equals(escalation.getStatus())) {
               throw new RuntimeException("Escalation is either IN_PROGRESS or COMPLETED for id: " + escalationId);
             }
             

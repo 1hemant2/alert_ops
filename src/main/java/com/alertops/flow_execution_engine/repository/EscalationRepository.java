@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import com.alertops.flow_execution_engine.model.Escalation;
 
-import jakarta.persistence.LockModeType;
+// import jakarta.persistence.LockModeType;
 
 @Repository
 public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
@@ -22,7 +22,7 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Query("select e from Escalation e where e.id = :id and e.teamId = :teamId")
       Escalation findByIdAndTeamId(UUID id, UUID teamId);
 
-      @Lock(LockModeType.PESSIMISTIC_WRITE)
+      // @Lock(LockModeType.PESSIMISTIC_WRITE)
       @Modifying
       @Query("UPDATE Escalation e SET e.status = :status WHERE e.id = :id")
       int updateStatus(@Param("id") UUID id, @Param("status") String status);

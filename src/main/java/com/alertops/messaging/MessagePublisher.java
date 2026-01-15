@@ -1,34 +1,39 @@
-// package com.alertops.messaging;
+package com.alertops.messaging;
+
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 
 
-// // import com.example.mes.RabbitMQConfig;
-// import com.example.scheduler.dto.ScheduledEvent;
-// import org.springframework.amqp.rabbit.core.RabbitTemplate;
-// import org.springframework.beans.factory.annotation.Autowired;
-// import org.springframework.stereotype.Service;
+@Component
+public class MessagePublisher {
+    @Autowired
+    RabbitTemplate rabbitTemplate;
+    FlowExecutionStateRepository flowExecutionStateRepository;
 
-// import com.alertops.configuration.RabbitMqConfig;
-// import com.alertops.dto.schedular.ScheduledEvent;
+    MessagePublisher(FlowExecutionStateRepository flowExecutionStateRepository) {
+        this.flowExecutionStateRepository = flowExecutionStateRepository;
+    }
 
-
-// @Service
-// public class MessagePublisher {
-//     @Autowired
-//     RabbitTemplate rabbitTemplate;
-
-//     public void publishWithDelay(ScheduledEvent event, long delayMs) {
-
-//         rabbitTemplate.convertAndSend(
-//                 RabbitMqConfig.NORMAL_EXCHANGE,
-//                 RabbitMqConfig.DELAY_ROUTING_KEY,
-//                 event,
-//                 message -> {
-//                     message.getMessageProperties().setExpiration(String.valueOf(delayMs));
-//                     message.getMessageProperties().setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
-//                     return message;
-//                 }
-//         );
-
-//         System.out.println("Sent: " + " with delay " + delayMs + "ms");
-//     }
-// }
+    public void publishWithDelay(FlowExecutionState flowExecutionState) {
+        try {
+            flowExecutionState.setExecutionState("ACTIVE");
+            flowExecutionStateRepository.save(flowExecutionState);
+            System.out.println("duration: --> " + flowExecutionState.getDuration().toMillis());
+            rabbitTemplate.convertAndSend(
+                RabbitMqConfig.NORMAL_EXCHANGE,
+                RabbitMqConfig.DELAY_ROUTING_KEY,
+                flowExecutionState,
+                message -> {
+                    message.getMessageProperties().setExpiration(String.valueOf(flowExecutionState.getDuration().toMillis()));
+                    message.getMessageProperties().setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
+                    return message;
+                }
+            );
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Failed to publish delayed message", e);
+        }
+    }
+}

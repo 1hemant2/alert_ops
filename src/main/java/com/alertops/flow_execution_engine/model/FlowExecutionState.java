@@ -5,6 +5,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -29,6 +31,18 @@ public class FlowExecutionState {
     private UUID processId;
     private Instant createdAt;
     private Instant updatedAt;
+
+    // rule: is retry behavior enabled for this node?
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean retryOnFailureEnabled;
+
+    // rule: maximum retry attempts allowed (excluding first send)
+    @Column(nullable = false, columnDefinition = "int default 0")
+    private int maxRetryAttempts;
+
+    // state: total number of send attempts already made
+    @Column(nullable = false, columnDefinition = "int default 0")
+    private int sendAttemptCount;
 
     @PrePersist
     void onCreate() {
@@ -136,6 +150,28 @@ public class FlowExecutionState {
         this.updatedAt = updatedAt;
     }
 
-    
+    public boolean isRetryOnFailureEnabled() {
+        return retryOnFailureEnabled;
+    }
+
+    public void setRetryOnFailureEnabled(boolean retryOnFailureEnabled) {
+        this.retryOnFailureEnabled = retryOnFailureEnabled;
+    }
+
+    public int getMaxRetryAttempts() {
+        return maxRetryAttempts;
+    }
+
+    public void setMaxRetryAttempts(int maxRetryAttempts) {
+        this.maxRetryAttempts = maxRetryAttempts;
+    }
+
+    public int getSendAttemptCount() {
+        return sendAttemptCount;
+    }
+
+    public void setSendAttemptCount(int sendAttemptCount) {
+        this.sendAttemptCount = sendAttemptCount;
+    }
 
 }
