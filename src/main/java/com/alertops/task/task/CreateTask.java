@@ -1,4 +1,4 @@
-package com.alertops.dto.task;
+package com.alertops.task.task;
 
 
 public class CreateTask {

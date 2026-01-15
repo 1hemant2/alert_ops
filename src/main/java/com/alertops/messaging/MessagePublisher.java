@@ -20,8 +20,6 @@ public class MessagePublisher {
     public void publishWithDelay(FlowExecutionState flowExecutionState) {
         try {
             flowExecutionState.setExecutionState("ACTIVE");
-            flowExecutionStateRepository.save(flowExecutionState);
-            System.out.println("duration: --> " + flowExecutionState.getDuration().toMillis());
             rabbitTemplate.convertAndSend(
                 RabbitMqConfig.NORMAL_EXCHANGE,
                 RabbitMqConfig.DELAY_ROUTING_KEY,
@@ -32,6 +30,7 @@ public class MessagePublisher {
                     return message;
                 }
             );
+            flowExecutionStateRepository.save(flowExecutionState);
         } catch (RuntimeException e) {
             throw new RuntimeException("Failed to publish delayed message", e);
         }

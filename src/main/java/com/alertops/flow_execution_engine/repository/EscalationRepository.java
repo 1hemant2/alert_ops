@@ -1,5 +1,6 @@
 package com.alertops.flow_execution_engine.repository;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -26,5 +27,7 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Modifying
       @Query("UPDATE Escalation e SET e.status = :status WHERE e.id = :id")
       int updateStatus(@Param("id") UUID id, @Param("status") String status);
+
+      List<Escalation> findAllByStatus(String status);
 }
 
