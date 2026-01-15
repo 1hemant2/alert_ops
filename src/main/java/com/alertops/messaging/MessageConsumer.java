@@ -1,68 +1,124 @@
-// package com.alertops.messaging;
+package com.alertops.messaging;
 
-// import org.springframework.amqp.rabbit.annotation.RabbitListener;
-// import org.springframework.stereotype.Service;
-// import org.springframework.transaction.annotation.Transactional;
+import java.util.UUID;
 
-// import com.alertops.configuration.RabbitMqConfig;
-// import com.alertops.dto.schedular.ScheduledEvent;
-// import com.alertops.model.ScheduledTask;
-// import com.alertops.repository.ScheduledTaskRepository;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.repository.EscalationRepository;
+import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 
-// import java.util.Optional;
-
-
-// @Service
-// public class MessageConsumer {
-//     private final MessageExecutor executor;
-//     private final ScheduledTaskRepository repo;
-//    // private final MessagePublisher publisher;
-
-
-//     public MessageConsumer(MessageExecutor executor, ScheduledTaskRepository repo, MessagePublisher publisher) {
-//         this.executor = executor;
-//         this.repo = repo;
-//       //  this.publisher = publisher;
-//     }
+@Component
+public class MessageConsumer {
+   private final Notification notification;
+   private final FlowExecutionStateRepository flowExecutionStateRepository;
+   private final EscalationRepository esclEscalationRepository;
+   private final MessagePublisher messagePublisher;
 
 
-//     @RabbitListener(queues = RabbitMqConfig.FINAL_QUEUE)
-//     @Transactional(readOnly = false)
-//     public void onMessage(ScheduledEvent event) {
-//         process(event.getId(), event.getEmail(), event.getMessage());
-//     }
+    public MessageConsumer(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository,
+        Notification notification, MessagePublisher messagePublisher
+    ) {
+        this.flowExecutionStateRepository = flowExecutionStateRepository;
+        this.esclEscalationRepository = escalationRepository;
+        this.notification = notification;
+        this.messagePublisher = messagePublisher;
+    }
 
 
-//     @Transactional(readOnly = false, propagation = org.springframework.transaction.annotation.Propagation.REQUIRED)
-//     public void process(Long taskId, String email, String message) {
-//         Optional<ScheduledTask> opt = repo.findById(taskId);
-//         if (opt.isEmpty()) return; // nothing to do
-//         ScheduledTask task = opt.get();
-//         // Idempotency: if already DONE or PROCESSING, skip
-//         if ("DONE".equals(task.getStatus()) || "PROCESSING".equals(task.getStatus())) {
-//             return;
-//         }
+    @RabbitListener(queues = RabbitMqConfig.FINAL_QUEUE)
+    @Transactional
+    public void onMessage(FlowExecutionState flowExecutionState) {
+        try {
+            UUID processId = flowExecutionState.getProcessId();
 
-//         // mark processing
-//         task.setStatus("PROCESSING");
-//         repo.save(task);
+            if(processId == null) {
+                //send the esclation failed notification who have created the escalation
+                throw new RuntimeException("Escalation failed");
+            }
 
-//         boolean sent = false;
-//         try {
-//             sent = executor.send(email, message);
-//         } catch (Exception ex) {
-//             task.setAttempts(task.getAttempts() + 1);
-//             task.setLastError(ex.getMessage());
-//             task.setStatus("FAILED");
-//             repo.save(task);
-//             return;
-//         }
+            Escalation escalation = esclEscalationRepository.findById(processId).orElse(null);
 
-//         if (sent) {
-//             task.setStatus("DONE");
-//             task.setAttempts(task.getAttempts() + 1);
-//             repo.save(task);
-//         }
-//     }
-// }
+            if(escalation != null) {
+                consume(flowExecutionState, escalation);
+            } else {
+                //send the mail escalation failed 
+                throw new RuntimeException("Something went wrong while getting the escaltion");
+            }
+
+        } catch (Exception e) {
+            System.out.println("Something went wrong" + e.getMessage());
+        };
+    }
+
+
+    public void consume(FlowExecutionState flowExecutionState, Escalation escalation) {
+        try {
+            String esclationStatus  = escalation.getStatus();
+            String flowExecutionNodeStatus = flowExecutionState.getExecutionState();
+            String notificationStatus = flowExecutionState.getNotificationState();
+            boolean retryOnFailureEnabled = flowExecutionState.isRetryOnFailureEnabled();
+            int maxRetryAttempts = flowExecutionState.getMaxRetryAttempts();
+            int sendAttemptCount = flowExecutionState.getSendAttemptCount();
+            FlowExecutionState nextNode = flowExecutionStateRepository.
+                                            findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "PENDING");
+
+            if(esclationStatus.equals("RUNNING") && flowExecutionNodeStatus.equals("ACTIVE") ) {
+                if(notificationStatus.equals("NOT_SENT")) {
+                    boolean mailSent = notification.sendEmail(flowExecutionState);
+                    if(mailSent) {
+                       // change node status terminal, notification status sent
+                       flowExecutionState.setExecutionState("TERMINAL");
+                       flowExecutionState.setNotificationState("SENT");
+                       flowExecutionStateRepository.save(flowExecutionState);
+                       if(nextNode == null) {
+                          escalation.setStatus("COMPLETED"); 
+                          escalation.setResolutionType("EXHAUSTED"); 
+                          esclEscalationRepository.save(escalation);
+                       } else {
+                           messagePublisher.publishWithDelay(nextNode);
+                       }
+                    } else {
+                        if(retryOnFailureEnabled && sendAttemptCount < maxRetryAttempts) {
+                           // don't change node status, notification_status, increase retry count push the same node
+                            // publish current node again to delay Q.
+                            flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
+                            flowExecutionStateRepository.save(flowExecutionState);
+                            messagePublisher.publishWithDelay(flowExecutionState);
+                        } else {
+                            // change the node status as failed, notification status failed, push the next node
+                            flowExecutionState.setExecutionState("TERMINAL");
+                            flowExecutionState.setNotificationState("FAILED");
+                            flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
+                            if(nextNode == null) {
+                               escalation.setStatus("COMPLETED");
+                               escalation.setResolutionType("EXHAUSTED"); 
+                               esclEscalationRepository.save(escalation);
+                            } else {
+                                messagePublisher.publishWithDelay(nextNode);
+                            }
+                        }
+                    }
+                    flowExecutionStateRepository.save(flowExecutionState);
+                }
+            } 
+        } catch (Exception e) {
+            //send the email node has been failed to execute 
+            flowExecutionState.setExecutionState("FAILED");
+            flowExecutionState.setNotificationState("FAILED");
+            flowExecutionStateRepository.save(flowExecutionState);
+            FlowExecutionState nextNode = flowExecutionStateRepository.
+                                            findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "IDLE");
+            if(nextNode == null) {
+               escalation.setStatus("COMPLETED");
+               escalation.setResolutionType("EXHAUSTED"); 
+               esclEscalationRepository.save(escalation);
+            } else {
+                messagePublisher.publishWithDelay(nextNode);
+            }
+        }
+    }
+}

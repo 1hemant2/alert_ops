@@ -10,22 +10,26 @@ import com.alertops.flow.model.Node;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+import com.alertops.messaging.MessagePublisher;
 import com.alertops.task.model.Task;
 
 @Service
 public class FlowExecutionStateService {
     FlowExecutionStateRepository flowExecutionStateRepository;
     EscalationRepository escalationRepository;
+    MessagePublisher messagePublisher;
 
-    public FlowExecutionStateService(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository) {
+    public FlowExecutionStateService(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository, MessagePublisher messagePublisher) {
          this.flowExecutionStateRepository = flowExecutionStateRepository;
          this.escalationRepository = escalationRepository;
+         this.messagePublisher = messagePublisher;
     }
 
     @Transactional
     public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId) {
         try {
-            
+            escalationRepository.updateStatus(escalationId, "RUNNING");
+
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();
                 flowExecutionState.setExecutionState("PENDING");
@@ -39,8 +43,9 @@ public class FlowExecutionStateService {
                 flowExecutionState.setTaskId(node.getId());
                 flowExecutionStateRepository.save(flowExecutionState);
             }
-            // publishNodeToDelayQ(escalationId);   
-           return "Started Flow Execution for escalationId: ";
+            FlowExecutionState flowExecutionState = flowExecutionStateRepository.findTopByProcessIdOrderByPositionAsc(escalationId);
+            messagePublisher.publishWithDelay(flowExecutionState);
+            return "Started Flow Execution for escalationId: " + escalationId;
         } catch (RuntimeException e) {
             throw e;
         }
