@@ -116,3 +116,48 @@ delayed execution, and recovery mechanisms are implemented.
 
 Additional delivery channels and operational controls are explored
 incrementally as part of the project’s evolution.
+
+---
+
+## Run With Docker
+
+This repository includes:
+- `Dockerfile` for building the Spring Boot application image
+- `docker-compose.yml` for running app + PostgreSQL + RabbitMQ together
+
+### Prerequisites
+
+- Docker
+- Docker Compose (v2)
+
+### Start the full stack
+
+```bash
+docker compose up --build
+```
+
+### Services and ports
+
+- App: `http://localhost:8096`
+- Actuator: `http://localhost:8096/actuator`
+- RabbitMQ UI: `http://localhost:15672` (username: `guest`, password: `guest`)
+- PostgreSQL: `localhost:5432` (db: `alert_ops`, user: `root`, password: `root`)
+
+### Stop services
+
+```bash
+docker compose down
+```
+
+### Stop and remove database volume
+
+```bash
+docker compose down -v
+```
+
+### Notes
+
+- The app connects to containers using Docker service names:
+  - PostgreSQL host: `postgres`
+  - RabbitMQ host: `rabbitmq`
+- App runtime settings are passed through environment variables in `docker-compose.yml`.
