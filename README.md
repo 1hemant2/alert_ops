@@ -132,6 +132,8 @@ This repository includes:
 
 ### Start the full stack
 
+Copy `.env.example` to `.env`, replace every placeholder, and then run:
+
 ```bash
 docker compose up --build
 ```
@@ -140,8 +142,11 @@ docker compose up --build
 
 - App: `http://localhost:8096`
 - Actuator: `http://localhost:8096/actuator`
-- RabbitMQ UI: `http://localhost:15672` (username: `guest`, password: `guest`)
-- PostgreSQL: `localhost:5432` (db: `alert_ops`, user: `root`, password: `root`)
+- RabbitMQ UI: `http://localhost:15672` (credentials come from `.env`)
+- PostgreSQL: `localhost:5432` (database and credentials come from `.env`)
+- Redis: `localhost:6379` (password comes from `.env`)
+
+The host ports above are defaults and can also be overridden in `.env`.
 
 ### Stop services
 
@@ -161,6 +166,8 @@ docker compose down -v
   - PostgreSQL host: `postgres`
   - RabbitMQ host: `rabbitmq`
 - App runtime settings are passed through environment variables in `docker-compose.yml`.
+- Redis is provisioned and health-checked in Phase 0, but AlertOps still uses its
+  in-memory cache until the later cache-migration phase.
 
 ---
 

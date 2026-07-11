@@ -41,12 +41,15 @@ different scaling rules from the stateless AlertOps application.
 Do the phases in order. In particular, do not begin by copying YAML into a cloud
 cluster: first prove the same image and configuration locally.
 
+Current lesson: [Phase 0 - production readiness](phase-0-readiness.md)
+
 ## Phase 0 audit (current repository)
 
-The application builds on Java 17 and already has a multi-stage, non-root Docker
-image plus a Compose stack for PostgreSQL and RabbitMQ. Spring Boot Actuator is
-present. The current Maven build succeeds, but Maven reports that there are no test
-sources.
+The application builds on Java 17 and has a multi-stage, non-root Docker image plus a
+Compose stack for PostgreSQL, RabbitMQ, and authenticated Redis. Spring Boot Actuator
+is present. The Maven build now runs the first JWT unit tests; broader service and
+integration coverage is still required. Redis is infrastructure-only in Phase 0; the
+application cache migration remains later work.
 
 Before treating the image as production-ready, fix these items:
 
