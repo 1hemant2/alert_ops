@@ -41,7 +41,9 @@ different scaling rules from the stateless AlertOps application.
 Do the phases in order. In particular, do not begin by copying YAML into a cloud
 cluster: first prove the same image and configuration locally.
 
-Current lesson: [Phase 0 - production readiness](phase-0-readiness.md)
+Completed foundation: [Phase 0 - production readiness](phase-0-readiness.md)
+
+Current lesson: [Phase 1 - Docker and Compose foundations](phase-1-docker-foundations.md)
 
 ## Phase 0 audit (current repository)
 
