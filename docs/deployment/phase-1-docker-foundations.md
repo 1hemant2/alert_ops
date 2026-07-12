@@ -214,6 +214,36 @@ application retries.
 An AlertOps container health check will be added during Phase 1. Spring Actuator
 already supplies the endpoints that it can test.
 
+### AlertOps health-check exercise (completed)
+
+The `app` service now calls the Actuator health endpoint from inside its own container:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8096/actuator/health"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 30s
+```
+
+The check uses `localhost` because it is executed inside the AlertOps container. It
+uses the container port, not a host port. `curl --fail` returns a non-zero exit code
+for an HTTP error, which Docker interprets as a failed check.
+
+The configuration was applied by recreating the app container and verified with:
+
+```powershell
+docker compose config --quiet
+docker compose up -d --no-deps --force-recreate app
+docker compose ps app
+```
+
+The observed status was `Up ... (healthy)`. The JWT filter initially logged every
+probe request, so `/actuator/health` and its subpaths are now excluded from JWT token
+processing. Spring Security still explicitly controls whether those endpoints are
+public; filter exclusion and endpoint authorization are different responsibilities.
+
 ## Command reference
 
 Run these commands from the repository root:
