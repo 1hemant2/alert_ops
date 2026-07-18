@@ -309,6 +309,38 @@ probe request, so `/actuator/health` and its subpaths are now excluded from JWT 
 processing. Spring Security still explicitly controls whether those endpoints are
 public; filter exclusion and endpoint authorization are different responsibilities.
 
+## Graceful shutdown exercise (completed)
+
+Docker sends its main container process `SIGTERM` when stopping it. Because the
+Dockerfile uses the exec-form `ENTRYPOINT`, Java is PID 1 and receives that signal
+directly. Spring Boot can then stop accepting new requests, wait for active work, and
+close application resources before exiting.
+
+Production configuration allows Spring up to 30 seconds per shutdown phase. Compose
+allows the container slightly longer so it does not send a forced `SIGKILL` while
+Spring is still cleaning up:
+
+```yaml
+app:
+  stop_grace_period: 40s
+```
+
+The applied container configuration reported a 40-second stop timeout. Its logs
+showed graceful Tomcat shutdown beginning and completing, followed by closure of the
+JPA entity manager and Hikari database pool. The container then started again and
+returned to `healthy`.
+
+`docker compose start app` and `docker compose up -d app` are not interchangeable:
+
+- `start` starts an existing stopped container with its existing configuration. It
+  does not build an image, create a missing container, or apply Compose-file changes.
+- `up` reconciles the declared Compose state. It creates missing resources and may
+  recreate a container when its image or configuration has changed. It also processes
+  declared dependencies; `-d` leaves the services running in the background.
+
+Use `start` after a simple manual stop when nothing changed. Use `up -d` after editing
+Compose, changing an image/build, or when the resources might not exist.
+
 ## Command reference
 
 Run these commands from the repository root:
