@@ -500,6 +500,46 @@ quickly, but it can also remove every replica during a shared dependency outage.
 Liveness should normally answer whether this process is stuck and needs restarting,
 not whether a remote dependency is available.
 
+## Full-stack persistence drill (completed)
+
+Individual service restarts do not fully prove Compose lifecycle persistence. The
+complete stack was removed with `docker compose down` (without `-v`) and recreated
+with `docker compose up -d`. `down` removed all four containers and the project
+network, while these named volumes remained:
+
+```text
+alert_ops_postgres_data
+alert_ops_rabbitmq_data
+alert_ops_redis_data
+```
+
+Before teardown, the drill recorded independent storage markers:
+
+- PostgreSQL cluster system identifier `7661185378394243107`;
+- durable RabbitMQ queue `phase1.persistence.test`;
+- Redis key `phase1:persistence` with value `survived`.
+
+After recreation, PostgreSQL returned the same system identifier, RabbitMQ listed the
+same durable queues, and Redis returned the marker value. Flyway reported that schema
+`public` was already up to date instead of initializing a new database. AlertOps and
+all infrastructure health checks returned healthy.
+
+The PostgreSQL system identifier is a read-only fingerprint generated when a database
+cluster is initialized. Matching values before and after recreation provide evidence
+that PostgreSQL reused the same data directory. On PowerShell, avoiding nested
+`sh -c` quoting made the check more reliable:
+
+```powershell
+$pgUser = (docker compose exec -T postgres printenv POSTGRES_USER).Trim()
+$pgDb = (docker compose exec -T postgres printenv POSTGRES_DB).Trim()
+docker compose exec -T postgres psql -U $pgUser -d $pgDb -tA -c "SELECT system_identifier FROM pg_control_system();"
+```
+
+Named-volume persistence is not a backup. A volume can still be deleted with
+`docker compose down -v`, corrupted, lost with its Docker host, or damaged by an
+application error. Production requires independent backups stored outside the host,
+retention policy, encryption, and tested restoration procedures.
+
 ## Command reference
 
 Run these commands from the repository root:
