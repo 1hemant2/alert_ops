@@ -19,12 +19,15 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: alertops-rabbitmq
+    hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER in .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
     ports:
       - "${RABBITMQ_HOST_PORT:-5672}:5672"
       - "${RABBITMQ_UI_HOST_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -69,7 +72,6 @@ services:
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?Set JWT_SECRET_BASE64 in your local .env file}
     ports:
       - "${APP_HOST_PORT:-8096}:8096"
-
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8096/actuator/health"]
       interval: 10s
@@ -80,4 +82,5 @@ services:
 
 volumes:
   postgres_data:
+  rabbitmq_data:
   redis_data:

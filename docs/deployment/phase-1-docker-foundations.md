@@ -168,15 +168,50 @@ They are mounted as follows:
 
 ```text
 PostgreSQL container -> postgres_data -> database files survive recreation
+RabbitMQ container   -> rabbitmq_data -> broker definitions and data survive recreation
 Redis container      -> redis_data    -> append-only data survives recreation
 ```
 
 Docker manages the physical location of named volumes. We normally refer to them by
 name instead of editing their files directly.
 
-RabbitMQ does not currently have a named volume in this Compose file. Its local broker
-data will therefore be lost if its container is removed. Adding and testing RabbitMQ
-persistence is a later Phase 1 improvement.
+RabbitMQ also has a stable `hostname: rabbitmq`. RabbitMQ stores its node database
+under an identity derived from its node name/hostname. A named volume alone is not
+enough when every recreated container starts with a different generated hostname.
+
+### RabbitMQ persistence exercise (completed)
+
+The RabbitMQ service now declares both stable storage and stable node identity:
+
+```yaml
+rabbitmq:
+  hostname: rabbitmq
+  volumes:
+    - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:
+```
+
+The first test used the named volume without a stable hostname. Docker preserved the
+volume, but after container recreation RabbitMQ selected a new node data directory and
+the durable test queue appeared to be lost. Adding the stable hostname fixed that
+node-identity problem.
+
+The successful test was:
+
+1. Recreate RabbitMQ with the named volume and stable hostname.
+2. Declare the durable queue `phase1.persistence.test`.
+3. Stop and remove only the RabbitMQ container.
+4. Create RabbitMQ again from the Compose configuration.
+5. Wait for its health check to pass.
+6. List queues and confirm `phase1.persistence.test` still exists and is durable.
+
+The container was new, while `alert_ops_rabbitmq_data` remained. This proves that the
+queue definition lived in persistent storage rather than only in the removed
+container. A durable queue is only part of message durability: publishers must also
+mark important messages as persistent, and production RabbitMQ still needs backups,
+replication, monitoring, and restore testing.
 
 ### Safe and destructive cleanup
 
