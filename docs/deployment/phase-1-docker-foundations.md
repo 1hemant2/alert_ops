@@ -85,6 +85,36 @@ Redis is running as infrastructure, but AlertOps still uses its in-memory cache 
 this stage. Running a dependency and integrating application code with it are separate
 tasks.
 
+## Reproducible image pinning (completed)
+
+Broad image tags such as `postgres:16-alpine` are mutable labels: the same Git commit
+could download different patch releases or operating-system packages at different
+times. AlertOps now combines a readable exact tag with an immutable content digest:
+
+```text
+repository:exact-version@sha256:exact-image-content
+```
+
+The selected service versions are PostgreSQL 16.14, RabbitMQ 3.13.7, and Redis 7.4.9.
+The Dockerfile also pins both stages of the application build:
+
+- Maven 3.9.9 with the Temurin 17 JDK compiles and packages the fat JAR.
+- Temurin JRE 17.0.19+10 runs the JAR in the final image.
+
+Tags communicate the version to humans; digests ensure that developers, CI, and
+deployment nodes receive identical image content. Pinning does not mean avoiding
+upgrades. It makes upgrades deliberate Git changes that can be tested and rolled back.
+
+The application image does not bake in `SPRING_PROFILES_ACTIVE`. Compose supplies
+`prod` when creating this local container, and future Kubernetes manifests will select
+the profile at runtime. This lets the same immutable application image move through
+development, staging, and production with environment-specific configuration.
+
+Verification included a clean test run, an image rebuild with `--pull`, all four
+containers reporting healthy, Java 17.0.19 inside the app container, the `prod` profile
+in Spring startup logs, an `UP` Actuator response, and the durable RabbitMQ queue still
+present.
+
 ## Networks, DNS, and `localhost`
 
 Compose creates a private project network, normally named `alert_ops_default`, and
