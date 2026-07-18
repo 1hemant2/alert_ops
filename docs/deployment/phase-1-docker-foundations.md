@@ -285,7 +285,7 @@ The `app` service now calls the Actuator health endpoint from inside its own con
 
 ```yaml
 healthcheck:
-  test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8096/actuator/health"]
+  test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8096/actuator/health/liveness"]
   interval: 10s
   timeout: 5s
   retries: 5
@@ -294,7 +294,9 @@ healthcheck:
 
 The check uses `localhost` because it is executed inside the AlertOps container. It
 uses the container port, not a host port. `curl --fail` returns a non-zero exit code
-for an HTTP error, which Docker interprets as a failed check.
+for an HTTP error, which Docker interprets as a failed check. The original aggregate
+health URL was changed to liveness after the dependency-failure drill proved that
+remote database and broker outages should not classify the Java process as dead.
 
 The configuration was applied by recreating the app container and verified with:
 
@@ -452,6 +454,51 @@ Depending on the host, cgroup files differ. Cgroup v2 commonly exposes `memory.m
 and `cpu.max`; this Docker Desktop environment uses cgroup v1 files such as
 `memory.limit_in_bytes`, `cpu.cfs_quota_us`, and `cpu.cfs_period_us`. Docker inspection
 and `docker stats` provide a more portable high-level view.
+
+## Dependency failure and recovery drill (completed)
+
+`depends_on` controls Compose startup ordering; it is not continuous supervision.
+Stopping PostgreSQL or RabbitMQ after startup left the AlertOps Java process running.
+This demonstrated why process state, liveness, readiness, and dependency health are
+different signals.
+
+### PostgreSQL outage
+
+With PostgreSQL stopped, the aggregate `/actuator/health` endpoint became unavailable
+or `DOWN`, while `/actuator/health/liveness` remained `UP`. Hikari attempted to obtain
+a connection, timed out after 30 seconds, and logged the database failure. Starting
+the existing PostgreSQL container restored the connection and AlertOps recovered
+without container recreation.
+
+The test exposed an operational problem: the Docker health check called the aggregate
+endpoint every ten seconds. During the outage, overlapping checks repeatedly triggered
+slow database health queries. The Compose app probe now calls the lightweight
+`/actuator/health/liveness` endpoint instead.
+
+### RabbitMQ outage
+
+RabbitMQ behaved differently from JDBC. Its connection closed, the Spring AMQP
+listener reported connection refusal, and the listener container repeatedly attempted
+consumer recovery. After RabbitMQ restarted and became healthy, AlertOps created a new
+AMQP connection automatically. The durable test and application queues remained.
+
+The aggregate health request timed out during the broker outage while liveness stayed
+`UP`. Docker does not automatically restart a container merely because it is marked
+unhealthy; `restart: unless-stopped` applies when its main process exits. A dependency
+outage should not cause a liveness failure and restart loop.
+
+### Redis boundary
+
+Redis was not failure-tested against AlertOps because the application is not connected
+to it yet. Stopping Redis currently cannot affect AlertOps health or behaviour. The
+Redis failure drill belongs with the later cache integration, when it can validate
+timeouts, cache fallback policy, and reconnection.
+
+Readiness policy will be made explicit in the Kubernetes phase. Whether an external
+dependency should make a pod unready is a service-design decision: it can fail traffic
+quickly, but it can also remove every replica during a shared dependency outage.
+Liveness should normally answer whether this process is stuck and needs restarting,
+not whether a remote dependency is available.
 
 ## Command reference
 

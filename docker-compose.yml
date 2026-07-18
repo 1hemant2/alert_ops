@@ -85,7 +85,7 @@ services:
     ports:
       - "${APP_HOST_PORT:-8096}:8096"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8096/actuator/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8096/actuator/health/liveness"]
       interval: 10s
       timeout: 5s
       retries: 5
