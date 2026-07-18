@@ -341,6 +341,118 @@ returned to `healthy`.
 Use `start` after a simple manual stop when nothing changed. Use `up -d` after editing
 Compose, changing an image/build, or when the resources might not exist.
 
+## Container resource limits (completed)
+
+Containers are isolated processes, but without resource controls any one service can
+consume most of the Docker host. CPU and memory behave differently:
+
+```text
+CPU demand above limit    -> execution is throttled; work becomes slower
+Memory usage above limit  -> process may be OOM-killed; container can exit with 137
+```
+
+The local learning limits were selected after measuring the idle stack:
+
+| Service | CPU limit | Memory reservation | Memory limit |
+|---|---:|---:|---:|
+| AlertOps | 1 CPU | 512 MiB | 1 GiB |
+| PostgreSQL | 1 CPU | 256 MiB | 512 MiB |
+| RabbitMQ | 1 CPU | 256 MiB | 512 MiB |
+| Redis | 0.5 CPU | 64 MiB | 256 MiB |
+
+Compose expresses these settings as:
+
+```yaml
+app:
+  cpus: 1.0
+  mem_reservation: 512m
+  mem_limit: 1g
+```
+
+The limit is a hard control. A Compose memory reservation is a soft target used under
+host memory pressure; it is not the same scheduling guarantee as a Kubernetes request.
+These values are learning defaults, not production capacity recommendations.
+Production values require load tests, peak measurements, and safety headroom.
+
+### CPU cores, millicpu, and parallel work
+
+One CPU represents the processing capacity of one logical CPU over time. An eight-core
+or eight-logical-CPU machine can execute roughly eight CPU instruction streams at one
+instant, while the operating-system scheduler lets many more processes and threads
+make progress by rapidly sharing those CPUs. Work waiting for a database, disk, or
+network does not continuously occupy a CPU.
+
+Compose uses decimal CPU units while Kubernetes commonly uses millicpu:
+
+| CPU capacity | Compose | Kubernetes |
+|---:|---:|---:|
+| Quarter CPU | `0.25` | `250m` |
+| Half CPU | `0.5` | `500m` |
+| One CPU | `1.0` | `1000m` or `1` |
+| Two CPUs | `2.0` | `2000m` or `2` |
+
+Here `m` means one-thousandth of a CPU, not megabytes, milliseconds, or minutes.
+Docker does not normally dedicate a particular physical core; all container threads
+share an aggregate processing quota unless CPU affinity is configured separately.
+
+### CPU quota and scheduling periods
+
+A simplified Linux CPU limit uses a quota and a period. The verified one-CPU AlertOps
+configuration reported:
+
+```text
+cpu.cfs_quota_us  = 100000
+cpu.cfs_period_us = 100000
+```
+
+This permits up to 100,000 microseconds of aggregate CPU time per 100,000-microsecond
+quota period: one CPU. A `0.5` CPU limit is conceptually about 50,000 microseconds per
+100,000-microsecond period.
+
+The quota applies to the whole container, not independently to each Java task. The
+scheduler can distribute it across many shorter executions and multiple threads. Two
+threads running simultaneously for 25 ms can together consume 50 ms of CPU time. If
+the container exhausts its quota while work remains runnable, Linux throttles it until
+more quota becomes available. It is not a rule that every task runs exactly 50 ms and
+then waits.
+
+### Reading CPU in Grafana
+
+A CPU panel may display cores, percentage of one core, percentage of the Kubernetes
+request, percentage of the limit, or percentage of the node. Always identify the
+denominator. For example, usage of `500m` is 50% of a one-CPU limit but 200% of a
+`250m` request.
+
+High CPU usage is not automatically a defect. Correlate it with:
+
+- request or message rate;
+- response latency and errors;
+- CPU throttled periods/time;
+- JVM garbage-collection time and heap pressure;
+- deployments and configuration changes;
+- whether one replica or every replica is affected.
+
+Rising traffic with rising CPU and stable latency can be healthy. Unchanged traffic
+followed by sustained CPU at the limit, throttling, and increased latency can indicate
+an expensive code path, retry storm, excessive logging, garbage collection, or a
+regression. Investigate before merely increasing the limit.
+
+### Resource-limit verification
+
+Before limits, every container saw approximately 3.6 GiB of Docker Desktop memory and
+the JVM estimated a 924 MiB maximum heap. After recreation, Docker reported the exact
+configured byte and CPU quotas. AlertOps saw a 1 GiB cgroup memory limit, and
+container-aware Java 17 recalculated its estimated maximum heap to 247.5 MiB.
+
+All four health checks passed, Actuator returned `UP`, and RabbitMQ's durable queues
+remained after recreation. Current idle usage fits the limits, but that does not prove
+production capacity; load testing remains necessary.
+
+Depending on the host, cgroup files differ. Cgroup v2 commonly exposes `memory.max`
+and `cpu.max`; this Docker Desktop environment uses cgroup v1 files such as
+`memory.limit_in_bytes`, `cpu.cfs_quota_us`, and `cpu.cfs_period_us`. Docker inspection
+and `docker stats` provide a more portable high-level view.
+
 ## Command reference
 
 Run these commands from the repository root:
@@ -359,6 +471,7 @@ Run these commands from the repository root:
 | `docker compose down -v` | Remove containers, network, and volumes; deletes local persisted data |
 | `docker volume ls` | List Docker-managed volumes |
 | `docker network ls` | List Docker networks |
+| `docker stats --no-stream` | Snapshot container CPU, memory, network, process, and I/O usage |
 | `docker network inspect alert_ops_default` | Show attached containers and low-level network details |
 | `docker compose exec app <command>` | Run a command inside the running app container |
 

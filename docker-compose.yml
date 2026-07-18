@@ -2,6 +2,9 @@ services:
   postgres:
     image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     container_name: alertops-postgres
+    cpus: 1.0
+    mem_limit: 512m
+    mem_reservation: 256m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
@@ -20,6 +23,9 @@ services:
     image: rabbitmq:3.13.7-management@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
     container_name: alertops-rabbitmq
     hostname: rabbitmq
+    cpus: 1.0
+    mem_limit: 512m
+    mem_reservation: 256m
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER in .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
@@ -37,6 +43,9 @@ services:
   redis:
     image: redis:7.4.9-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: alertops-redis
+    cpus: 0.5
+    mem_limit: 256m
+    mem_reservation: 64m
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
@@ -55,6 +64,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: alertops-app
+    cpus: 1.0
+    mem_limit: 1g
+    mem_reservation: 512m
     depends_on:
       postgres:
         condition: service_healthy
