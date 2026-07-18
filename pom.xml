@@ -100,9 +100,10 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Shared Redis-backed application state -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-cache</artifactId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <dependency>

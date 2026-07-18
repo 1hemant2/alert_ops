@@ -165,9 +165,10 @@ docker compose down -v
 - The app connects to containers using Docker service names:
   - PostgreSQL host: `postgres`
   - RabbitMQ host: `rabbitmq`
+  - Redis host: `redis`
 - App runtime settings are passed through environment variables in `docker-compose.yml`.
-- Redis is provisioned and health-checked in Phase 0, but AlertOps still uses its
-  in-memory cache until the later cache-migration phase.
+- One-time workflow intents use authenticated Redis with JSON values, a configurable
+  TTL, and atomic consumption so application replicas share the same state.
 
 ---
 

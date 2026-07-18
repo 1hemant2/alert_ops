@@ -79,11 +79,11 @@ settings: we declare them in the files above.
 | `app` | `alertops-app` | Spring Boot AlertOps application |
 | `postgres` | `alertops-postgres` | Relational application data |
 | `rabbitmq` | `alertops-rabbitmq` | Asynchronous message broker |
-| `redis` | `alertops-redis` | Shared cache infrastructure for a later code change |
+| `redis` | `alertops-redis` | Shared one-time workflow intent state |
 
-Redis is running as infrastructure, but AlertOps still uses its in-memory cache at
-this stage. Running a dependency and integrating application code with it are separate
-tasks.
+Redis was initially infrastructure-only. AlertOps now connects through Spring Data
+Redis and Lettuce. This distinction matters: running a dependency does not make state
+shared until the application explicitly reads and writes it.
 
 ## Reproducible image pinning (completed)
 
@@ -487,18 +487,58 @@ The aggregate health request timed out during the broker outage while liveness s
 unhealthy; `restart: unless-stopped` applies when its main process exits. A dependency
 outage should not cause a liveness failure and restart loop.
 
-### Redis boundary
+### Redis outage
 
-Redis was not failure-tested against AlertOps because the application is not connected
-to it yet. Stopping Redis currently cannot affect AlertOps health or behaviour. The
-Redis failure drill belongs with the later cache integration, when it can validate
-timeouts, cache fallback policy, and reconnection.
+The Redis drill was completed after intent-cache integration. With Redis stopped,
+aggregate health returned HTTP 503 `DOWN`, while liveness remained HTTP 200 `UP` and
+the application container stayed healthy. After Redis restarted, aggregate health
+returned to `UP` without recreating AlertOps. Intent operations fail closed rather
+than silently treating an unavailable store as a missing one-time intent.
 
 Readiness policy will be made explicit in the Kubernetes phase. Whether an external
 dependency should make a pod unready is a service-design decision: it can fail traffic
 quickly, but it can also remove every replica during a shared dependency outage.
 Liveness should normally answer whether this process is stuck and needs restarting,
 not whether a remote dependency is available.
+
+## Shared Redis intent state (completed)
+
+The original `ConcurrentMapCacheManager` stored intents inside one JVM. An intent
+written by replica A could not be read by replica B, entries had no TTL, and the
+declared delete method was never called. That made horizontal scaling unsafe.
+
+AlertOps now uses Spring Data Redis with Lettuce and a direct `StringRedisTemplate`:
+
+```text
+AlertOps replica A ----\
+                        -> Redis key: alertops:intent:<UUID>
+AlertOps replica B ----/          value: {"type":"JOIN_TEAM"}
+                                  TTL: 10 minutes
+```
+
+Connection host, port, password, timeouts, and intent TTL are runtime configuration.
+Compose waits for authenticated Redis health before starting AlertOps. Development
+defaults to localhost, while production requires injected Redis connection values.
+
+Intent creation writes JSON with a configurable ten-minute default expiry. Successful
+login calls Redis `GETDEL`, which reads and deletes the key atomically. A separate
+`GET` followed by `DELETE` would allow two replicas to read the same one-time value
+between operations; one atomic server operation permits only one consumer.
+
+Verification covered:
+
+- four unit tests for key namespacing, JSON, TTL, reads, and atomic consumption;
+- a real Redis integration test using two independent Lettuce connection factories;
+- replica A writing an intent and replica B reading and consuming it;
+- the first replica observing that the consumed intent no longer exists;
+- a Redis key receiving a 600-second TTL and disappearing after `GETDEL`;
+- aggregate Actuator health including Redis;
+- Redis outage returning aggregate `DOWN` while liveness stayed `UP`;
+- automatic health recovery after Redis restarted.
+
+The integration test is enabled with `REDIS_INTEGRATION_TEST=true` and Redis connection
+environment variables. It remains infrastructure-independent during ordinary unit
+test runs and can be enabled against a GitLab CI Redis service in Phase 3.
 
 ## Full-stack persistence drill (completed)
 

@@ -50,8 +50,8 @@ Current lesson: [Phase 1 - Docker and Compose foundations](phase-1-docker-founda
 The application builds on Java 17 and has a multi-stage, non-root Docker image plus a
 Compose stack for PostgreSQL, RabbitMQ, and authenticated Redis. Spring Boot Actuator
 is present. The Maven build now runs the first JWT unit tests; broader service and
-integration coverage is still required. Redis is infrastructure-only in Phase 0; the
-application cache migration remains later work.
+integration coverage is still required. Phase 1 migrated one-time intent state from
+process memory to authenticated Redis with TTL and atomic consumption.
 
 Before treating the image as production-ready, fix these items:
 
@@ -64,7 +64,7 @@ Before treating the image as production-ready, fix these items:
 - Replace development database and RabbitMQ credentials.
 - Add readiness, liveness, and startup health groups.
 - Decide how PostgreSQL, RabbitMQ, and Redis data are backed up and restored.
-- Replace the in-memory `intent` cache with Redis before running multiple app pods.
+- Verify Redis-backed intent sharing and atomic consumption before multiple app pods. (Completed in Phase 1.)
 - Pin container versions and add image/dependency scanning in CI.
 
 ## Configuration ownership

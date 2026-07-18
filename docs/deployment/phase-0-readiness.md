@@ -116,10 +116,11 @@ Phase 0 provisions an authenticated Redis 7 container, an append-only persistenc
 a named data volume, and a health check. This proves the infrastructure contract before
 horizontal application scaling is introduced.
 
-AlertOps does not connect to Redis yet. Its `intent` cache remains in memory, so the
-application must still run as one replica. A later code phase will add the Redis client,
-serialization and expiry policy, integration tests, and an atomic consume operation.
-Installing Redis alone does not make application state shared.
+At the Phase 0 boundary, AlertOps did not connect to Redis and the `intent` cache
+remained process-local. Phase 1 has since added the Redis client, JSON serialization,
+expiry policy, integration tests, and atomic consume operation. This history preserves
+the distinction: installing Redis alone does not make application state shared; the
+application must explicitly use it.
 
 ## Interview notes
 
