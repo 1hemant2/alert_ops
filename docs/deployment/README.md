@@ -43,7 +43,9 @@ cluster: first prove the same image and configuration locally.
 
 Completed foundation: [Phase 0 - production readiness](phase-0-readiness.md)
 
-Current lesson: [Phase 1 - Docker and Compose foundations](phase-1-docker-foundations.md)
+Completed: [Phase 1 - Docker and Compose foundations](phase-1-docker-foundations.md)
+
+Current lesson: [Phase 2 - local Kubernetes](phase-2-kubernetes.md)
 
 ## Phase 0 audit (current repository)
 

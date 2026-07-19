@@ -663,3 +663,24 @@ The names differ, but these foundations carry forward:
 
 The key idea is declarative operation: describe the desired state in configuration,
 then let an orchestrator create, connect, monitor, and recreate resources.
+
+## Phase 1 definition of done
+
+Phase 1 was audited complete on 2026-07-19:
+
+- [x] Multi-stage, non-root AlertOps image builds from pinned base-image digests.
+- [x] PostgreSQL, RabbitMQ, and Redis images use readable versions plus digests.
+- [x] Compose networking and service-name DNS are verified.
+- [x] PostgreSQL, RabbitMQ, and Redis use named persistent volumes.
+- [x] RabbitMQ has stable node identity and survives container recreation.
+- [x] AlertOps has a lightweight liveness health check.
+- [x] Graceful shutdown completes before Docker's stop timeout.
+- [x] CPU, memory reservation, and memory limits are applied and measured.
+- [x] PostgreSQL, RabbitMQ, and Redis outage/recovery behaviour is recorded.
+- [x] Full-stack teardown preserves all named-volume data without `-v`.
+- [x] One-time intent state is shared through Redis with TTL and atomic consumption.
+- [x] Unit tests pass and the opt-in two-client Redis integration test passes.
+- [x] The full Compose stack returns to healthy after Docker Engine restart.
+
+Phase 2 reuses these concepts as Kubernetes Deployments, Services, probes,
+ConfigMaps, Secrets, resource requests/limits, and PersistentVolumeClaims.
