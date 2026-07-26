@@ -314,15 +314,22 @@ reproducibility reasons used in Phase 1.
 | Storage | Docker named volumes | Local test storage class | Cloud block/file storage |
 | Availability | One host | One laptop | Multi-node and potentially multi-zone |
 
-## Tool status before cluster creation
+## Tool and cluster versions used
 
-The workstation currently has the Docker CLI and `kubectl` client v1.29.2. kind,
-minikube and Helm are not installed. Docker Engine was unavailable during the first
-Phase 2 check, so no cluster tool was installed and no cluster was created.
+The completed local environment uses:
 
-We will restore Docker Desktop first, then install a pinned kind version and compatible
-Kubernetes node image. Helm is intentionally deferred; plain manifests make the basic
-resources easier to understand.
+| Component | Version or value |
+|---|---|
+| Docker Desktop | 4.83 |
+| WSL | 2.7.11 |
+| kubectl client | v1.36.3 |
+| kind | v0.32.0 |
+| kind cluster | `alertops` |
+| Kubernetes node | v1.36.1 |
+| Linux control groups | cgroup v2 |
+
+Helm is intentionally deferred. Plain manifests expose the basic Kubernetes resources
+and relationships instead of hiding them behind templates.
 
 ## Commands will be introduced gradually
 
@@ -379,8 +386,694 @@ Kubernetes has no direct equivalent of Compose `depends_on`. Applications must r
 remote dependencies, and probes/controllers express whether a workload should receive
 traffic or be restarted.
 
-## Phase boundary
+## Phase 2 implementation journal
 
-Do not begin by writing every manifest at once. First prove the cluster, context, node,
-and local image workflow. Then deploy one workload at a time and inspect the Kubernetes
-objects created at each step.
+### 1. Local cluster and terminology
+
+The cluster was created as a pinned kind cluster named `alertops`:
+
+```powershell
+kind create cluster --name alertops --image <pinned-kind-node-image>
+```
+
+- `kind create cluster` creates and initializes the local Kubernetes cluster.
+- `--name alertops` gives the cluster a stable local name.
+- `--image` selects a kind node image containing Kubernetes components and the node
+  runtime. It is not the AlertOps application image.
+
+The commonly confused terms have different scopes:
+
+```text
+kind cluster: alertops
+`-- Docker node container: alertops-control-plane
+    `-- Kubernetes components and containerd
+        `-- application and system Pods
+            `-- one or more workload containers
+```
+
+- A **container** is an isolated process created from an image.
+- `alertops-control-plane` is a Docker container acting as the kind Kubernetes node.
+- The **cluster** is the complete Kubernetes system: API, desired state, nodes,
+  networking, storage integration, and workloads.
+
+The cluster was inspected with:
+
+```powershell
+kubectl config get-contexts
+kubectl get nodes -o wide
+kubectl get namespaces
+kubectl get pods --all-namespaces
+```
+
+A **context** connects a cluster, credentials, and a default namespace. The `*` in
+`kubectl config get-contexts` marks the current context. `-o wide` requests extra
+columns such as IP, OS, kernel, and container runtime. `--all-namespaces` searches
+across every namespace.
+
+The node output showed:
+
+```text
+alertops-control-plane   Ready   control-plane   v1.36.1
+```
+
+`Ready` means the node can accept workloads. This single-node learning cluster runs
+the control plane and application Pods together. Production clusters normally use a
+replicated managed control plane and separate worker nodes.
+
+The initial namespaces were:
+
+| Namespace | Purpose |
+|---|---|
+| `default` | Used when no namespace is specified |
+| `kube-system` | Kubernetes system components |
+| `kube-public` | Publicly readable cluster information |
+| `kube-node-lease` | Lightweight node heartbeats |
+| `local-path-storage` | kind's local storage provisioner |
+
+`kubectl get pods` initially returned `No resources found in default namespace`
+because the cluster was healthy but no user workload existed in `default`.
+
+### 2. Local platform troubleshooting
+
+Docker Desktop initially failed while starting the kind control-plane container.
+Docker Desktop and WSL were upgraded. An obsolete `disableHardwareAcceleration`
+setting was removed after creating this backup:
+
+```text
+C:\Users\ASUS\AppData\Roaming\Docker\settings.json.pre-4.83-backup-20260725-133516
+```
+
+An older `kubectl` executable appeared earlier in `PATH` than the newly installed
+client. A PowerShell profile alias was added so new sessions resolve `kubectl` to
+v1.36.3:
+
+```text
+C:\Users\ASUS\OneDrive\Documents\WindowsPowerShell\profile.ps1
+```
+
+Existing shells do not automatically reread a changed `PATH`. Close and reopen
+PowerShell. If only the PowerShell profile changed, reload it with:
+
+```powershell
+. $PROFILE
+```
+
+`kubectl version --client` verifies the client executable. It does not prove that a
+cluster exists or report its server version.
+
+#### Cgroup and CPU fundamentals
+
+Linux **control groups**, or cgroups, account for and constrain CPU, memory, and other
+resources used by process groups. Kubernetes asks the runtime to place each container
+into cgroups according to its resource configuration. This machine uses cgroup v2,
+the newer unified hierarchy.
+
+CPU values express CPU capacity over time:
+
+- `1000m`, or `1`, means one CPU core of capacity.
+- `500m` means half a core.
+- `250m` means one quarter of a core.
+
+A CPU limit is enforced by throttling CPU time over small accounting periods. It does
+not mean that one Java task always runs for exactly 50 ms and then stops. An eight-core
+machine can execute roughly eight CPU-bound threads simultaneously, while many more
+threads can exist and wait for CPU or I/O. A scheduling window is a short interval
+during which the kernel accounts for CPU usage.
+
+High CPU in Grafana is a signal to investigate, not automatically a fault. Correlate
+it with traffic, throughput, latency, errors, garbage collection, retries, queue
+depth, and CPU-throttling metrics.
+
+### 3. Application image workflow
+
+Docker Compose was not needed to build the Kubernetes application image:
+
+```powershell
+docker build --tag alertops:3514a9d28585 .
+kind load docker-image alertops:3514a9d28585 --name alertops
+```
+
+- `docker build` reads the local Dockerfile and creates the AlertOps image.
+- `--tag`, or `-t`, assigns the readable image name and tag.
+- `.` is the Docker build context.
+- `kind load docker-image` copies the built image into the kind node's containerd
+  image store.
+- `--name alertops` selects the kind cluster.
+
+Compose previously appeared to build the application because its `app` service has a
+`build` instruction. Compose only orchestrated the same Docker build; the Dockerfile
+remained the build definition.
+
+Docker and Git tags solve different problems:
+
+| Item | Points to | Purpose |
+|---|---|---|
+| Git commit | Exact source snapshot | Source history |
+| Git tag | Named Git commit | Release marker or CI trigger |
+| Docker image | Packaged runnable artifact | Deployment |
+| Docker image tag | Readable image reference | Artifact selection |
+| Image digest | Immutable image content | Exact reproducibility |
+
+`docker build -t alertops:3514a9d28585 .` creates an image and attaches that tag.
+`docker tag old-name new-name` does not rebuild or copy its layers; it adds another
+reference to the same local image. In a company workflow, a pushed Git tag often
+triggers CI, which builds and pushes a Docker image. Kubernetes deploys that image,
+not the Git tag.
+
+The image was loaded into kind because Docker Desktop's image store and the kind
+node's containerd store are separate. Cloud worker nodes instead pull images from
+OCIR, ECR, or another registry.
+
+### 4. Namespace, configuration, and secrets
+
+The dedicated namespace was created and inspected with:
+
+```powershell
+kubectl apply -f k8s/base/namespace.yaml
+kubectl get namespace alertops --show-labels
+```
+
+- `apply` creates or updates declared state.
+- `-f` means read the following file.
+- `--show-labels` adds labels to the table output.
+
+Every namespaced manifest explicitly contains:
+
+```yaml
+metadata:
+  namespace: alertops
+```
+
+`kind: ConfigMap` identifies an API resource type; it does not create a namespace.
+`metadata.namespace` places the resource into an already existing namespace.
+
+Non-secret values are committed in `alertops-config`. Sensitive local values were
+created without committing their source file:
+
+```powershell
+kubectl create secret generic alertops-secrets `
+  --namespace alertops `
+  --from-env-file=.env.k8s.local
+```
+
+- `generic` creates an ordinary `Opaque` Secret.
+- `--namespace`, or `-n`, selects the namespace.
+- `--from-env-file` reads key/value pairs from the ignored local file.
+
+The Deployment injects both resources:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: alertops-config
+  - secretRef:
+      name: alertops-secrets
+```
+
+Spring resolves expressions such as `${SPRING_RABBITMQ_HOST}` from the container's
+environment when the application starts.
+
+Secret values can be retrieved and Base64-decoded, but Base64 is encoding rather than
+encryption. Normal inspection should show key names, not values:
+
+```powershell
+kubectl describe secret alertops-secrets -n alertops
+```
+
+Production needs least-privilege RBAC, encryption at rest, and usually an external
+source such as OCI Vault, AWS Secrets Manager, or HashiCorp Vault.
+
+### 5. Labels and selectors
+
+Labels are searchable metadata:
+
+```yaml
+labels:
+  app.kubernetes.io/name: postgres
+  app.kubernetes.io/part-of: alertops
+```
+
+- `name: postgres` identifies the component.
+- `part-of: alertops` groups it with the complete system.
+- Labels under `spec.template.metadata` are copied onto created Pods.
+
+A selector is an active matching rule:
+
+```yaml
+selector:
+  matchLabels:
+    app.kubernetes.io/name: postgres
+```
+
+A StatefulSet selector identifies the Pods it owns. A Service selector identifies
+the Pods that receive its traffic. Selectors must match the Pod-template labels.
+Labels do not route traffic by themselves; selectors use them to form relationships.
+
+The `-l` command option uses the same mechanism for filtering:
+
+```powershell
+kubectl get pods -n alertops -l app.kubernetes.io/name=redis
+```
+
+### 6. StorageClass, provisioner, PV, and PVC
+
+The local StorageClass reported:
+
+```text
+standard (default)   rancher.io/local-path   Delete   WaitForFirstConsumer
+```
+
+| Field | Meaning |
+|---|---|
+| `standard` | Storage policy selected by the PVC |
+| `rancher.io/local-path` | Driver that creates backing local storage |
+| Reclaim policy `Delete` | Delete the PV when its claim is deleted |
+| `WaitForFirstConsumer` | Wait for a Pod before choosing storage placement |
+| Expansion `false` | Existing claims cannot be enlarged through this class |
+
+A provisioner translates a PVC request into real storage. Creating a StorageClass does
+not install a new storage driver; its `provisioner` must name an installed driver.
+OKE and EKS use CSI drivers to provision OCI or AWS block/file volumes.
+
+```text
+Pod mounts PVC
+    -> PVC requests storage
+        -> StorageClass selects policy and provisioner
+            -> provisioner creates PV and backing storage
+```
+
+The PVC was initially `Pending` because `WaitForFirstConsumer` waits until a Pod uses
+it. It became `Bound` when the StatefulSet Pod was scheduled. `RWO`, or
+`ReadWriteOnce`, permits a read/write mount from a single node.
+
+### 7. Why StatefulSet, Service, and PVC are separate
+
+Each stateful dependency uses three objects because each solves a different problem:
+
+```text
+StatefulSet -> creates and replaces the process Pod with stable identity
+Service     -> provides stable DNS and selects the current Pod
+PVC         -> preserves data independently of Pod lifetime
+```
+
+For PostgreSQL:
+
+- StatefulSet creates `postgres-0` and recreates it when necessary.
+- Service provides `postgres:5432`; AlertOps never relies on a temporary Pod IP.
+- PVC mounts at `/var/lib/postgresql/data`.
+
+RabbitMQ and Redis use the same model. A StatefulSet alone would not provide the
+application-facing Service or persistent disk. A Service alone would not create a
+Pod. A PVC alone would only request storage.
+
+The following command displays all four layers together:
+
+```powershell
+kubectl get statefulset,pod,pvc,service -n alertops
+```
+
+This single-replica design teaches identity and persistence, but it is not highly
+available. Production PostgreSQL, RabbitMQ, and Redis require product-specific
+replication, quorum, backups, restore tests, and disruption planning. Simply setting
+their replica count to three does not safely create a database or broker cluster.
+
+### 8. RabbitMQ startup-probe failure
+
+RabbitMQ initially restarted because an executable startup probe could race with
+Erlang cookie creation. A probe running as root could create a root-owned cookie
+before RabbitMQ, running as UID 999, could read it.
+
+The startup probe was changed to:
+
+```yaml
+startupProbe:
+  tcpSocket:
+    port: amqp
+```
+
+This checks whether AMQP is listening without executing a cookie-dependent command.
+Readiness and liveness retain RabbitMQ diagnostics after startup. The replacement Pod
+became ready with the same PVC, and the Service selected its new IP automatically.
+
+Probes run inside the container and can have side effects. Probe commands should be
+safe, lightweight, and permission-aware.
+
+### 9. Redis authentication and AOF persistence
+
+Redis returned an authenticated `PONG`. An unauthenticated request returned:
+
+```text
+NOAUTH Authentication required.
+```
+
+The configuration enables:
+
+```text
+appendonly yes
+appendfsync everysec
+```
+
+Redis normally serves reads from memory. Its write path is approximately:
+
+```text
+SET/DEL/INCR
+    -> update memory
+    -> append the command to AOF under /data
+    -> flush it to PVC-backed storage
+```
+
+`appendfsync everysec` balances performance and durability; a sudden host loss can
+lose approximately the latest second of writes. On restart, Redis replays the AOF to
+reconstruct memory. AOF improves recovery but is not a substitute for backups.
+
+### 10. AlertOps Deployment and Service
+
+AlertOps runs in a Deployment because shared intent state was moved to Redis and the
+application replicas are intended to be stateless. The final desired count is:
+
+```yaml
+replicas: 3
+```
+
+The Deployment uses:
+
+- the commit-SHA image tag;
+- ConfigMap and Secret environment injection;
+- resource requests and limits;
+- startup, readiness, and liveness probes;
+- container security restrictions;
+- `maxUnavailable: 0` and `maxSurge: 1` rolling updates.
+
+Requests are considered by the scheduler. Limits constrain actual use. A `250m` CPU
+request reserves scheduling capacity equal to a quarter of a CPU. A CPU limit of `1`
+allows up to one CPU of time. A memory limit is a hard ceiling and exceeding it may
+cause an OOM kill.
+
+The ClusterIP Service provides stable internal discovery:
+
+```text
+service/alertops -> ready AlertOps Pod endpoints on port 8096
+```
+
+Local access was tested with:
+
+```powershell
+kubectl port-forward service/alertops 8096:8096 -n alertops
+Invoke-RestMethod http://localhost:8096/actuator/health
+```
+
+- `port-forward` creates a temporary local tunnel to the Service.
+- It runs in the foreground until `Ctrl+C`.
+- It is a debugging mechanism, not production ingress.
+
+The response was:
+
+```json
+{"status":"UP","groups":["liveness","readiness"]}
+```
+
+### 11. Scaling and shared state
+
+After changing `replicas` from one to three, Kubernetes created three AlertOps Pods.
+The Service EndpointSlice contained all three Pod IPs, proving Service discovery.
+
+Every replica receives the same Redis host and credentials. This is the correct
+infrastructure for shared intent state. The full invitation/login flow was not
+repeated because the application workflow was no longer fresh in memory. The precise
+result is:
+
+> Multi-replica scheduling, readiness, and Service discovery were verified. Shared
+> Redis intent state is structurally configured, but cross-replica intent creation
+> and atomic consumption still require an application-level integration test.
+
+Infrastructure configuration is useful evidence but does not replace a functional
+test. A future automated test should create an intent through one replica and consume
+it through another.
+
+### 12. Controlled operational drills
+
+#### Pod self-healing
+
+One AlertOps Pod was deleted and the replicas were watched:
+
+```powershell
+kubectl delete pod <pod-name> -n alertops
+kubectl get pods -n alertops -l app.kubernetes.io/name=alertops --watch
+```
+
+- `delete pod` removed only the disposable Pod, not its Deployment.
+- `--watch` kept the query open and printed state changes.
+
+The Deployment continued to desire three replicas. Kubernetes created a replacement,
+which progressed from `0/1 Running` to `1/1 Running` when readiness succeeded. This
+proved controller reconciliation and readiness gating.
+
+#### Rolling restart
+
+```powershell
+kubectl rollout restart deployment/alertops -n alertops
+kubectl rollout status deployment/alertops -n alertops
+```
+
+`rollout restart` modifies a Pod-template annotation and creates a new ReplicaSet
+without changing the application image. `rollout status` follows progress. AlertOps
+took around 50 seconds for each new Pod to become ready, and the rollout succeeded.
+
+With `maxUnavailable: 0`, Kubernetes retained the desired number of ready replicas.
+With `maxSurge: 1`, it could temporarily create one extra Pod.
+
+#### Invalid image and rollback
+
+An intentionally nonexistent image was set only in the live cluster:
+
+```powershell
+kubectl set image deployment/alertops `
+  alertops=alertops:rollback-drill-missing `
+  -n alertops
+
+kubectl rollout status deployment/alertops -n alertops --timeout=90s
+kubectl get pods -n alertops -l app.kubernetes.io/name=alertops
+```
+
+- `set image` updates a named container in the Deployment.
+- `--timeout=90s` stops waiting after 90 seconds; it does not repair the rollout.
+- This imperative command did not modify the committed YAML.
+
+The result contained three healthy old Pods and one new `ImagePullBackOff` Pod.
+Kubernetes could not pull the missing image, but `maxUnavailable: 0` protected the
+healthy replicas.
+
+Rollback used:
+
+```powershell
+kubectl rollout undo deployment/alertops -n alertops
+kubectl rollout status deployment/alertops -n alertops
+kubectl get deployment alertops -n alertops `
+  -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
+`rollout undo` restored the previous Pod template. JSONPath extracted only the image
+field. The failed Pod disappeared and all three healthy replicas remained on:
+
+```text
+alertops:3514a9d28585
+```
+
+#### Redis Pod recreation and disk recovery
+
+A harmless key was stored before deleting Redis:
+
+```powershell
+kubectl exec redis-0 -n alertops -- `
+  redis-cli SET phase2:persistence "survives-pod-recreation"
+
+kubectl delete pod redis-0 -n alertops
+kubectl wait --for=condition=Ready pod/redis-0 -n alertops --timeout=180s
+
+kubectl exec redis-0 -n alertops -- `
+  redis-cli GET phase2:persistence
+```
+
+- `exec` runs a command inside a container.
+- `--` ends kubectl options; everything after it is the container command.
+- `wait --for=condition=Ready` waits for the recreated Pod to become ready.
+
+The value survived. The StatefulSet recreated `redis-0`, mounted the same PVC, and
+Redis replayed its AOF into memory. Cleanup returned `1`, meaning one key was deleted:
+
+```powershell
+kubectl exec redis-0 -n alertops -- redis-cli DEL phase2:persistence
+```
+
+### 13. Environment design: clusters versus namespaces
+
+Companies use both patterns:
+
+- namespaces commonly separate teams, applications, or lower-risk environments;
+- separate clusters commonly isolate production from non-production;
+- large organizations may use multiple clusters per region or security boundary.
+
+A reasonable example is:
+
+```text
+non-production cluster
+|-- alertops-dev namespace
+`-- alertops-test namespace
+
+production cluster
+`-- alertops-prod namespace
+```
+
+Namespaces provide logical isolation but share a control plane and often nodes. They
+are not as strong a failure, upgrade, or security boundary as separate clusters.
+Production separation depends on risk, compliance, scale, cost, and platform policy.
+
+### 14. Questions asked during Phase 2
+
+**Why not deploy the Docker image directly to EC2 or OCI Compute?**
+
+That remains valid for smaller systems. Kubernetes becomes valuable when consistent
+scheduling, self-healing, discovery, rollout, scaling, policy, and resource management
+are needed across many replicas and machines.
+
+**Does an eight-core machine mean only eight tasks can exist?**
+
+No. It can execute roughly eight CPU-bound threads simultaneously, but many more
+threads can exist or wait for CPU and I/O. The operating system schedules runnable
+work across the available CPUs.
+
+**Does Kubernetes create a replacement immediately after a Pod is deleted?**
+
+The controller observes that actual replicas are below desired replicas and creates a
+replacement. The scheduler selects a suitable node. Creation can be delayed when no
+node satisfies the resource or policy requirements.
+
+**Is a Pod the same as a container?**
+
+Not exactly. A Pod is the smallest Kubernetes scheduling unit and can contain one or
+more containers sharing networking and volumes. AlertOps uses the common
+one-container-per-Pod pattern.
+
+**Why are readiness and liveness separate?**
+
+Readiness decides whether the Pod receives traffic. Liveness decides whether a
+container restart may repair it. A remote database outage should generally fail
+readiness, not liveness, because restarting AlertOps cannot fix PostgreSQL.
+
+**Does a ConfigMap create its namespace?**
+
+No. Namespace is a separate resource. `metadata.namespace` places the ConfigMap into
+an existing namespace.
+
+**Why put a hostname in ConfigMap but a JWT key in Secret?**
+
+A hostname is ordinary configuration. Passwords and signing keys are sensitive.
+Secrets allow separate access controls and handling, although production also needs
+encryption and external secret management.
+
+**Why does a Service need selectors?**
+
+Pod IPs change. The Service matches current Pods by label and maintains stable DNS
+plus the ready endpoint set.
+
+**Why was a PVC `Pending` before its Pod existed?**
+
+The `standard` StorageClass uses `WaitForFirstConsumer`, so it waits for workload
+scheduling information before provisioning and binding the volume.
+
+**Why use StatefulSet when Service and PVC already exist?**
+
+The PVC stores data and the Service provides networking; neither creates or
+supervises the process. The StatefulSet creates and replaces the Pod with stable
+identity.
+
+**Why did a Service find the replacement Pod automatically?**
+
+The replacement had the same labels. The Service selector matched it, and Kubernetes
+updated the EndpointSlice with its new Pod IP.
+
+**Why did Redis retain a value after Pod deletion?**
+
+Redis reconstructed the value by replaying AOF data stored on the PVC. It then served
+normal requests from memory again.
+
+**What does `-f` mean?**
+
+Use the following file as command input, such as `kubectl apply -f manifest.yaml`.
+
+**What does `-n` mean?**
+
+It is the short form of `--namespace` and scopes the command to that namespace.
+
+**What does `-l` mean?**
+
+It filters resources using a label selector.
+
+**Does `kubectl` create containers?**
+
+No. It sends requests to the Kubernetes API. Controllers, the scheduler, kubelet, and
+the container runtime cooperate to create the workload.
+
+**What is the difference between a Git tag and a Docker tag?**
+
+A Git tag names source history. A Docker tag names a runnable image artifact. CI often
+uses the Git tag as a trigger and then produces a Docker image tag for deployment.
+
+**Why does kind need `kind load docker-image`?**
+
+The image built by Docker is not automatically present in the kind node's containerd
+store. Loading copies it into the node. Production nodes pull from a registry.
+
+## Final validation evidence
+
+The live cluster reported:
+
+```text
+Node
+alertops-control-plane   Ready   control-plane   v1.36.1
+
+Deployment
+alertops   3/3 Ready
+
+StatefulSets
+postgres   1/1 Ready
+rabbitmq   1/1 Ready
+redis      1/1 Ready
+
+PersistentVolumeClaims
+postgres-data   Bound   1Gi   RWO
+rabbitmq-data   Bound   1Gi   RWO
+redis-data      Bound   1Gi   RWO
+
+AlertOps Service endpoints
+10.244.0.16:8096
+10.244.0.17:8096
+10.244.0.18:8096
+```
+
+Pod names and IPs are temporary and will change after recreation.
+
+## Phase 2 completion checklist
+
+- [x] Compatible Docker Desktop, WSL, kind, and kubectl installed.
+- [x] Pinned kind cluster created and inspected.
+- [x] AlertOps image built with a commit-SHA tag and loaded into kind.
+- [x] Dedicated Namespace, ConfigMap, and Secret created.
+- [x] PostgreSQL deployed with Service and bound PVC.
+- [x] RabbitMQ deployed with Service and bound PVC.
+- [x] Redis deployed with authentication, AOF, Service, and bound PVC.
+- [x] AlertOps deployed with probes, resources, security context, and Service.
+- [x] Health endpoint reached using a temporary port-forward.
+- [x] AlertOps scaled to three ready replicas.
+- [x] Service endpoint discovery across three replicas verified.
+- [x] Pod self-healing and readiness transition observed.
+- [x] Rolling restart completed.
+- [x] Invalid-image rollout failed without removing healthy replicas.
+- [x] Previous working rollout restored.
+- [x] Redis data survived Pod recreation and the test key was cleaned up.
+- [ ] Cross-replica intent create/consume behavior automated and functionally tested.
+- [ ] Production-grade backup and restore procedures designed and tested.
+
+Phase 2 is complete for the local Kubernetes learning objective. The unchecked items
+are deliberately carried forward: application integration coverage and production
+backup/restore work belong in later application and reliability phases.

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertops-config
+  namespace: alertops
+  labels:
+    app.kubernetes.io/part-of: alertops
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  SERVER_PORT: "8096"
+
+  POSTGRES_DB: "alert_ops"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/alert_ops"
+  SPRING_DATASOURCE_USERNAME: "alertops"
+
+  SPRING_RABBITMQ_HOST: "rabbitmq"
+  SPRING_RABBITMQ_PORT: "5672"
+  SPRING_RABBITMQ_USERNAME: "alertops"
+
+  SPRING_DATA_REDIS_HOST: "redis"
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_DATA_REDIS_CONNECT_TIMEOUT: "2s"
+  SPRING_DATA_REDIS_TIMEOUT: "2s"
+
+  INTENT_CACHE_TTL: "10m"
