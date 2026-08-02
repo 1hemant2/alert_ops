@@ -71,3 +71,19 @@ jobs:
           path: target/surefire-reports/
           if-no-files-found: warn
           retention-days: 7
+
+  container-build:
+    name: Container image build
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Build commit image
+        run: docker build --tag "alertops:${{ github.sha }}" .
+
+      - name: Verify local image
+        run: docker image ls --digests "alertops:${{ github.sha }}"
