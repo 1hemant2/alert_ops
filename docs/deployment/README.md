@@ -7,9 +7,9 @@ so the same design can be explained in interviews.
 ## Target architecture
 
 ```text
-Developer -> GitLab -> CI pipeline -> container registry
-                   \-> manifests repository -> Argo CD
-                                                |
+Developer -> GitHub -> GitHub Actions -> GHCR
+                  \-> manifests repository -> Argo CD
+                                               |
 Internet -> load balancer -> Kubernetes Service -> AlertOps pods
                                                    |-- PostgreSQL
                                                    |-- RabbitMQ
@@ -31,7 +31,7 @@ different scaling rules from the stateless AlertOps application.
 | 0 | Deployment readiness | config, secrets, health, tests | clean build and production checklist |
 | 1 | Local containers | images, networks, volumes, Compose | healthy local stack after restart |
 | 2 | Kubernetes locally | Pod, Deployment, Service, ConfigMap, Secret, PVC | stack runs in kind/minikube |
-| 3 | CI with GitLab | stages, cache, artifacts, image tags, scanning | commit produces tested image |
+| 3 | CI with GitHub Actions | workflows, jobs, cache, artifacts, image tags, scanning | commit produces tested image |
 | 4 | OCI foundation | compartments, IAM, VCN, subnets, gateways, security lists | private network and cluster exist |
 | 5 | Cloud deployment | registry, ingress, DNS, TLS, storage | public HTTPS health endpoint |
 | 6 | Argo CD GitOps | desired state, sync, drift, rollback | Git change deploys automatically |
@@ -46,6 +46,13 @@ Completed foundation: [Phase 0 - production readiness](phase-0-readiness.md)
 Completed: [Phase 1 - Docker and Compose foundations](phase-1-docker-foundations.md)
 
 Completed: [Phase 2 - local Kubernetes](phase-2-kubernetes.md)
+
+Current lesson: [Phase 3 - GitHub Actions CI](phase-3-github-actions.md)
+
+Phase 3 uses one implementation path: GitHub Actions with GitHub Container Registry
+(GHCR). GitLab CI terminology and YAML translation are deliberately deferred until the
+working GitHub pipeline is complete, so two CI systems are not learned at the same
+time.
 
 ## Phase 0 audit (current repository)
 
@@ -77,7 +84,7 @@ Use this rule throughout the project:
 |---|---|---|
 | Non-secret config | port, log level, queue name | Git, ConfigMap |
 | Secret | JWT key, database password | secret manager / Kubernetes Secret source |
-| Build output | JAR, test report | GitLab artifact |
+| Build output | JAR, test report | GitHub Actions artifact |
 | Deployable image | immutable image tagged with commit SHA | OCIR (OCI) / ECR (AWS) |
 | Application data | relational records | PostgreSQL with backups |
 | Unstructured backup/export | database dump, report | OCI Object Storage / AWS S3 |
@@ -110,7 +117,8 @@ Later phases will grow toward:
 .
 |-- Dockerfile
 |-- docker-compose.yml
-|-- .gitlab-ci.yml
+|-- .github/workflows/
+|   `-- ci.yml
 |-- docs/deployment/
 |-- k8s/
 |   |-- base/
@@ -120,7 +128,7 @@ Later phases will grow toward:
 
 For serious GitOps, use a separate environment repository so CI can update an image
 tag without granting the application repository direct cluster access. Argo CD pulls
-desired state from Git; CI should not run `kubectl apply` against production.
+desired state from GitHub; CI should not run `kubectl apply` against production.
 
 ## Learning journal template
 

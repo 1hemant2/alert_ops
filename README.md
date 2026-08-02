@@ -176,6 +176,6 @@ docker compose down -v
 
 The staged OCI deployment and GitOps learning plan is documented in
 [`docs/deployment/README.md`](docs/deployment/README.md). It starts with production
-readiness, progresses through Docker and local Kubernetes, then adds GitLab CI,
+readiness, progresses through Docker and local Kubernetes, then adds GitHub Actions CI,
 OCI networking/OKE, Argo CD, reliability, and advanced delivery. AWS equivalents
 are included for interview preparation.

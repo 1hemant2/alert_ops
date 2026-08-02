@@ -538,7 +538,7 @@ Verification covered:
 
 The integration test is enabled with `REDIS_INTEGRATION_TEST=true` and Redis connection
 environment variables. It remains infrastructure-independent during ordinary unit
-test runs and can be enabled against a GitLab CI Redis service in Phase 3.
+test runs and can be enabled against a GitHub Actions Redis service container in Phase 3.
 
 ## Full-stack persistence drill (completed)
 
