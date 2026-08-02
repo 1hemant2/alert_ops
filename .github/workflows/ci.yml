@@ -19,6 +19,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
+    env:
+      REDIS_INTEGRATION_TEST: "true"
+      REDIS_INTEGRATION_HOST: "localhost"
+      REDIS_INTEGRATION_PORT: "6379"
+      REDIS_INTEGRATION_PASSWORD: "alertops-ci-only-password"
+
+    services:
+      redis:
+        image: redis:7.4.9-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     steps:
       - name: Check out source
         uses: actions/checkout@v6
@@ -29,6 +46,11 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+
+      - name: Configure Redis authentication
+        run: >-
+          docker exec "${{ job.services.redis.id }}"
+          redis-cli CONFIG SET requirepass "$REDIS_INTEGRATION_PASSWORD"
 
       - name: Run Maven verification
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
