@@ -348,6 +348,20 @@ Do not memorize this table. Each command will be explained when its resource exi
 | `kubectl rollout status deployment/<name>` | Follow Deployment rollout progress |
 | `kind delete cluster` | Remove the disposable local cluster node containers |
 
+For troubleshooting, remember the purpose of each command family rather than every
+flag:
+
+```text
+get       -> What is the current state?
+describe  -> Why is it in that state?
+logs      -> What did the application report?
+events    -> What did Kubernetes report?
+rollout   -> What is happening with the Deployment version?
+```
+
+`describe` and `events` are especially useful when a container never started, such as
+`ImagePullBackOff` or `CreateContainerConfigError`; application logs may not exist yet.
+
 `kubectl` is only a client for the Kubernetes API. It does not run containers. It
 reads kubeconfig to find a cluster and credentials, sends API requests, and displays
 the resource state returned by the API server.
@@ -544,6 +558,12 @@ The image was loaded into kind because Docker Desktop's image store and the kind
 node's containerd store are separate. Cloud worker nodes instead pull images from
 OCIR, ECR, or another registry.
 
+Images are cached at node scope, not namespace scope. Deleting the `alertops`
+namespace removes its namespaced API resources but does not remove
+`alertops:3514a9d28585` from the kind node's containerd store. Deleting the entire kind
+cluster removes that node and its cache. In `kind load docker-image ... --name
+alertops`, `--name alertops` selects the cluster; it does not select a namespace.
+
 ### 4. Namespace, configuration, and secrets
 
 The dedicated namespace was created and inspected with:
@@ -593,6 +613,12 @@ envFrom:
 Spring resolves expressions such as `${SPRING_RABBITMQ_HOST}` from the container's
 environment when the application starts.
 
+ConfigMaps and Secrets are API objects, not Pods. The kubelet resolves required
+references and injects their keys before starting the container. If a required Secret
+does not exist, the application process cannot start and the Pod commonly reports
+`CreateContainerConfigError`; Spring cannot handle an error that prevents Java from
+starting.
+
 Secret values can be retrieved and Base64-decoded, but Base64 is encoding rather than
 encryption. Normal inspection should show key names, not values:
 
@@ -634,6 +660,21 @@ The `-l` command option uses the same mechanism for filtering:
 ```powershell
 kubectl get pods -n alertops -l app.kubernetes.io/name=redis
 ```
+
+A Service is the stable frontend, while EndpointSlices are its changing backend list:
+
+```text
+DNS name postgres
+    -> Service ClusterIP and port
+        -> EndpointSlice with ready Pod IPs
+            -> postgres-0 Pod IP and target port
+```
+
+Each Service gets its own ClusterIP. That IP remains stable for the Service's lifetime,
+but deleting and recreating the Service can allocate a new one. EndpointSlice names,
+such as `postgres-xrd5c`, use a generated suffix and are internal implementation
+objects, not client DNS names. A Service can exist while its EndpointSlice has no
+addresses: this means a stable frontend exists but no matching ready backend exists.
 
 ### 6. StorageClass, provisioner, PV, and PVC
 
@@ -763,6 +804,20 @@ The Deployment uses:
 - startup, readiness, and liveness probes;
 - container security restrictions;
 - `maxUnavailable: 0` and `maxSurge: 1` rolling updates.
+
+The resource-to-runtime chain is:
+
+```text
+Deployment manifest stores replicas, Pod template, and rollout strategy
+    -> Deployment controller manages ReplicaSet revisions
+        -> ReplicaSet controller maintains the Pod count
+            -> scheduler assigns each unscheduled Pod to one node
+                -> node kubelet asks the runtime to start its containers
+```
+
+The scheduler schedules Pods, not Services or PVCs. A Pod stays `Pending` with a
+`FailedScheduling` event when no node satisfies its requested resources. The kubelet
+operates Pods assigned to its node; it does not manage cluster-wide Services.
 
 Requests are considered by the scheduler. Limits constrain actual use. A `250m` CPU
 request reserves scheduling capacity equal to a quarter of a CPU. A CPU limit of `1`
@@ -904,6 +959,57 @@ Redis replayed its AOF into memory. Cleanup returned `1`, meaning one key was de
 ```powershell
 kubectl exec redis-0 -n alertops -- redis-cli DEL phase2:persistence
 ```
+
+#### Focused rebuild and Service-selector drift
+
+The committed manifests were used to rebuild the namespace without creating duplicate
+practice YAML. Deleting the namespace removed its Deployments, StatefulSets, Pods,
+Services, ConfigMap, Secret, and PVCs. The cluster and node-level image cache remained.
+
+Services were deliberately created before their workloads. Each received a ClusterIP,
+but its EndpointSlice initially showed `<unset>` because no matching Pod existed. When
+`postgres-0` became ready, its temporary Pod IP and port `5432` appeared automatically,
+and `postgres-data` changed from `Pending` to `Bound`.
+
+The live AlertOps Service selector was then changed to a value no Pod had:
+
+```powershell
+kubectl set selector service/alertops `
+  app.kubernetes.io/name=missing-alertops `
+  -n alertops
+```
+
+All three Pods stayed `1/1 Running`, but the EndpointSlice had no addresses. Comparing
+`kubectl describe service alertops -n alertops` with
+`kubectl get pods --show-labels -n alertops` exposed the mismatch. Reapplying
+`k8s/base/alertops-service.yaml` restored the committed selector and all three
+endpoints. This is a small GitOps example: live state drifted, and declared Git state
+corrected it.
+
+#### Redis dependency outage: readiness versus liveness
+
+Redis was temporarily scaled to zero without deleting its PVC:
+
+```powershell
+kubectl scale statefulset/redis --replicas=0 -n alertops
+```
+
+All AlertOps Pods changed to `0/1 Running`, and the Service had no usable endpoints.
+Direct checks from one Pod returned:
+
+```text
+liveness:  200
+readiness: 503
+```
+
+The containers stayed running and their restart counts did not increase. The failure
+was in a remote dependency, so restarting AlertOps would not repair it. Reapplying the
+Redis StatefulSet restored `replicas: 1`; after Redis became ready, AlertOps readiness
+succeeded and its Service endpoints returned automatically.
+
+If liveness instead fails beyond its threshold, kubelet restarts the container inside
+the same Pod and increments `RESTARTS`. Repeated startup failures may result in
+`CrashLoopBackOff`; Kubernetes does not immediately delete the Pod object.
 
 ### 13. Environment design: clusters versus namespaces
 
@@ -1066,6 +1172,9 @@ Pod names and IPs are temporary and will change after recreation.
 - [x] Health endpoint reached using a temporary port-forward.
 - [x] AlertOps scaled to three ready replicas.
 - [x] Service endpoint discovery across three replicas verified.
+- [x] Namespace rebuilt from committed manifests without duplicate practice YAML.
+- [x] Broken Service selector diagnosed through labels and empty endpoints.
+- [x] Redis outage produced readiness 503 and liveness 200 without container restarts.
 - [x] Pod self-healing and readiness transition observed.
 - [x] Rolling restart completed.
 - [x] Invalid-image rollout failed without removing healthy replicas.
