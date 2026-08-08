@@ -132,6 +132,8 @@ This repository includes:
 
 ### Start the full stack
 
+Copy `.env.example` to `.env`, replace every placeholder, and then run:
+
 ```bash
 docker compose up --build
 ```
@@ -140,8 +142,11 @@ docker compose up --build
 
 - App: `http://localhost:8096`
 - Actuator: `http://localhost:8096/actuator`
-- RabbitMQ UI: `http://localhost:15672` (username: `guest`, password: `guest`)
-- PostgreSQL: `localhost:5432` (db: `alert_ops`, user: `root`, password: `root`)
+- RabbitMQ UI: `http://localhost:15672` (credentials come from `.env`)
+- PostgreSQL: `localhost:5432` (database and credentials come from `.env`)
+- Redis: `localhost:6379` (password comes from `.env`)
+
+The host ports above are defaults and can also be overridden in `.env`.
 
 ### Stop services
 
@@ -160,4 +165,17 @@ docker compose down -v
 - The app connects to containers using Docker service names:
   - PostgreSQL host: `postgres`
   - RabbitMQ host: `rabbitmq`
+  - Redis host: `redis`
 - App runtime settings are passed through environment variables in `docker-compose.yml`.
+- One-time workflow intents use authenticated Redis with JSON values, a configurable
+  TTL, and atomic consumption so application replicas share the same state.
+
+---
+
+## Cloud Deployment Course
+
+The staged OCI deployment and GitOps learning plan is documented in
+[`docs/deployment/README.md`](docs/deployment/README.md). It starts with production
+readiness, progresses through Docker and local Kubernetes, then adds GitHub Actions CI,
+OCI networking/OKE, Argo CD, reliability, and advanced delivery. AWS equivalents
+are included for interview preparation.

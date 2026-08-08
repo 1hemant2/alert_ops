@@ -2,7 +2,9 @@ package com.alertops.auth.controller;
 
 import com.alertops.auth.dto.*;
 import com.alertops.auth.service.UserService;
+import com.alertops.caching.Intent;
 import com.alertops.caching.IntentCache;
+import com.alertops.caching.IntentType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,8 +34,9 @@ public class UserController {
 
             Map<String, Object> res = userService.Login(req);
             UUID intentId = req.getIntentId();
+            Intent intent = intentCache.consume(intentId);
 
-            if(intentId != null && intentCache.get(intentId) != null) {
+            if (intent != null && intent.type() == IntentType.JOIN_TEAM) {
                 return ResponseEntity.ok(
                         Map.of(
                                 "action", "TEAM_SELECTION_REQUIRED",

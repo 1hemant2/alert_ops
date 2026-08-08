@@ -1,0 +1,121 @@
+name: AlertOps CI
+
+on:
+  push:
+    branches:
+      - deployment
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Maven verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    env:
+      REDIS_INTEGRATION_TEST: "true"
+      REDIS_INTEGRATION_HOST: "localhost"
+      REDIS_INTEGRATION_PORT: "6379"
+      REDIS_INTEGRATION_PASSWORD: "alertops-ci-only-password"
+
+    services:
+      redis:
+        image: redis:7.4.9-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Configure Redis authentication
+        run: >-
+          docker exec "${{ job.services.redis.id }}"
+          redis-cli CONFIG SET requirepass "$REDIS_INTEGRATION_PASSWORD"
+
+      - name: Run Maven verification
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+
+      - name: Upload application JAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: alertops-jar-${{ github.sha }}
+          path: target/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-reports-${{ github.sha }}
+          path: target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 7
+
+  container-build:
+    name: Container image build
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Build commit image
+        run: docker build --tag "ghcr.io/${{ github.repository }}:${{ github.sha }}" .
+
+      - name: Scan container image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          format: table
+          output: trivy-results.txt
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: "true"
+          exit-code: "1"
+
+      - name: Upload container scan report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report-${{ github.sha }}
+          path: trivy-results.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: >-
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+          docker login ghcr.io
+          --username "${{ github.actor }}"
+          --password-stdin
+
+      - name: Push commit image
+        if: github.event_name != 'pull_request'
+        run: docker push "ghcr.io/${{ github.repository }}:${{ github.sha }}"

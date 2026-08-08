@@ -17,10 +17,19 @@ import java.util.UUID;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final String HEALTH_ENDPOINT = "/actuator/health";
+
     private final JwtUtil jwtUtil;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        return requestUri.equals(HEALTH_ENDPOINT)
+                || requestUri.startsWith(HEALTH_ENDPOINT + "/");
     }
 
     @Override
@@ -31,12 +40,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String header = request.getHeader("Authorization");
-        System.out.println("JWT filter hit for: " + request.getRequestURI());
 
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
             Claims claims = jwtUtil.parse(token);
-            System.out.println("JWT claims: " + claims.getSubject());
             
             String teamIdStr = claims.get("teamId", String.class);
             String userIdStr = claims.getSubject();

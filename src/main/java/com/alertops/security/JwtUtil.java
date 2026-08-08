@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -16,15 +17,11 @@ public class JwtUtil {
     // 10 minutes
     private static final long ACCESS_TOKEN_TTL =  1000;
 
-    // In real apps: load from application.yml / env
-    private static final String SECRET =
-            "dGhpcy1pcy1hLXZlcnktc2VjdXJlLTI1Ni1iaXQtc2VjcmV0LWtleQ==";
-
     private final Key signingKey;
 
-    public JwtUtil() {
+    public JwtUtil(@Value("${security.jwt.secret-base64}") String secretBase64) {
         this.signingKey = Keys.hmacShaKeyFor(
-                java.util.Base64.getDecoder().decode(SECRET)
+                java.util.Base64.getDecoder().decode(secretBase64)
         );
     }
 
@@ -46,7 +43,7 @@ public class JwtUtil {
 
     public Claims parse(String token) {
         return Jwts.parser()
-                .setSigningKey(SECRET)
+                .setSigningKey(signingKey)
                 .parseClaimsJws(token)
                 .getBody();
     }

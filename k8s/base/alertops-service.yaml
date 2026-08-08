@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertops
+  namespace: alertops
+  labels:
+    app.kubernetes.io/name: alertops
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: alertops
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: alertops
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8096
+      targetPort: http
