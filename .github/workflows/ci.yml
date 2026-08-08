@@ -88,6 +88,16 @@ jobs:
       - name: Build commit image
         run: docker build --tag "ghcr.io/${{ github.repository }}:${{ github.sha }}" .
 
+      - name: Scan container image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          format: table
+          severity: "HIGH,CRITICAL"
+          ignore-unfixed: "true"
+          exit-code: "0"
+
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         run: >-
