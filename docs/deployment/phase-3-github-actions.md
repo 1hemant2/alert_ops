@@ -139,7 +139,158 @@ Phase 3 is complete when:
 - one controlled failure can be diagnosed from job logs;
 - the process is documented well enough to explain in an interview.
 
+## Completed workflow
+
+The implemented workflow is [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
+It runs for pushes to `deployment` and `master`, pull requests targeting `master`,
+and manual dispatches.
+
+```text
+pull request to master                    push to deployment or master
+-----------------------                   ----------------------------
+Maven verification                        Maven verification
+        |                                          |
+        v                                          v
+container build + Trivy scan               container build + Trivy scan
+GHCR login and push: skipped               GHCR login and push: allowed
+```
+
+The two jobs run on separate temporary runners. `actions/checkout` is therefore
+required in each job: it puts the triggering commit's source files on that job's
+otherwise empty runner. `needs: test` makes `container-build` wait for a successful
+Maven verification job; a Maven failure skips the container job.
+
+### Pipeline outputs
+
+| Output | Location | Retention | Purpose |
+|---|---|---:|---|
+| Fat JAR | GitHub Actions artifact | 7 days | Build evidence for the exact commit |
+| Surefire reports | GitHub Actions artifact | 7 days | Test-failure diagnosis |
+| `trivy-results.txt` | GitHub Actions artifact | 30 days | Container vulnerability evidence |
+| Container image | GHCR | Package retention policy | Deployable release artifact |
+
+An artifact is downloaded as a ZIP because GitHub Actions packages uploaded files
+for transport. GHCR is separate from Actions artifacts: it stores OCI/Docker images,
+not build reports.
+
+### Image name, tag, and digest
+
+The workflow builds and pushes an image named:
+
+```text
+ghcr.io/1hemant2/alert_ops:<git-commit-sha>
+```
+
+`<git-commit-sha>` is the readable source-version tag. `docker push` uploads the
+image and GHCR returns a content digest such as `sha256:...`; that digest identifies
+the exact immutable image content. The tag is used for source traceability, while a
+digest is the strongest deployment pin:
+
+```text
+ghcr.io/1hemant2/alert_ops@sha256:<image-content-digest>
+```
+
+The local image disappears when the GitHub-hosted runner is destroyed. The pushed
+GHCR image remains available for a later Kubernetes cluster to pull.
+
+## Container security gate
+
+After Docker builds the final image, Trivy scans the image before registry login and
+push. Scanning after the build is necessary because the final image contains the JRE,
+operating-system packages, application JAR, and all runtime Java dependencies.
+
+```text
+build image -> scan HIGH and CRITICAL findings -> upload report -> push only if clean
+```
+
+The scan uses a reviewed SHA-pinned Trivy Action. It writes a readable
+`trivy-results.txt` file and `actions/upload-artifact` uploads it with `if: always()`.
+That condition means the report is retained even when the scan fails; it does not run
+another scan. The later GHCR steps use their normal implicit `success()` condition,
+so they are skipped after a scan failure.
+
+`exit-code: "1"` turns HIGH or CRITICAL findings into a release gate. The initial
+audit found 31 findings. They were remediated by:
+
+- upgrading the Spring Boot parent from `3.5.4` to `3.5.16`, which updates its managed
+  dependency set together;
+- temporarily overriding Spring Boot's managed Netty version to `4.1.136.Final` and
+  PostgreSQL JDBC version to `42.7.12` until a future Spring Boot release manages
+  those patched versions.
+
+Netty is transitive rather than an AlertOps direct dependency:
+
+```text
+spring-boot-starter-data-redis -> lettuce-core -> Netty
+```
+
+Do not add an individual Netty module directly just to patch a CVE. The `netty.version`
+override updates the Netty BOM consistently. The PostgreSQL driver is a direct runtime
+dependency, but its original version was also supplied by Spring Boot dependency
+management. Remove the temporary overrides once a Spring Boot update supplies the
+same or newer fixed versions.
+
+## Protected master branch
+
+The GitHub repository has an active ruleset targeting `master`:
+
+- pull requests are required before merging;
+- branches must be up to date before merging;
+- `Maven verification` and `Container image build` are required checks from GitHub
+  Actions;
+- force pushes and deletion are blocked.
+
+The branch rule requires passing checks; it does not decide which workflow steps run.
+The `if: github.event_name != 'pull_request'` condition on GHCR login and image push
+is what prevents a pull-request build from publishing a container image.
+
+## Controlled failure and recovery drill
+
+An unmerged `ci-failure-drill` pull request added a temporary JUnit assertion of
+`assertTrue(false)`. The Maven job reported the exact failing class, method, and
+assertion message. Because `container-build` has `needs: test`, its image build was
+skipped. The required checks prevented the PR from merging into `master`.
+
+Recovery consisted of removing only the temporary test with `git rm`, committing,
+and pushing the same branch. The PR then became green. It was closed without merging
+and its remote and local branches were deleted.
+
+Use this diagnostic order for a real CI incident:
+
+```text
+failed workflow -> failed job -> failed step -> first concrete error -> source/config fix
+```
+
+## GitHub Actions to GitLab CI mapping
+
+The implementation remains GitHub Actions; this mapping is for interviews and for a
+future deliberate GitLab migration.
+
+| GitHub Actions | GitLab CI | Meaning |
+|---|---|---|
+| `.github/workflows/ci.yml` | `.gitlab-ci.yml` | Pipeline definition |
+| `on: push` / `pull_request` | `rules:` / `only` / `except` | Pipeline trigger conditions |
+| workflow job | GitLab job | Unit of work on a runner |
+| `runs-on: ubuntu-24.04` | runner tags / executor selection | Runner environment |
+| `needs: test` | `needs: [test]` | Dependency and ordering between jobs |
+| `run:` | `script:` | Shell commands executed by a job |
+| `uses:` | `image:`, `before_script`, included templates | Reusable implementation; no exact one-to-one equivalent |
+| `services: redis` | `services:` | Temporary test dependency |
+| `actions/upload-artifact` | `artifacts:` | Retained job output |
+| `actions/setup-java` Maven cache | `cache:` | Reusable dependency cache |
+| `GITHUB_TOKEN` | `CI_JOB_TOKEN` / protected CI variables | Scoped job authentication |
+| GHCR | GitLab Container Registry | Remote OCI image registry |
+| GitHub ruleset | protected branches + merge-request approval/pipeline rules | Merge policy |
+
+In an interview: “The concepts are portable. I used GitHub Actions to test, build,
+scan, and publish an immutable image; GitLab CI expresses the same lifecycle through
+stages/jobs, `rules`, `services`, artifacts, caches, and the GitLab registry. CI still
+creates evidence and release artifacts; GitOps later deploys the version declared in
+Git.”
+
 ## Official references
 
 - [Building and testing Java with Maven](https://docs.github.com/en/actions/tutorials/build-and-test-code/java-with-maven)
 - [Publishing Docker images](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+- [GitHub repository rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets)
+- [Trivy GitHub Action](https://github.com/aquasecurity/trivy-action)

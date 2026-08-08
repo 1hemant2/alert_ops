@@ -47,12 +47,11 @@ Completed: [Phase 1 - Docker and Compose foundations](phase-1-docker-foundations
 
 Completed: [Phase 2 - local Kubernetes](phase-2-kubernetes.md)
 
-Current lesson: [Phase 3 - GitHub Actions CI](phase-3-github-actions.md)
+Completed: [Phase 3 - GitHub Actions CI](phase-3-github-actions.md)
 
-Phase 3 uses one implementation path: GitHub Actions with GitHub Container Registry
-(GHCR). GitLab CI terminology and YAML translation are deliberately deferred until the
-working GitHub pipeline is complete, so two CI systems are not learned at the same
-time.
+Next lesson: Phase 4 - OCI foundation. Phase 3 uses GitHub Actions with GitHub
+Container Registry (GHCR); its GitLab CI terminology mapping is recorded in the
+completed Phase 3 notes.
 
 ## Phase 0 audit (current repository)
 
