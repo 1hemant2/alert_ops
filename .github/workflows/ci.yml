@@ -77,13 +77,25 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Check out source
         uses: actions/checkout@v6
 
       - name: Build commit image
-        run: docker build --tag "alertops:${{ github.sha }}" .
+        run: docker build --tag "ghcr.io/${{ github.repository }}:${{ github.sha }}" .
 
-      - name: Verify local image
-        run: docker image ls --digests "alertops:${{ github.sha }}"
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: >-
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+          docker login ghcr.io
+          --username "${{ github.actor }}"
+          --password-stdin
+
+      - name: Push commit image
+        if: github.event_name != 'pull_request'
+        run: docker push "ghcr.io/${{ github.repository }}:${{ github.sha }}"
