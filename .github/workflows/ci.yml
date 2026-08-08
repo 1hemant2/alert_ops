@@ -94,9 +94,19 @@ jobs:
           scan-type: image
           image-ref: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
           format: table
+          output: trivy-results.txt
           severity: "HIGH,CRITICAL"
           ignore-unfixed: "true"
           exit-code: "1"
+
+      - name: Upload container scan report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report-${{ github.sha }}
+          path: trivy-results.txt
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
