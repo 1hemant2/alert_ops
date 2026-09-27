@@ -88,6 +88,7 @@ services:
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
       INTENT_CACHE_TTL: ${INTENT_CACHE_TTL:-10m}
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?Set JWT_SECRET_BASE64 in your local .env file}
+      ALERTOPS_CORS_ALLOWED_ORIGINS: ${ALERTOPS_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
     ports:
       - "${APP_HOST_PORT:-8096}:8096"
     healthcheck:
