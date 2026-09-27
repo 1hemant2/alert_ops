@@ -3,11 +3,10 @@ package com.alertops.flow_execution_engine.application;
 import java.util.List;
 import java.util.UUID;
 
-import javax.management.RuntimeErrorException;
-
 import org.springframework.stereotype.Service;
 
 import com.alertops.flow.repository.NodeRepository;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
@@ -31,39 +30,33 @@ public class StartFlowExecutionUseCase {
     }
 
     public String  execute(FlowExecutionStateService flowExecutionStateService, UUID escalationId) {
-        try {
-            AuthContext authContext = AuthContextHolder.get();
-            UUID teamId = authContext.getTeamId();
+        AuthContext authContext = AuthContextHolder.get();
+        UUID teamId = authContext.getTeamId();
 
-            Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, teamId);
+        Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, teamId);
  
-            if (escalation == null) {
-              throw new RuntimeException("Escalation not found for id: " + escalationId);
-            }
- 
-            if(!"IDLE".equals(escalation.getStatus())) {
-              throw new RuntimeException("Escalation is either IN_PROGRESS or COMPLETED for id: " + escalationId);
-            }
-            
-            UUID flowId = escalation.getFlowId();
-            List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
-
-            if(nodes.size() == 0) {
-                throw new RuntimeException("Must be at least single node to start the escalation");
-            }
-
-            UUID taskId = escalation.getTaskId();
-            Task task = taskRepository.findByTaskId(taskId);
-            System.out.println("taskId -> " + taskId);
-            if(task == null) {
-                throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
-            }
-
-            return flowExecutionStateService.startFlowExecution(task, nodes, escalationId);
-
-            // saveNodeStates(escalation);
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
+        if (escalation == null) {
+          throw new RuntimeException("Escalation not found for id: " + escalationId);
         }
+ 
+        if(!"IDLE".equals(escalation.getStatus())) {
+          throw EscalationException.startConflict();
+        }
+        
+        UUID flowId = escalation.getFlowId();
+        List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
+
+        if(nodes.size() == 0) {
+            throw new RuntimeException("Must be at least single node to start the escalation");
+        }
+
+        UUID taskId = escalation.getTaskId();
+        Task task = taskRepository.findByTaskId(taskId);
+        System.out.println("taskId -> " + taskId);
+        if(task == null) {
+            throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
+        }
+
+        return flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
     }
 }

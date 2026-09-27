@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow.model.Node;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -26,9 +27,12 @@ public class FlowExecutionStateService {
     }
 
     @Transactional
-    public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId) {
+    public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId, UUID teamId) {
         try {
-            escalationRepository.updateStatus(escalationId, "RUNNING");
+            int claimedRows = escalationRepository.claimForStart(escalationId, teamId);
+            if (claimedRows != 1) {
+                throw EscalationException.startConflict();
+            }
 
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();

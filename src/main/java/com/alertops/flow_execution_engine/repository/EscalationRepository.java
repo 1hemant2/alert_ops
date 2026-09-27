@@ -6,7 +6,6 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,11 +22,13 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Query("select e from Escalation e where e.id = :id and e.teamId = :teamId")
       Escalation findByIdAndTeamId(UUID id, UUID teamId);
 
-      // @Lock(LockModeType.PESSIMISTIC_WRITE)
       @Modifying
-      @Query("UPDATE Escalation e SET e.status = :status WHERE e.id = :id")
-      int updateStatus(@Param("id") UUID id, @Param("status") String status);
+      @Query("""
+              UPDATE Escalation e
+              SET e.status = 'RUNNING'
+              WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'IDLE'
+              """)
+      int claimForStart(@Param("id") UUID id, @Param("teamId") UUID teamId);
 
       List<Escalation> findAllByStatus(String status);
 }
-
