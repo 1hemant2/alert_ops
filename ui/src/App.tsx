@@ -1,10 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
 import { SessionProvider } from './app/Session'
 import { useSession } from './app/useSession'
+import { AppShell } from './components/AppShell'
 import { LoginPage, RegisterPage } from './features/auth/AuthPages'
+import { FlowsPage } from './features/flows/FlowsPage'
+import { FlowDetailPage } from './features/flows/FlowDetailPage'
+import { TasksPage } from './features/tasks/TasksPage'
 import { TeamPickerPage } from './features/teams/TeamPickerPage'
 import { PublicPage } from './pages/PublicPage'
+import { TeamOverviewPage } from './pages/TeamOverviewPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,30 +32,30 @@ function RequireTeam() {
   return <Outlet />
 }
 
-function WorkspaceWelcome() {
-  const { team } = useSession()
-  return (
-    <main className="team-picker">
-      <div className="eyebrow">TEAM WORKSPACE</div>
-      <h1>{team?.name}</h1>
-      <p className="page-lede">Your team-scoped session is active. Task and flow setup is the next step.</p>
-      <Link className="button button-primary" to="/teams">Switch team</Link>
-    </main>
-  )
+function HomeRedirect() {
+  const { token, team } = useSession()
+  if (token && team) return <Navigate to={`/app/${team.id}`} replace />
+  if (token) return <Navigate to="/teams" replace />
+  return <PublicPage />
 }
 
 function AppRoutes() {
   return <BrowserRouter><Routes>
-    <Route path="/" element={<PublicPage />} />
+    <Route path="/" element={<HomeRedirect />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route element={<RequireAuth />}>
       <Route path="/teams" element={<TeamPickerPage />} />
       <Route element={<RequireTeam />}>
-        <Route path="/app/:teamId" element={<WorkspaceWelcome />} />
+        <Route path="/app/:teamId" element={<AppShell />}>
+          <Route index element={<TeamOverviewPage />} />
+          <Route path="tasks" element={<TasksPage />} />
+          <Route path="flows" element={<FlowsPage />} />
+          <Route path="flows/:flowId" element={<FlowDetailPage />} />
+        </Route>
       </Route>
     </Route>
-    <Route path="*" element={<main className="team-picker"><h1>Page not found</h1><Link to="/">Return to AlertOps</Link></main>} />
+    <Route path="*" element={<main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to AlertOps</a></main>} />
   </Routes></BrowserRouter>
 }
 
