@@ -23,8 +23,10 @@
         <java.version>17</java.version>
         <jjwt.version>0.11.5</jjwt.version>
         <!-- Temporary security overrides until Spring Boot manages these fixed versions. -->
-        <netty.version>4.1.136.Final</netty.version>
+        <netty.version>4.1.137.Final</netty.version>
         <postgresql.version>42.7.12</postgresql.version>
+        <rabbit-amqp-client.version>5.34.0</rabbit-amqp-client.version>
+        <tomcat.version>10.1.60</tomcat.version>
     </properties>
 
     <dependencies>
