@@ -32,7 +32,7 @@ class NotificationTest {
 
         UUID escalationId = UUID.fromString("7f000101-a0e3-1299-81a0-e303e5670000");
         FlowExecutionState state = new FlowExecutionState();
-        state.setUserEmail("responder@example.com");
+        state.setUserEmail("user@example.com");
         state.setProcessId(escalationId);
         state.setTaskDetails("Queue **backlog** <img src=x onerror=alert(1)>");
 

@@ -108,7 +108,7 @@ public class Notification {
                 ## Response reference
 
                 - **Escalation ID:** %s
-                - **Assigned responder:** %s
+                - **Assigned user:** %s
 
                 Review this alert and follow your team's incident response procedure.
 
