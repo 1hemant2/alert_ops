@@ -30,6 +30,7 @@ export function AppShell() {
         <nav className="primary-nav" aria-label="Main navigation">
           <div className="nav-section-title">CONTROL ROOM</div>
           <NavLink end to={base} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">◫</span>Overview</NavLink>
+          <NavLink to={`${base}/members`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">♧</span>Members</NavLink>
           <NavLink to={`${base}/tasks`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">▤</span>Tasks</NavLink>
           <NavLink to={`${base}/flows`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">⌁</span>Escalation flows</NavLink>
           <NavLink to={`${base}/escalations`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">◉</span>Escalations</NavLink>

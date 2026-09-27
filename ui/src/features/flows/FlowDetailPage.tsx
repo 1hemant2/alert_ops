@@ -69,7 +69,7 @@ export function FlowDetailPage() {
         <p className="form-intro">The recipient must already have an account and belong to this team.</p>
         <form onSubmit={submit} className="form-stack">
           <Field label="Step name"><input required maxLength={100} value={nodeNameValue} onChange={event => setNodeNameValue(event.target.value)} placeholder="Notify primary on-call" /></Field>
-          <Field label="Responder email"><input required type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="oncall@company.com" /></Field>
+          <Field label="Recipient email"><input required type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="oncall@company.com" /></Field>
           <Field label="Delay before this step" hint="The first step also uses this delay after the escalation starts."><div className="input-with-suffix"><input required type="number" min="0" max="10080" value={delay} onChange={event => setDelay(event.target.value)} /><span>minutes</span></div></Field>
           {create.error && <div className="form-error" role="alert">{create.error.message}</div>}
           <Button disabled={create.isPending || !flow.data}>{create.isPending ? 'Adding node…' : 'Add node'} <span>→</span></Button>

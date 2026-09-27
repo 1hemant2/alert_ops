@@ -28,7 +28,7 @@ export function FlowsPage() {
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">TEAM FLOWS</span><h2>Flow templates</h2></div><span className="count-pill">{flows.data?.length ?? '—'}</span></div>
-        {flows.isPending ? <LoadingRows count={4} /> : flows.isError ? <ErrorState message={flows.error.message} onRetry={() => void flows.refetch()} /> : flows.data.length === 0 ? <EmptyState title="No response paths yet" description="Create a flow and add a few responder nodes in the order they should run." /> : <div className="flow-list">{flows.data.map(flow => <Link className="flow-row" to={`/app/${teamId}/flows/${flow.id}`} key={flow.id}><span className="flow-symbol">⌁</span><span className="flow-row-copy"><strong>{flow.name}</strong><small>Updated {formatDate(flow.updatedAt ?? flow.createdAt)}</small></span><span className="flow-version">v{flow.version ?? 0}</span><span className="task-id">OPEN&nbsp; →</span></Link>)}</div>}
+        {flows.isPending ? <LoadingRows count={4} /> : flows.isError ? <ErrorState message={flows.error.message} onRetry={() => void flows.refetch()} /> : flows.data.length === 0 ? <EmptyState title="No response paths yet" description="Create a flow and add notification recipients in the order they should be contacted." /> : <div className="flow-list">{flows.data.map(flow => <Link className="flow-row" to={`/app/${teamId}/flows/${flow.id}`} key={flow.id}><span className="flow-symbol">⌁</span><span className="flow-row-copy"><strong>{flow.name}</strong><small>Updated {formatDate(flow.updatedAt ?? flow.createdAt)}</small></span><span className="flow-version">v{flow.version ?? 0}</span><span className="task-id">OPEN&nbsp; →</span></Link>)}</div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW FLOW</span><h2>Start a response path</h2></div><span className="form-number">02</span></div>
@@ -38,7 +38,7 @@ export function FlowsPage() {
           {create.error && <div className="form-error" role="alert">{create.error.message}</div>}
           <Button disabled={create.isPending}>{create.isPending ? 'Creating flow…' : 'Create flow'} <span>→</span></Button>
         </form>
-        <div className="side-callout"><span>FLOW BUILDER</span><p>Next, add nodes with the responder email and the delay before that step runs.</p></div>
+        <div className="side-callout"><span>FLOW BUILDER</span><p>Next, add notification recipients and the delay before each step runs.</p></div>
       </Card>
     </div>
   </>

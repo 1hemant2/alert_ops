@@ -14,7 +14,7 @@ export function LoginPage() {
     mutationFn: () => login(email.trim(), password),
     onSuccess: token => {
       beginSession(token)
-      navigate('/teams')
+      navigate(sessionStorage.getItem('alertops.pending-invite') ? '/join' : '/teams')
     },
   })
 
