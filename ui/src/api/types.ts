@@ -30,6 +30,35 @@ export interface SelectedTeam {
   role?: string
 }
 
+export interface TeamMember {
+  memberId: string
+  userId: string
+  name: string
+  email: string
+  role: string
+}
+
+export interface TeamInviteRequest {
+  email: string
+  role: 'ADMIN' | 'USER'
+  expiresInHours: number
+}
+
+export interface TeamInviteResponse {
+  email: string
+  role: string
+  teamName: string
+  expiresAt: string
+}
+
+export interface TeamInvitePreview extends TeamInviteResponse {}
+
+export interface TeamInviteAcceptance {
+  teamId: string
+  teamName: string
+  role: string
+}
+
 export interface Task {
   id: string
   name: string

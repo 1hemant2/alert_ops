@@ -69,6 +69,8 @@ public class MessageConsumer {
             if(esclationStatus.equals("RUNNING") && flowExecutionNodeStatus.equals("ACTIVE") ) {
                 if(notificationStatus.equals("NOT_SENT")) {
                     boolean mailSent = notification.sendEmail(flowExecutionState);
+                    // Persist total attempts, including successful SMTP submissions.
+                    flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
                     if(mailSent) {
                        // change node status terminal, notification status sent
                        flowExecutionState.setExecutionState("TERMINAL");
@@ -85,14 +87,12 @@ public class MessageConsumer {
                         if(retryOnFailureEnabled && sendAttemptCount < maxRetryAttempts) {
                            // don't change node status, notification_status, increase retry count push the same node
                             // publish current node again to delay Q.
-                            flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
                             flowExecutionStateRepository.save(flowExecutionState);
                             messagePublisher.publishWithDelay(flowExecutionState);
                         } else {
                             // change the node status as failed, notification status failed, push the next node
                             flowExecutionState.setExecutionState("TERMINAL");
                             flowExecutionState.setNotificationState("FAILED");
-                            flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
                             if(nextNode == null) {
                                escalation.setStatus("COMPLETED");
                                escalation.setResolutionType("EXHAUSTED"); 

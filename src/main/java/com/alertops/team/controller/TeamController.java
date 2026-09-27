@@ -1,9 +1,15 @@
 package com.alertops.team.controller;
 
-import com.alertops.caching.IntentCache;
+import com.alertops.team.dto.InviteAcceptanceRequest;
 import com.alertops.team.dto.InviteDtoReq;
 import com.alertops.team.dto.TeamReqDto;
+import com.alertops.team.service.InviteConflictException;
+import com.alertops.team.service.InviteExpiredException;
+import com.alertops.team.service.InviteMailDeliveryException;
+import com.alertops.team.service.InviteNotFoundException;
+import com.alertops.team.service.TeamInvitationService;
 import com.alertops.team.service.TeamService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,12 +22,12 @@ import java.util.UUID;
 public class TeamController {
 
     TeamService teamService;
-    IntentCache intentCache;
+    TeamInvitationService teamInvitationService;
     TeamController(TeamService teamService ,
-                   IntentCache intentCache
+                   TeamInvitationService teamInvitationService
                    ) {
         this.teamService = teamService;
-        this.intentCache = intentCache;
+        this.teamInvitationService = teamInvitationService;
     }
 
     @GetMapping("/select")
@@ -29,6 +35,8 @@ public class TeamController {
         try {
             Map<String, Object> res = teamService.selectTeam(teamId);
             return ResponseEntity.ok( Map.of("data", res));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("code", "FORBIDDEN", "message", e.getMessage()));
         } catch (RuntimeException e) {
             return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error occured while user login" + e.getMessage());
         }
@@ -74,27 +82,67 @@ public class TeamController {
     @PostMapping("/invite")
     public ResponseEntity<?> inviteUser(@RequestBody InviteDtoReq req) {
         try {
-            teamService.inviteUser(req);
-            return ResponseEntity.ok("user invited successfully");
+            return ResponseEntity.status(HttpStatus.CREATED).body(teamInvitationService.createInvite(req));
+        } catch (AccessDeniedException e) {
+            return error(HttpStatus.FORBIDDEN, "FORBIDDEN", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return error(HttpStatus.BAD_REQUEST, "INVALID_INVITE", e.getMessage());
+        } catch (InviteConflictException e) {
+            return error(HttpStatus.CONFLICT, "INVITE_CONFLICT", e.getMessage());
+        } catch (InviteNotFoundException e) {
+            return error(HttpStatus.NOT_FOUND, "TEAM_NOT_FOUND", e.getMessage());
+        } catch (InviteMailDeliveryException e) {
+            return error(HttpStatus.BAD_GATEWAY, "EMAIL_DELIVERY_FAILED", e.getMessage());
         } catch (RuntimeException e) {
-            return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error occured while user login" + e.getMessage());
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, "INVITE_FAILED", "The invitation could not be created.");
+        }
+    }
+
+    @GetMapping("/members")
+    public ResponseEntity<?> getTeamMembers() {
+        try {
+            return ResponseEntity.ok(teamService.getTeamMembers());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("code", "FORBIDDEN", "message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error occurred while fetching team members");
         }
     }
 
     @GetMapping("/join")
-    public ResponseEntity<?> joinTeam(@RequestParam UUID token) {
+    public ResponseEntity<?> previewInvite(@RequestParam UUID token) {
         try {
-            return ResponseEntity.ok(teamService.joinTeam(token));
+            return ResponseEntity.ok(teamInvitationService.preview(token));
+        } catch (InviteNotFoundException e) {
+            return error(HttpStatus.NOT_FOUND, "INVITE_NOT_FOUND", e.getMessage());
+        } catch (InviteExpiredException e) {
+            return error(HttpStatus.GONE, "INVITE_EXPIRED", e.getMessage());
+        } catch (InviteConflictException e) {
+            return error(HttpStatus.CONFLICT, "INVITE_UNAVAILABLE", e.getMessage());
         } catch (RuntimeException e) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(
-                            Map.of(
-                                    "action", "ERROR",
-                                    "message", e.getMessage()
-                            )
-                    );
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, "INVITE_PREVIEW_FAILED", "The invitation could not be loaded.");
         }
+    }
+
+    @PostMapping("/join")
+    public ResponseEntity<?> acceptInvite(@RequestBody InviteAcceptanceRequest request) {
+        try {
+            return ResponseEntity.ok(teamInvitationService.accept(request.token()));
+        } catch (AccessDeniedException e) {
+            return error(HttpStatus.FORBIDDEN, "FORBIDDEN", e.getMessage());
+        } catch (InviteNotFoundException e) {
+            return error(HttpStatus.NOT_FOUND, "INVITE_NOT_FOUND", e.getMessage());
+        } catch (InviteExpiredException e) {
+            return error(HttpStatus.GONE, "INVITE_EXPIRED", e.getMessage());
+        } catch (InviteConflictException e) {
+            return error(HttpStatus.CONFLICT, "INVITE_UNAVAILABLE", e.getMessage());
+        } catch (RuntimeException e) {
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, "INVITE_ACCEPT_FAILED", "The invitation could not be accepted.");
+        }
+    }
+
+    private ResponseEntity<Map<String, String>> error(HttpStatus status, String code, String message) {
+        return ResponseEntity.status(status).body(Map.of("code", code, "message", message));
     }
 
 

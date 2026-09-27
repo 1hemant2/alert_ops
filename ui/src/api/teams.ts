@@ -1,8 +1,30 @@
 import { jsonBody, request } from './client'
-import type { SelectedTeam, Team } from './types'
+import type { SelectedTeam, Team, TeamInviteAcceptance, TeamInvitePreview, TeamInviteRequest, TeamInviteResponse, TeamMember } from './types'
 
 export function getTeams(): Promise<Team[]> {
   return request<Team[]>('/api/v1/team')
+}
+
+export function getTeamMembers(): Promise<TeamMember[]> {
+  return request<TeamMember[]>('/api/v1/team/members')
+}
+
+export function createTeamInvite(payload: TeamInviteRequest): Promise<TeamInviteResponse> {
+  return request<TeamInviteResponse>('/api/v1/team/invite', {
+    method: 'POST',
+    body: jsonBody(payload),
+  })
+}
+
+export function previewTeamInvite(token: string): Promise<TeamInvitePreview> {
+  return request<TeamInvitePreview>(`/api/v1/team/join?token=${encodeURIComponent(token)}`, { public: true })
+}
+
+export function acceptTeamInvite(token: string): Promise<TeamInviteAcceptance> {
+  return request<TeamInviteAcceptance>('/api/v1/team/join', {
+    method: 'POST',
+    body: jsonBody({ token }),
+  })
 }
 
 export async function createTeam(teamName: string): Promise<SelectedTeam> {

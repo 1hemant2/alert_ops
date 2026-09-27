@@ -50,7 +50,7 @@ export function TeamPickerPage() {
           {(selection.error || create.error) && <div className="form-error" role="alert">{(selection.error ?? create.error)?.message}</div>}
         </Card>
         <Card className="create-team-card">
-          <div className="create-icon">＋</div><span className="eyebrow">NEW WORKSPACE</span><h2>Start with a team</h2><p>Create a workspace for your responders, then configure its first escalation flow.</p>
+          <div className="create-icon">＋</div><span className="eyebrow">NEW WORKSPACE</span><h2>Start with a team</h2><p>Create a workspace for your team members, then configure its first escalation flow.</p>
           <form onSubmit={submit} className="form-stack">
             <Field label="Team name"><input required maxLength={80} value={teamName} onChange={event => setTeamName(event.target.value)} placeholder="e.g. Platform Operations" /></Field>
             <Button disabled={create.isPending}>{create.isPending ? 'Creating…' : 'Create team'} <span>→</span></Button>

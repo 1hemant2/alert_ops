@@ -40,7 +40,7 @@ export function PublicPage() {
           <article><span>02</span><h3>Persist</h3><p>Store each execution step before publishing delayed work to RabbitMQ.</p></article>
           <article><span>03</span><h3>Resume</h3><p>Recover running work from saved state when the application starts again.</p></article>
         </div>
-        <div className="simulation-note"><span>DEMO NOTE</span> Notification delivery is simulated in this project; the consumer records the send attempt in application logs.</div>
+        <div className="delivery-note"><span>EMAIL DELIVERY</span> Flow nodes send formatted HTML emails with a Markdown plain-text fallback through the backend SMTP server. Configure SMTP credentials before starting an escalation; SENT means the SMTP server accepted the message.</div>
       </section>
       <footer className="public-footer"><span>ALERTOPS <i /> RELIABLE ESCALATION, MADE EXPLICIT.</span><span>AN ENGINEERING DEMONSTRATION</span></footer>
     </div>

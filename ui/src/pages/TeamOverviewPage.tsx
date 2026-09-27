@@ -31,9 +31,9 @@ export function TeamOverviewPage() {
       <Card className="journey-card">
         <div className="card-heading"><div><span className="eyebrow">FOUR STEPS TO A LIVE DEMO</span><h2>Set up an escalation</h2></div><span className="section-index">01 / 04</span></div>
         <div className="setup-steps">
-          <SetupStep index="01" title="Create a task" description="Describe the incident responders need to resolve." complete={Boolean(tasks.data?.length)} to={`${base}/tasks`} action="View tasks" />
+          <SetupStep index="01" title="Create a task" description="Describe the issue users will be notified about." complete={Boolean(tasks.data?.length)} to={`${base}/tasks`} action="View tasks" />
           <SetupStep index="02" title="Build a flow" description="Choose the people and delays in your response path." complete={Boolean(flows.data?.length)} to={`${base}/flows`} action="View flows" />
-          <SetupStep index="03" title="Add response nodes" description="Set the responder email and delay for each step." complete={Boolean(firstFlowNodes.data?.length)} to={firstFlowId ? `${base}/flows/${firstFlowId}` : `${base}/flows`} action={firstFlowId ? 'Configure nodes' : 'Create a flow'} />
+          <SetupStep index="03" title="Add response nodes" description="Set each notification recipient and the delay before contacting them." complete={Boolean(firstFlowNodes.data?.length)} to={firstFlowId ? `${base}/flows/${firstFlowId}` : `${base}/flows`} action={firstFlowId ? 'Configure nodes' : 'Create a flow'} />
           <SetupStep index="04" title="Create escalation" description="Pair a task with a flow and start its execution." complete={Boolean(escalations.data?.length)} to={`${base}/escalations`} action="View escalations" />
         </div>
       </Card>
@@ -46,7 +46,7 @@ export function TeamOverviewPage() {
           <div className="arch-line" />
           <div className="architecture-step"><span className="arch-icon arch-recover">03</span><div><strong>Resume on startup</strong><small>A reconciler republishes active work.</small></div></div>
         </div>
-        <div className="simulation-note compact"><span>DELIVERY</span> Email is simulated; the consumer writes the attempt to application logs.</div>
+        <div className="delivery-note compact"><span>DELIVERY</span> Escalation nodes email their configured recipients through SMTP. SENT means SMTP accepted the message.</div>
       </Card>
     </div>
     <div className="recent-heading"><div><span className="eyebrow">RECENT ACTIVITY</span><h2>Latest escalations</h2></div><Link to={`${base}/escalations`} className="text-link">All escalations <span>→</span></Link></div>

@@ -1,7 +1,6 @@
 package com.alertops.team.model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -15,7 +14,6 @@ public class Invite {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @Column(updatable = false, nullable = false)
     private UUID token;
 
@@ -72,6 +70,10 @@ public class Invite {
         return createdAt;
     }
 
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public UUID getTeamId() {
         return teamId;
     }
@@ -88,4 +90,3 @@ public class Invite {
         this.status = status;
     }
 }
-

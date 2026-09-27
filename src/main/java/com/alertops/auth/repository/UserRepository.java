@@ -14,6 +14,7 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     //find queries
     User findByEmail(String email);
+    User findByEmailIgnoreCase(String email);
 
     //Delete queries
     void deleteByEmail(String email);
