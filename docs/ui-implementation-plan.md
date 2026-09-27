@@ -55,7 +55,7 @@ The initial auth token has no team ID. Team selection issues a new JWT with team
 4. **Expose execution evidence:** add `GET /api/v1/escalation/{id}/execution-states`, scoped by the selected team, ordered by node position. Return a small DTO: `nodeId`, `userEmail`, `executionState`, `notificationState`, `sendAttemptCount`, `createdAt`, `updatedAt`. This lets the detail page show the actual durable queue workflow. Return 404 when the escalation is outside the team. Do not expose internal entities directly.
 5. **Secure flow node reads and writes:** `getNodesByFlowId`, node creation, and reorder currently look up a flow/node by ID without consistently checking the selected team's ownership. Enforce team membership on all three before exposing the controls in a public demo.
 6. **Make reorder reliable before enabling it:** verify version increments, moving to first position, and reindexing. The current `newPosition.compareTo(BigInteger.valueOf(50)) < 50` condition is always true for a `compareTo` result. Add focused service tests for order and stale version handling.
-7. **Keep delivery claims accurate:** `Notification#sendEmail` currently prints `[SEND]` to stdout and returns success. Label this as a simulated notification in the UI. Actual email delivery and configurable retry rules are future backend work; node creation has no retry settings today.
+7. **Email delivery:** `Notification#sendEmail` sends a styled HTML message rendered from Markdown, with a Markdown plain-text fallback, through Spring Mail when SMTP is configured. A missing SMTP configuration or send error returns failure so the saved node state follows the existing retry/failure path. The UI should explain that `SENT` means accepted by SMTP, not confirmed delivery. Configurable retry rules are future backend work; node creation has no retry settings today.
 
 Invite management can follow later. `POST /team/invite` logs the token rather than sending an email or returning a usable invite URL, and `InviteDtoReq` has no `ttl` setter. Team deletion and member role routes are placeholders. Do not put these actions in the first UI. The public join flow can be added once the invite contract is complete.
 
@@ -63,7 +63,7 @@ Invite management can follow later. `POST /team/invite` logs the token rather th
 
 | Route | Page | Main content |
 | --- | --- | --- |
-| `/` | Public overview | What AlertOps does; concise architecture diagram; sign-in CTA; clearly mark notification output as simulated. |
+| `/` | Public overview | What AlertOps does; concise architecture diagram; sign-in CTA; explain SMTP email requirements and the meaning of `SENT`. |
 | `/register`, `/login` | Authentication | Simple forms with visible API errors. |
 | `/teams` | Team picker | List teams, create team, select team. After create, select the new team automatically. |
 | `/app/:teamId` | Team overview | Guided four-step demo: task → flow → nodes → escalation. Show counts only if API results are loaded. |
@@ -113,7 +113,7 @@ Each ticket is a reviewable commit or small PR. Finish its acceptance checks bef
 4. **Auth and team pages.** Implement register, login, team list/create/select and route guards. Acceptance: refresh retains the active session; switching teams changes the token and never shows old team data.
 5. **Tasks and flows.** Implement lists/create, flow detail, add-node form, ordered timeline. Acceptance: create a task and a two-node flow using registered team members; reload and see the same order.
 6. **Backend execution read endpoint and ownership checks.** Add the scoped, ordered state DTO endpoint and fix node access; add focused backend tests. Enable the UI execution timeline only when the endpoint exists.
-7. **Escalations.** Implement list/create/detail/start and status polling. Acceptance: select a task and configured flow, create escalation, start once, see `IDLE → RUNNING → COMPLETED` from API responses, and inspect the saved node states. Explain that notifications are simulated.
+7. **Escalations.** Implement list/create/detail/start and status polling. Acceptance: select a task and configured flow, create escalation, start once, see `IDLE → RUNNING → COMPLETED` from API responses, and inspect the saved node states. Explain SMTP configuration and that `SENT` reflects SMTP acceptance.
 8. **Reorder, if backend gate 6 passes.** Add accessible Move up/Move down buttons using `nodeId`, `afterNodeId`, and current flow `version`. Refetch after every move and show a clear stale-version retry state. Skip drag and drop.
 9. **Release check.** Test the guided journey on desktop and mobile widths; run `typecheck` and `build`; test deployed UI against deployed API, including browser preflight, direct route reload, expired token, empty team, and a failed API request. Document the UI URL and `VITE_API_BASE_URL` in `ui/README.md`.
 
@@ -121,6 +121,6 @@ Each ticket is a reviewable commit or small PR. Finish its acceptance checks bef
 
 - A new reviewer can complete the full demo from a fresh account without using curl or the database.
 - The UI is served from its own static deployment and calls the API through a documented public origin or edge route.
-- All live statuses and node progress are sourced from the API; simulated delivery is clearly labeled.
+- All live statuses and node progress are sourced from the API; email status wording reflects SMTP acceptance rather than inbox delivery.
 - Tenant switching does not mix data, and the backend checks team ownership for every exposed flow operation.
 - The repository contains build, configuration, and deployment instructions that another developer can follow without hidden steps.

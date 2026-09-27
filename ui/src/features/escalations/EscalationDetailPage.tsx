@@ -43,7 +43,7 @@ export function EscalationDetailPage() {
   return <>
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
     <PageHeader eyebrow={`EXECUTION / ${item.id.slice(0, 8).toUpperCase()}`} title={item.name} description="Durable progress for this team scoped escalation." action={<StatusBadge status={item.status} />} />
-    <InlineNotice tone="warning">Notification delivery is simulated. The consumer writes each send attempt to application logs; this page shows the persisted execution state.</InlineNotice>
+    <InlineNotice>Each active node sends a formatted HTML email with a Markdown plain-text fallback to its configured recipient. SENT means the SMTP server accepted the message; it is not a delivery receipt.</InlineNotice>
     <div className="detail-summary-grid">
       <Card className="detail-summary-card"><span className="eyebrow">TASK CONTEXT</span><strong>{task?.name ?? item.taskId.slice(0, 8)}</strong><p>{task?.description || 'Task details are not available.'}</p></Card>
       <Card className="detail-summary-card"><span className="eyebrow">FLOW TEMPLATE</span>{flow.data ? <Link className="detail-link" to={`/app/${teamId}/flows/${flow.data.id}`}>{flow.data.name} <span>↗</span></Link> : <strong>{item.flowId.slice(0, 8)}</strong>}<p>{nodes.data ? `${nodes.data.length} configured response ${nodes.data.length === 1 ? 'node' : 'nodes'}` : 'Loading flow configuration…'}</p></Card>

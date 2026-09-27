@@ -37,7 +37,7 @@ export function TasksPage() {
         <p className="form-intro">Give responders a concise summary of the issue that triggered the escalation.</p>
         <form onSubmit={submit} className="form-stack">
           <Field label="Task name"><input required maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="Production API latency" /></Field>
-          <Field label="Description" hint="This text is included in the simulated notification."><textarea rows={5} maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} placeholder="What is failing? What should the responder check first?" /></Field>
+          <Field label="Description" hint="This text is included in the email sent to each responder."><textarea rows={5} maxLength={1000} value={description} onChange={event => setDescription(event.target.value)} placeholder="What is failing? What should the responder check first?" /></Field>
           {create.error && <div className="form-error" role="alert">{create.error.message}</div>}
           <Button disabled={create.isPending}>{create.isPending ? 'Creating task…' : 'Create task'} <span>→</span></Button>
         </form>

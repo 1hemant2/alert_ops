@@ -148,6 +148,22 @@ docker compose up --build
 
 The host ports above are defaults and can also be overridden in `.env`.
 
+### SMTP email delivery
+
+Escalation nodes send a styled HTML email generated from Markdown, with a Markdown plain-text fallback, using the configured SMTP server. Set these optional values in `.env` before starting the stack:
+
+```dotenv
+SPRING_MAIL_HOST=smtp.example.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=alerts@example.com
+SPRING_MAIL_PASSWORD=your-smtp-password
+ALERTOPS_EMAIL_FROM=alerts@example.com
+```
+
+SMTP authentication and STARTTLS default to enabled. For an implicit TLS server on port `465`, set `SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true` and `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false`. Configure `ALERTOPS_EMAIL_FROM` with a sender address verified by your SMTP provider; the SMTP login may not be a valid sender. Keep provider credentials out of source control.
+
+If SMTP is not configured or the SMTP server rejects a send, the notification is recorded as failed and follows the node's configured retry/fallback path. A node marked `SENT` means the SMTP server accepted the message; AlertOps does not claim that it reached the recipient's inbox.
+
 ### Stop services
 
 ```bash

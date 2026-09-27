@@ -45,7 +45,7 @@ The container serves only the static UI on port `8080`; it does not contain or s
 5. Create an escalation from the task and flow, open its detail page, and start it.
 6. Watch the escalation and saved node states update. The detail page refreshes while the escalation is `RUNNING`.
 
-Notification delivery is simulated: the consumer currently writes the recipient and message to the backend application log. The UI labels this explicitly. Flow nodes can be moved with the up/down controls; each move sends the flow version and refetches the flow after the API accepts it.
+Escalation nodes send a styled HTML email rendered from Markdown, with a Markdown plain-text fallback, through the backend's SMTP configuration. Set the SMTP environment variables described in the repository root README before starting an escalation. A node marked `SENT` means the SMTP server accepted the message; it is not a delivery receipt. Flow nodes can be moved with the up/down controls; each move sends the flow version and refetches the flow after the API accepts it.
 
 ## API configuration
 

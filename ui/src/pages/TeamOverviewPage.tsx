@@ -46,7 +46,7 @@ export function TeamOverviewPage() {
           <div className="arch-line" />
           <div className="architecture-step"><span className="arch-icon arch-recover">03</span><div><strong>Resume on startup</strong><small>A reconciler republishes active work.</small></div></div>
         </div>
-        <div className="simulation-note compact"><span>DELIVERY</span> Email is simulated; the consumer writes the attempt to application logs.</div>
+        <div className="delivery-note compact"><span>DELIVERY</span> Escalation nodes email their configured recipients through SMTP. SENT means SMTP accepted the message.</div>
       </Card>
     </div>
     <div className="recent-heading"><div><span className="eyebrow">RECENT ACTIVITY</span><h2>Latest escalations</h2></div><Link to={`${base}/escalations`} className="text-link">All escalations <span>→</span></Link></div>

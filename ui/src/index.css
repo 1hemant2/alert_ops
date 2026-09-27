@@ -125,9 +125,9 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .architecture-step small { color: #8e9890; font-size: 9px; }
 .arch-line { width: 1px; height: 14px; background: #dfe6d5; margin: 2px 0 2px 14px; }
 .arch-stamp { color: #9aa59c; font-size: 7px; font-weight: 800; letter-spacing: .1em; }
-.simulation-note { padding: 10px 12px; color: #776b50; background: #faf7ed; border: 1px solid #f1ead5; border-radius: 7px; font-size: 9px; line-height: 1.55; }
-.simulation-note > span { color: #9a8557; margin-right: 7px; font-weight: 850; font-size: 7px; letter-spacing: .12em; }
-.simulation-note.compact { padding: 9px 10px; }
+.delivery-note { padding: 10px 12px; color: #776b50; background: #faf7ed; border: 1px solid #f1ead5; border-radius: 7px; font-size: 9px; line-height: 1.55; }
+.delivery-note > span { color: #9a8557; margin-right: 7px; font-weight: 850; font-size: 7px; letter-spacing: .12em; }
+.delivery-note.compact { padding: 9px 10px; }
 .recent-heading { margin: 32px 0 12px; display: flex; align-items: end; justify-content: space-between; }
 .recent-heading h2 { margin: 5px 0 0; color: #21312a; font: 500 20px Georgia, serif; }
 .text-link { color: #5d7247; font-size: 9px; font-weight: 650; }
@@ -339,7 +339,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .explainer-steps article > span { color: #8aa14f; font-size: 8px; font-weight: 800; letter-spacing: .1em; }
 .explainer-steps h3 { font: 500 15px Georgia,serif; margin: 7px 0 6px; }
 .explainer-steps p { color: #7e8980; margin: 0; font-size: 8px; line-height: 1.65; }
-.public-explainer .simulation-note { grid-column: 2; max-width: 580px; }
+.public-explainer .delivery-note { grid-column: 2; max-width: 580px; }
 .public-footer { height: 48px; padding: 0 max(calc((100vw - 1190px)/2), 6vw); background: #e8ece3; color: #829084; display: flex; align-items: center; justify-content: space-between; font-size: 7px; letter-spacing: .1em; font-weight: 750; }
 .public-footer i { margin: 0 7px; vertical-align: 2px; }
 .auth-page { min-height: 100vh; padding: 34px 22px; display: flex; align-items: center; flex-direction: column; justify-content: center; background: radial-gradient(ellipse at 50% 0%, #edf2e4, transparent 48%), #f5f6f2; }
@@ -358,7 +358,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
   .main-column { margin-left: 214px; width: calc(100% - 214px); }
   .public-main { padding-left: 6vw; padding-right: 6vw; gap: 36px; }
   .public-explainer { grid-template-columns: 1fr; }
-  .public-explainer .simulation-note { grid-column: 1; }
+  .public-explainer .delivery-note { grid-column: 1; }
 }
 @media (max-width: 880px) {
   .sidebar { width: 68px; flex-basis: 68px; padding: 22px 10px 12px; align-items: center; }
