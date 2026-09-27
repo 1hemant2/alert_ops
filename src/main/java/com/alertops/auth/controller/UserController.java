@@ -61,7 +61,8 @@ public class UserController {
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@RequestBody UserRegisterDto req) {
         try {
-            return  ResponseEntity.ok(userService.createUser(req));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(UserResponseDto.from(userService.createUser(req)));
         } catch (RuntimeException e) {
             return  ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("error occured while user register" + e.getMessage());
         }
@@ -83,4 +84,3 @@ public class UserController {
         }
     }
 }
-
