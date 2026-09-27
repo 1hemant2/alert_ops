@@ -32,6 +32,7 @@ export function AppShell() {
           <NavLink end to={base} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">◫</span>Overview</NavLink>
           <NavLink to={`${base}/tasks`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">▤</span>Tasks</NavLink>
           <NavLink to={`${base}/flows`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">⌁</span>Escalation flows</NavLink>
+          <NavLink to={`${base}/escalations`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph">◉</span>Escalations</NavLink>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-system"><span className="queue-mark">↗</span><span><strong>Queue workflow</strong><small>Delayed, persisted execution</small></span></div>

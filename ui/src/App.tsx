@@ -1,15 +1,18 @@
+import { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
+import { AppShell } from './components/AppShell'
 import { SessionProvider } from './app/Session'
 import { useSession } from './app/useSession'
-import { AppShell } from './components/AppShell'
-import { LoginPage, RegisterPage } from './features/auth/AuthPages'
-import { FlowsPage } from './features/flows/FlowsPage'
-import { FlowDetailPage } from './features/flows/FlowDetailPage'
-import { TasksPage } from './features/tasks/TasksPage'
-import { TeamPickerPage } from './features/teams/TeamPickerPage'
 import { PublicPage } from './pages/PublicPage'
 import { TeamOverviewPage } from './pages/TeamOverviewPage'
+import { LoginPage, RegisterPage } from './features/auth/AuthPages'
+import { TeamPickerPage } from './features/teams/TeamPickerPage'
+import { TasksPage } from './features/tasks/TasksPage'
+import { FlowDetailPage } from './features/flows/FlowDetailPage'
+import { FlowsPage } from './features/flows/FlowsPage'
+import { EscalationDetailPage } from './features/escalations/EscalationDetailPage'
+import { EscalationsPage } from './features/escalations/EscalationsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +42,10 @@ function HomeRedirect() {
   return <PublicPage />
 }
 
+function NotFound() {
+  return <main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to AlertOps</a></main>
+}
+
 function AppRoutes() {
   return <BrowserRouter><Routes>
     <Route path="/" element={<HomeRedirect />} />
@@ -52,13 +59,18 @@ function AppRoutes() {
           <Route path="tasks" element={<TasksPage />} />
           <Route path="flows" element={<FlowsPage />} />
           <Route path="flows/:flowId" element={<FlowDetailPage />} />
+          <Route path="escalations" element={<EscalationsPage />} />
+          <Route path="escalations/:escalationId" element={<EscalationDetailPage />} />
         </Route>
       </Route>
     </Route>
-    <Route path="*" element={<main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to AlertOps</a></main>} />
+    <Route path="*" element={<NotFound />} />
   </Routes></BrowserRouter>
 }
 
 export default function App() {
+  useEffect(() => {
+    document.documentElement.dataset.ready = 'true'
+  }, [])
   return <QueryClientProvider client={queryClient}><SessionProvider><AppRoutes /></SessionProvider></QueryClientProvider>
 }
