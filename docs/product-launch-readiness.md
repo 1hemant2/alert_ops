@@ -13,8 +13,11 @@ Reassessed: 2026-09-27. This list is based on the current source code. It contai
 
 ### 2. Make escalation execution safe under duplicate messages and restarts
 
-- [ ] Process each queue message against the latest database state and atomically claim the step. The current consumer uses the queued state object; startup recovery republishes active steps, and one failure path searches for `IDLE` although new steps are `PENDING`. Persist when a step is due so recovery does not restart its full wait. Make the database-to-queue handoff recoverable and prevent two consumers from advancing the same run.
-- [ ] Make starting a run atomic. Two simultaneous `start` requests must not create two sets of step states or schedule the first step twice.
+- [x] Reload the saved step for each queue message and atomically claim an eligible delivery. Ignore duplicate deliveries and messages for an older send attempt. Unit tests cover these consumer decisions; database concurrency integration coverage is still needed.
+- [x] When an unexpected processing error occurs, look for the next `PENDING` step before deciding the escalation is exhausted.
+- [ ] Persist when a step is due so recovery does not restart its full wait. Make the database-to-queue handoff recoverable and prevent consumer crashes from losing or duplicating scheduled work.
+- [x] Claim a start by changing the escalation from `IDLE` to `RUNNING` with a conditional database update, so only one simultaneous request can create step states.
+- [ ] Add database integration tests proving that duplicate starts create one state set and duplicate deliveries cannot advance a step twice.
 - **Done when:** duplicate messages, repeated starts, consumer crashes, and application restarts do not skip or advance a step twice; the remaining SMTP uncertainty after a send succeeds but before the database records it is explicitly handled or documented. Focused integration tests exercise these cases.
 - **Evidence:** [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), [reconciler](../src/main/java/com/alertops/messaging/ReconcilerService.java), [publisher](../src/main/java/com/alertops/messaging/MessagePublisher.java), [start use case](../src/main/java/com/alertops/flow_execution_engine/application/StartFlowExecutionUseCase.java).
 

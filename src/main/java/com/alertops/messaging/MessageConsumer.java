@@ -118,7 +118,7 @@ public class MessageConsumer {
             flowExecutionState.setNotificationState("FAILED");
             flowExecutionStateRepository.save(flowExecutionState);
             FlowExecutionState nextNode = flowExecutionStateRepository.
-                                            findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "IDLE");
+                                            findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "PENDING");
             if(nextNode == null) {
                escalation.setStatus("COMPLETED");
                escalation.setResolutionType("EXHAUSTED"); 
