@@ -40,7 +40,7 @@ public class FlowExecutionStateService {
                 flowExecutionState.setDuration(node.getDuration());
                 flowExecutionState.setPosition(node.getPosition());
                 flowExecutionState.setProcessId(escalationId);
-                flowExecutionState.setTaskId(node.getId());
+                flowExecutionState.setTaskId(task.getId());
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             FlowExecutionState flowExecutionState = flowExecutionStateRepository.findTopByProcessIdOrderByPositionAsc(escalationId);

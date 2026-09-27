@@ -203,25 +203,26 @@ operating-system packages, application JAR, and all runtime Java dependencies.
 build image -> scan HIGH and CRITICAL findings -> upload report -> push only if clean
 ```
 
-The scan uses a reviewed SHA-pinned Trivy Action. It writes a readable
-`trivy-results.txt` file and `actions/upload-artifact` uploads it with `if: always()`.
+The scan uses a reviewed SHA-pinned Trivy Action and pins the Trivy binary to
+`v0.74.0`. It writes a readable `trivy-results.txt` file and
+`actions/upload-artifact` uploads it with `if: always()`.
 That condition means the report is retained even when the scan fails; it does not run
 another scan. The later GHCR steps use their normal implicit `success()` condition,
 so they are skipped after a scan failure.
 
-`exit-code: "1"` turns HIGH or CRITICAL findings into a release gate. The initial
-audit found 31 findings. They were remediated by:
-
-- upgrading the Spring Boot parent from `3.5.4` to `3.5.16`, which updates its managed
-  dependency set together;
-- temporarily overriding Spring Boot's managed Netty version to `4.1.136.Final` and
-  PostgreSQL JDBC version to `42.7.12` until a future Spring Boot release manages
-  those patched versions.
+`exit-code: "1"` turns HIGH or CRITICAL findings into a release gate. An earlier
+audit's 31 findings led to upgrading Spring Boot from `3.5.4` to `3.5.16` and
+temporarily overriding Netty and PostgreSQL versions. A later scan identified eight
+Java findings in RabbitMQ, Netty, and Tomcat. The current temporary overrides are
+Netty `4.1.137.Final`, RabbitMQ Java client `5.34.0`, Tomcat `10.1.60`, and
+PostgreSQL JDBC `42.7.12` until Spring Boot manages the fixed versions.
 
 Netty is transitive rather than an AlertOps direct dependency:
 
 ```text
 spring-boot-starter-data-redis -> lettuce-core -> Netty
+spring-boot-starter-amqp -> spring-rabbit -> amqp-client
+spring-boot-starter-web -> spring-boot-starter-tomcat -> Tomcat
 ```
 
 Do not add an individual Netty module directly just to patch a CVE. The `netty.version`

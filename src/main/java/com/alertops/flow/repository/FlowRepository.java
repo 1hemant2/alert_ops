@@ -15,6 +15,8 @@ import com.alertops.flow.model.Flow;
 public interface FlowRepository extends JpaRepository<Flow, UUID> {
         Page<Flow> findByTeamId(UUID teamId, Pageable pageable);
 
+        Flow findByIdAndTeamId(UUID id, UUID teamId);
+
         @Modifying
         @Query("""
                 UPDATE Flow f SET f.name = :#{#flow.name}, f.updatedBy = :#{#flow.updatedBy}, f.updatedAt = :#{#flow.updatedAt}

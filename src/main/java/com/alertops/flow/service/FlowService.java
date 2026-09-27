@@ -122,7 +122,8 @@ public class FlowService {
                 throw new RuntimeException("Flow ID is required");
             }   
 
-            Flow flow = flowRepository.findById(flowId).orElse(null);
+            AuthContext authContext = AuthContextHolder.get();
+            Flow flow = flowRepository.findByIdAndTeamId(flowId, authContext.getTeamId());
 
             if(flow == null) {
                 throw new RuntimeException("Flow not found");
@@ -158,70 +159,49 @@ public class FlowService {
                 throw new RuntimeException("Flow not found");
             }
 
-            if(!flow.getVersion().equals(version)) {
+            AuthContext authContext = AuthContextHolder.get();
+            if (!flow.getTeamId().equals(authContext.getTeamId())) {
+                throw new RuntimeException("Flow not found");
+            }
+
+            if (version == null || !flow.getVersion().equals(version)) {
                 throw new RuntimeException("Flow has been updated by other user. Please refresh and try again.");
             }
 
-            BigInteger newPosition;
+            if (afterNode != null && (!afterNode.getFlowId().equals(node.getFlowId())
+                    || afterNode.getId().equals(node.getId()))) {
+                throw new RuntimeException("Choose a different node in the same flow");
+            }
 
-            /**
-             * Calculate new position based on afterNode position
-             * If afterNode is null, move to the start
-             * Else, find the next node after afterNode position and set position in between
-             * If next node is null, set position after afterNode position
-             */
-            if(afterNode == null) {
-                Node firstNode = nodeRepository.findTopByFlowIdOrderByPositionAsc(node.getFlowId());
-                if(firstNode == null) {
-                    throw new RuntimeException("No nodes found in the flow");
-                } else {
-                    newPosition = firstNode.getPosition().subtract(BigInteger.valueOf(1000));
+            List<Node> nodes = new ArrayList<>(nodeRepository.findAllByFlowIdOrderByPositionAsc(node.getFlowId()));
+            nodes.removeIf(existing -> existing.getId().equals(nodeId));
+            int insertAt = afterNode == null ? 0 : -1;
+            if (afterNode != null) {
+                for (int index = 0; index < nodes.size(); index++) {
+                    if (nodes.get(index).getId().equals(afterNodeId)) {
+                        insertAt = index + 1;
+                        break;
+                    }
                 }
-            } else {
-                
-                Node nextNode = nodeRepository.findNextNode(node.getFlowId(), afterNode.getPosition());
-
-                if(nextNode == null) {
-                    newPosition = afterNode.getPosition().add(BigInteger.valueOf(1000));
-                    node.setPosition(newPosition);
-                } else {
-                    newPosition = afterNode.getPosition().add(nextNode.getPosition()).divide(BigInteger.valueOf(2));
-                    node.setPosition(newPosition);
-                }  
+                if (insertAt < 0) {
+                    throw new RuntimeException("Target node not found in this flow");
+                }
             }
-            
-            // System.out.println("New Position: " + newPosition);
+            nodes.add(insertAt, node);
 
-            node.setPosition(newPosition);
-            Node updatedNode = nodeRepository.save(node);
-            flow.setUpdatedBy(flow.getId());
-            flow.setUpdatedAt(Instant.now());
-            flowRepository.updateFlow(flow);
-
-            if(newPosition.compareTo(BigInteger.valueOf(50)) < 50) {
-               reindexNodes(node.getFlowId());
-               Node newUpdatedNode = nodeRepository.findById(node.getId()).orElseThrow();
-               updatedNode.setPosition(newUpdatedNode.getPosition());
-            }
-            
-            return updatedNode;
-        } catch(Exception e) {
-            throw e;
-        }
-    }
-
-    private void reindexNodes(UUID flowId) {
-        try {
-            List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
             BigInteger position = BigInteger.valueOf(1000);
-            for(Node node : nodes) {
-                node.setPosition(position);
-                nodeRepository.save(node);
+            for (Node current : nodes) {
+                current.setPosition(position);
                 position = position.add(BigInteger.valueOf(1000));
             }
+            nodeRepository.saveAll(nodes);
+            flow.setUpdatedBy(authContext.getUserId());
+            flow.setUpdatedAt(Instant.now());
+            flowRepository.saveAndFlush(flow);
+            return node;
         } catch(Exception e) {
             throw e;
         }
     }
-}
 
+}

@@ -10,6 +10,9 @@ public class CreateNodeDto {
     private int durationInMinutes;
     private String email;
     private BigInteger position;
+
+    public CreateNodeDto() {
+    }
     
 
     public CreateNodeDto(UUID id, UUID flowId, String nodeName, int durationInMinutes, String email, BigInteger position) {

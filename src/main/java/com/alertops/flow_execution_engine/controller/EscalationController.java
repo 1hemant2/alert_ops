@@ -7,6 +7,7 @@ import com.alertops.flow_execution_engine.service.EscalationService;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -28,7 +29,8 @@ public class EscalationController {
 
     @PostMapping("/create")
     public ResponseEntity<?> createEsclation(@RequestBody CreateEscalationReqDto req) {
-        return ResponseEntity.status(400).body(escalationService.createEscalation(req.getEscalationName(), req.getTaskId(), req.getFlowId()));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(escalationService.createEscalation(req.getEscalationName(), req.getTaskId(), req.getFlowId()));
     }
 
     @GetMapping("/all")
@@ -38,7 +40,14 @@ public class EscalationController {
 
     @GetMapping
     public ResponseEntity<?> getEscalations(@RequestParam UUID escalationId) {
-        return ResponseEntity.ok(escalationService.getEscalationById(escalationId));
+        var escalation = escalationService.getEscalationById(escalationId);
+        return escalation == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(escalation);
+    }
+
+    @GetMapping("/{escalationId}/execution-states")
+    public ResponseEntity<?> getExecutionStates(@PathVariable UUID escalationId) {
+        var executionStates = escalationService.getExecutionStates(escalationId);
+        return executionStates == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(executionStates);
     }
 
     @PostMapping("/start")
@@ -48,4 +57,3 @@ public class EscalationController {
     }
 
 }
-

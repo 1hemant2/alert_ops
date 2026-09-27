@@ -54,7 +54,7 @@ public class CreateFlowNodeUseCase {
                 throw new RuntimeException("User is not a member of the team");
             }
 
-            Flow flow = flowRepository.findById(request.getFlowId()).orElse(null);
+            Flow flow = flowRepository.findByIdAndTeamId(request.getFlowId(), authContext.getTeamId());
 
             if(flow == null) {
                 throw new RuntimeException("Flow not found");
@@ -62,7 +62,8 @@ public class CreateFlowNodeUseCase {
 
 
             // 2. Cross-domain validation (APPLICATION responsibility)
-            if (!teamMember.getTeamId().equals(authContext.getTeamId())) {
+            if (!flow.getTeamId().equals(authContext.getTeamId())
+                    || !teamMember.getTeamId().equals(authContext.getTeamId())) {
                 throw new RuntimeException("User not in same team");
             }
 
