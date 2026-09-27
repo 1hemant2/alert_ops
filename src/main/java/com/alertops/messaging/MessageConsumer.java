@@ -15,7 +15,7 @@ import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepositor
 public class MessageConsumer {
    private final Notification notification;
    private final FlowExecutionStateRepository flowExecutionStateRepository;
-   private final EscalationRepository esclEscalationRepository;
+   private final EscalationRepository escalationRepository;
    private final MessagePublisher messagePublisher;
 
 
@@ -23,7 +23,7 @@ public class MessageConsumer {
         Notification notification, MessagePublisher messagePublisher
     ) {
         this.flowExecutionStateRepository = flowExecutionStateRepository;
-        this.esclEscalationRepository = escalationRepository;
+        this.escalationRepository = escalationRepository;
         this.notification = notification;
         this.messagePublisher = messagePublisher;
     }
@@ -31,31 +31,38 @@ public class MessageConsumer {
 
     @RabbitListener(queues = RabbitMqConfig.FINAL_QUEUE)
     @Transactional
-    public void onMessage(FlowExecutionState flowExecutionState) {
-        try {
-            UUID processId = flowExecutionState.getProcessId();
+    public void onMessage(FlowExecutionState queuedState) {
+        if (queuedState == null || queuedState.getId() == null) {
+            return;
+        }
 
-            if(processId == null) {
-                //send the esclation failed notification who have created the escalation
-                throw new RuntimeException("Escalation failed");
-            }
+        FlowExecutionState currentState = flowExecutionStateRepository.findById(queuedState.getId()).orElse(null);
+        if (currentState == null
+                || currentState.getSendAttemptCount() != queuedState.getSendAttemptCount()
+                || !"ACTIVE".equals(currentState.getExecutionState())
+                || !"NOT_SENT".equals(currentState.getNotificationState())
+                || currentState.getProcessId() == null) {
+            return;
+        }
 
-            Escalation escalation = esclEscalationRepository.findById(processId).orElse(null);
+        Escalation escalation = escalationRepository.findById(currentState.getProcessId()).orElse(null);
+        if (escalation == null || !"RUNNING".equals(escalation.getStatus())) {
+            return;
+        }
 
-            if(escalation != null) {
-                consume(flowExecutionState, escalation);
-            } else {
-                //send the mail escalation failed 
-                throw new RuntimeException("Something went wrong while getting the escaltion");
-            }
+        int claimedRows = flowExecutionStateRepository.claimForDelivery(
+                currentState.getId(), queuedState.getSendAttemptCount());
+        if (claimedRows != 1) {
+            return;
+        }
 
-        } catch (Exception e) {
-            System.out.println("Something went wrong" + e.getMessage());
-        };
+        // The bulk update bypasses the persistence context, so keep the managed copy aligned.
+        currentState.setExecutionState("PROCESSING");
+        consume(currentState, escalation);
     }
 
 
-    public void consume(FlowExecutionState flowExecutionState, Escalation escalation) {
+    private void consume(FlowExecutionState flowExecutionState, Escalation escalation) {
         try {
             String esclationStatus  = escalation.getStatus();
             String flowExecutionNodeStatus = flowExecutionState.getExecutionState();
@@ -66,7 +73,7 @@ public class MessageConsumer {
             FlowExecutionState nextNode = flowExecutionStateRepository.
                                             findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "PENDING");
 
-            if(esclationStatus.equals("RUNNING") && flowExecutionNodeStatus.equals("ACTIVE") ) {
+            if(esclationStatus.equals("RUNNING") && flowExecutionNodeStatus.equals("PROCESSING") ) {
                 if(notificationStatus.equals("NOT_SENT")) {
                     boolean mailSent = notification.sendEmail(flowExecutionState);
                     // Persist total attempts, including successful SMTP submissions.
@@ -79,7 +86,7 @@ public class MessageConsumer {
                        if(nextNode == null) {
                           escalation.setStatus("COMPLETED"); 
                           escalation.setResolutionType("EXHAUSTED"); 
-                          esclEscalationRepository.save(escalation);
+                          escalationRepository.save(escalation);
                        } else {
                            messagePublisher.publishWithDelay(nextNode);
                        }
@@ -96,7 +103,7 @@ public class MessageConsumer {
                             if(nextNode == null) {
                                escalation.setStatus("COMPLETED");
                                escalation.setResolutionType("EXHAUSTED"); 
-                               esclEscalationRepository.save(escalation);
+                               escalationRepository.save(escalation);
                             } else {
                                 messagePublisher.publishWithDelay(nextNode);
                             }
@@ -115,7 +122,7 @@ public class MessageConsumer {
             if(nextNode == null) {
                escalation.setStatus("COMPLETED");
                escalation.setResolutionType("EXHAUSTED"); 
-               esclEscalationRepository.save(escalation);
+               escalationRepository.save(escalation);
             } else {
                 messagePublisher.publishWithDelay(nextNode);
             }
