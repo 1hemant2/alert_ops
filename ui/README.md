@@ -45,6 +45,8 @@ The container serves only the static UI on port `8080`; it does not contain or s
 5. Create an escalation from the task and flow, open its detail page, and start it.
 6. Watch the escalation and saved node states update. The detail page refreshes while the escalation is `RUNNING`.
 
+Team owners can invite admins or users from the Members page; admins can invite users only. Invite emails require the backend SMTP settings above and `ALERTOPS_UI_BASE_URL` set to the UI origin. The recipient must sign in or register with the invited address before accepting the link.
+
 Escalation nodes send a styled HTML email rendered from Markdown, with a Markdown plain-text fallback, through the backend's SMTP configuration. Set the SMTP environment variables described in the repository root README before starting an escalation. A node marked `SENT` means the SMTP server accepted the message; it is not a delivery receipt. Flow nodes can be moved with the up/down controls; each move sends the flow version and refetches the flow after the API accepts it.
 
 ## API configuration

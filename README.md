@@ -26,8 +26,8 @@ Rather than relying on periodic polling or best-effort schedulers, AlertOps mode
 - Users can register and authenticate using JWT.
 - A user can belong to multiple teams.
 - Teams enforce role-based access control (admin, member, etc.).
-- Team invitations are supported even if the invited user does not yet exist.
-- User intent is preserved and resolved when the invited user registers.
+- Team owners and admins can send invitation emails to existing or new users; admins can invite users only.
+- Invite links are previewed before acceptance and require sign-in with the invited email address.
 
 This mirrors how real SaaS systems handle collaboration and ownership.
 
@@ -161,6 +161,8 @@ ALERTOPS_EMAIL_FROM=alerts@example.com
 ```
 
 SMTP authentication and STARTTLS default to enabled. For an implicit TLS server on port `465`, set `SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true` and `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false`. Configure `ALERTOPS_EMAIL_FROM` with a sender address verified by your SMTP provider; the SMTP login may not be a valid sender. Keep provider credentials out of source control.
+
+Team invitation links point to the UI origin configured with `ALERTOPS_UI_BASE_URL` (defaults to `http://localhost:5173` for local development). Set this to the deployed UI origin when sending invitations outside local development.
 
 If SMTP is not configured or the SMTP server rejects a send, the notification is recorded as failed and follows the node's configured retry/fallback path. A node marked `SENT` means the SMTP server accepted the message; AlertOps does not claim that it reached the recipient's inbox.
 

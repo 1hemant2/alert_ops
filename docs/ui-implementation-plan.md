@@ -57,7 +57,9 @@ The initial auth token has no team ID. Team selection issues a new JWT with team
 6. **Make reorder reliable before enabling it:** verify version increments, moving to first position, and reindexing. The current `newPosition.compareTo(BigInteger.valueOf(50)) < 50` condition is always true for a `compareTo` result. Add focused service tests for order and stale version handling.
 7. **Email delivery:** `Notification#sendEmail` sends a styled HTML message rendered from Markdown, with a Markdown plain-text fallback, through Spring Mail when SMTP is configured. A missing SMTP configuration or send error returns failure so the saved node state follows the existing retry/failure path. The UI should explain that `SENT` means accepted by SMTP, not confirmed delivery. Configurable retry rules are future backend work; node creation has no retry settings today.
 
-Invite management can follow later. `POST /team/invite` logs the token rather than sending an email or returning a usable invite URL, and `InviteDtoReq` has no `ttl` setter. Team deletion and member role routes are placeholders. Do not put these actions in the first UI. The public join flow can be added once the invite contract is complete.
+Member management now includes a selected-team member list, an SMTP-backed invitation form, and a `/join?token=...` flow with preview, sign-in or registration continuation, and acceptance. Invite links use `ALERTOPS_UI_BASE_URL`; set it to the deployed UI origin in production. Team deletion and member role routes remain placeholders and must stay unavailable in the UI.
+
+The follow-on backend and UI tickets are in [Team management UI task list](team-management-ui-task-list.md).
 
 ## Page map and user journey
 
@@ -67,6 +69,8 @@ Invite management can follow later. `POST /team/invite` logs the token rather th
 | `/register`, `/login` | Authentication | Simple forms with visible API errors. |
 | `/teams` | Team picker | List teams, create team, select team. After create, select the new team automatically. |
 | `/app/:teamId` | Team overview | Guided four-step demo: task → flow → nodes → escalation. Show counts only if API results are loaded. |
+| `/app/:teamId/members` | Members | Team-scoped member directory and owner/admin invitation form. The server enforces invitation permission and SMTP delivery. |
+| `/join?token=...` | Join team | Preview the invitation, sign in or register with the invited address, accept it, then select the team. |
 | `/app/:teamId/tasks` | Tasks | Table and create form; task detail text used in notifications. |
 | `/app/:teamId/flows` | Flows | List and create form. |
 | `/app/:teamId/flows/:flowId` | Flow detail | Ordered node timeline with recipient and delay; add node; reorder only after gate 6. Include a short note that delays are scheduled through RabbitMQ. |
