@@ -37,6 +37,24 @@ export function reorderFlowNode(input: {
   })
 }
 
+export function updateFlowNode(nodeId: string, input: {
+  nodeName: string
+  durationInMinutes: number
+  email: string
+  version: number
+}): Promise<FlowNode> {
+  return request<FlowNode>(`/api/v1/flow/node/${encodeURIComponent(nodeId)}`, {
+    method: 'PUT',
+    body: jsonBody(input),
+  })
+}
+
+export function deleteFlowNode(nodeId: string, version: number): Promise<void> {
+  return request<void>(`/api/v1/flow/node/${encodeURIComponent(nodeId)}?version=${encodeURIComponent(version)}`, {
+    method: 'DELETE',
+  })
+}
+
 export function nodeName(node: FlowNode): string {
   return node.name ?? node.nodeName ?? 'Escalation step'
 }

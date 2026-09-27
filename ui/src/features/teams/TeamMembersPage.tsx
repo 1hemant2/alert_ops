@@ -63,7 +63,7 @@ export function TeamMembersPage() {
         </Field>
         <Button disabled={invite.isPending}>{invite.isPending ? 'Sending invitation…' : 'Send invitation'} <span>→</span></Button>
       </form>
-      {inviteSentTo && <InlineNotice tone="success">The invitation email was accepted by SMTP for {inviteSentTo}.</InlineNotice>}
+      {inviteSentTo && <InlineNotice tone="success">The invitation email was accepted for sending to {inviteSentTo}. Delivery is not confirmed.</InlineNotice>}
       {invite.error && <div className="form-error" role="alert">{invite.error.message}</div>}
     </Card>}
     {!canInvite && <InlineNotice>Only team owners and admins can send invitations. The API checks this permission when an invitation is submitted.</InlineNotice>}

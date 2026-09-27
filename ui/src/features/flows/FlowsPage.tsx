@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFlow, getFlows } from '../../api/flows'
 import { Button, Card, EmptyState, ErrorState, Field, LoadingRows, PageHeader } from '../../components/Elements'
@@ -7,14 +7,16 @@ import { formatDate } from '../../lib/format'
 
 export function FlowsPage() {
   const { teamId = '' } = useParams()
+  const navigate = useNavigate()
   const [flowName, setFlowName] = useState('')
   const queryClient = useQueryClient()
   const flows = useQuery({ queryKey: ['flows', teamId], queryFn: getFlows })
   const create = useMutation({
     mutationFn: () => createFlow(flowName.trim()),
-    onSuccess: async () => {
+    onSuccess: async (flow) => {
       setFlowName('')
       await queryClient.invalidateQueries({ queryKey: ['flows', teamId] })
+      navigate(`/app/${teamId}/flows/${flow.id}`)
     },
   })
 
@@ -24,21 +26,28 @@ export function FlowsPage() {
   }
 
   return <>
-    <PageHeader eyebrow="CONFIGURATION / FLOWS" title="Escalation flows" description="Build a predictable response path from ordered recipients and delay windows." />
+    <PageHeader eyebrow="POLICIES / ESCALATION PATHS" title="Escalation paths" description="Choose who gets notified and when. Every path keeps your response steps in a clear order." />
     <div className="two-column-layout">
       <Card className="main-list-card">
-        <div className="card-heading"><div><span className="eyebrow">TEAM FLOWS</span><h2>Flow templates</h2></div><span className="count-pill">{flows.data?.length ?? '—'}</span></div>
-        {flows.isPending ? <LoadingRows count={4} /> : flows.isError ? <ErrorState message={flows.error.message} onRetry={() => void flows.refetch()} /> : flows.data.length === 0 ? <EmptyState title="No response paths yet" description="Create a flow and add notification recipients in the order they should be contacted." /> : <div className="flow-list">{flows.data.map(flow => <Link className="flow-row" to={`/app/${teamId}/flows/${flow.id}`} key={flow.id}><span className="flow-symbol">⌁</span><span className="flow-row-copy"><strong>{flow.name}</strong><small>Updated {formatDate(flow.updatedAt ?? flow.createdAt)}</small></span><span className="flow-version">v{flow.version ?? 0}</span><span className="task-id">OPEN&nbsp; →</span></Link>)}</div>}
+        <div className="card-heading"><div><span className="eyebrow">YOUR TEAM</span><h2>Response paths</h2></div><span className="count-pill">{flows.data?.length ?? '—'}</span></div>
+        {flows.isPending ? <LoadingRows count={4} /> : flows.isError ? <ErrorState message={flows.error.message} onRetry={() => void flows.refetch()} /> : flows.data.length === 0 ? <EmptyState title="No escalation paths yet" description="Create a path, then add recipients and decide how long to wait before each step." /> : <div className="flow-list">{flows.data.map(flow => <Link className="flow-row path-list-row" to={`/app/${teamId}/flows/${flow.id}`} key={flow.id}><span className="flow-symbol path-list-icon"><span /><span /><span /></span><span className="flow-row-copy"><strong>{flow.name}</strong><small>Updated {formatDate(flow.updatedAt ?? flow.createdAt)}</small></span><span className="flow-version">v{flow.version ?? 0}</span><span className="task-id">OPEN&nbsp; →</span></Link>)}</div>}
       </Card>
       <Card className="side-form-card">
-        <div className="card-heading"><div><span className="eyebrow">NEW FLOW</span><h2>Start a response path</h2></div><span className="form-number">02</span></div>
-        <p className="form-intro">A flow is a reusable set of recipient and delay instructions.</p>
+        <div className="card-heading"><div><span className="eyebrow">NEW PATH</span><h2>Create an escalation path</h2></div><span className="form-number">01</span></div>
+        <p className="form-intro">Give this path a name. Next, add the people to contact and the wait time between steps.</p>
         <form onSubmit={submit} className="form-stack">
-          <Field label="Flow name"><input required maxLength={120} value={flowName} onChange={event => setFlowName(event.target.value)} placeholder="Primary API response" /></Field>
+          <Field label="Path name"><input required maxLength={120} value={flowName} onChange={event => setFlowName(event.target.value)} placeholder="Primary API response" /></Field>
           {create.error && <div className="form-error" role="alert">{create.error.message}</div>}
-          <Button disabled={create.isPending}>{create.isPending ? 'Creating flow…' : 'Create flow'} <span>→</span></Button>
+          <Button disabled={create.isPending}>{create.isPending ? 'Creating path…' : 'Create path and add steps'} <span>→</span></Button>
         </form>
-        <div className="side-callout"><span>FLOW BUILDER</span><p>Next, add notification recipients and the delay before each step runs.</p></div>
+        <div className="path-mini-preview" aria-label="Path preview: escalation starts, then response steps run in order">
+          <div className="path-preview-heading"><span>PATH PREVIEW</span><small>CONNECTED SEQUENCE</small></div>
+          <div className="path-mini-node path-mini-start"><span className="path-mini-dot">↗</span><span><strong>Escalation starts</strong><small>Task needs a response</small></span></div>
+          <div className="path-mini-arrow" aria-hidden="true">↓</div>
+          <div className="path-mini-node"><span className="path-mini-number">01</span><span><strong>First responder</strong><small>Choose a teammate</small></span></div>
+          <div className="path-mini-arrow" aria-hidden="true">↓</div>
+          <div className="path-mini-node path-mini-placeholder"><span className="path-mini-number">02</span><span><strong>Next step</strong><small>Set a wait time</small></span><span className="path-mini-plus">＋</span></div>
+        </div>
       </Card>
     </div>
   </>

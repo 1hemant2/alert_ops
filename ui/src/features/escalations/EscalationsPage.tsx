@@ -31,11 +31,11 @@ export function EscalationsPage() {
 
   const canCreate = Boolean(tasks.data?.length && flows.data?.length)
   return <>
-    <PageHeader eyebrow="EXECUTION / ESCALATIONS" title="Escalation runs" description="A run binds a task to an ordered flow, then persists the state of every step." />
+    <PageHeader eyebrow="EXECUTION / ESCALATIONS" title="Escalation runs" description="A run pairs a task with an escalation path and saves the state of every response step." />
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">LIVE + HISTORY</span><h2>Team escalations</h2></div><span className="count-pill">{escalations.data?.length ?? '—'}</span></div>
-        {escalations.isPending ? <LoadingRows count={4} /> : escalations.isError ? <ErrorState message={escalations.error.message} onRetry={() => void escalations.refetch()} /> : escalations.data.length === 0 ? <EmptyState title="No escalations have run" description="Choose a task and a flow to create your first team escalation." /> : <div className="table-scroll"><table><thead><tr><th>NAME</th><th>STATUS</th><th>CREATED</th><th /></tr></thead><tbody>{escalations.data.map(item => <tr key={item.id}><td><Link className="table-primary" to={`/app/${teamId}/escalations/${item.id}`}>{item.name}</Link><small className="table-subtext">{item.id.slice(0, 8)}</small></td><td><StatusBadge status={item.status} /></td><td>{formatDate(item.createdAt)}</td><td><Link className="table-arrow" to={`/app/${teamId}/escalations/${item.id}`}>→</Link></td></tr>)}</tbody></table></div>}
+        {escalations.isPending ? <LoadingRows count={4} /> : escalations.isError ? <ErrorState message={escalations.error.message} onRetry={() => void escalations.refetch()} /> : escalations.data.length === 0 ? <EmptyState title="No escalations have run" description="Choose a task and an escalation path to create your first team escalation." /> : <div className="table-scroll"><table><thead><tr><th>NAME</th><th>STATUS</th><th>CREATED</th><th /></tr></thead><tbody>{escalations.data.map(item => <tr key={item.id}><td><Link className="table-primary" to={`/app/${teamId}/escalations/${item.id}`}>{item.name}</Link><small className="table-subtext">{item.id.slice(0, 8)}</small></td><td><StatusBadge status={item.status} /></td><td>{formatDate(item.createdAt)}</td><td><Link className="table-arrow" to={`/app/${teamId}/escalations/${item.id}`}>→</Link></td></tr>)}</tbody></table></div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW EXECUTION</span><h2>Configure a run</h2></div><span className="form-number">03</span></div>
@@ -43,12 +43,12 @@ export function EscalationsPage() {
         <form onSubmit={submit} className="form-stack">
           <Field label="Escalation name"><input required maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="API latency response" /></Field>
           <Field label="Task"><select required value={taskId} onChange={event => setTaskId(event.target.value)}><option value="">Choose a task</option>{tasks.data?.map(task => <option key={task.id} value={task.id}>{task.name}</option>)}</select></Field>
-          <Field label="Flow"><select required value={flowId} onChange={event => setFlowId(event.target.value)}><option value="">Choose a flow</option>{flows.data?.map(flow => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></Field>
-          {!canCreate && <div className="form-hint">Create at least one task and one flow first.</div>}
+          <Field label="Escalation path"><select required value={flowId} onChange={event => setFlowId(event.target.value)}><option value="">Choose a path</option>{flows.data?.map(flow => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></Field>
+          {!canCreate && <div className="form-hint">Create at least one task and one escalation path first.</div>}
           {create.error && <div className="form-error" role="alert">{create.error.message}</div>}
           <Button disabled={create.isPending || !canCreate}>{create.isPending ? 'Creating…' : 'Create escalation'} <span>→</span></Button>
         </form>
-        <div className="side-callout"><span>BEFORE STARTING</span><p>Make sure the selected flow has at least one recipient node. A new run begins in IDLE.</p></div>
+        <div className="side-callout"><span>BEFORE STARTING</span><p>Make sure the selected path has at least one response step. A new run begins in IDLE.</p></div>
       </Card>
     </div>
   </>
