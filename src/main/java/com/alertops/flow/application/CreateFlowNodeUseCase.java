@@ -3,6 +3,7 @@ package com.alertops.flow.application;
 import java.math.BigInteger;
 
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
 
 import com.alertops.auth.model.User;
 import com.alertops.auth.repository.UserRepository;
@@ -37,6 +38,7 @@ public class CreateFlowNodeUseCase {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public CreateNodeDto execute(CreateNodeDto request, FlowService flowService) {
 
         try {
@@ -84,7 +86,9 @@ public class CreateFlowNodeUseCase {
             }   
             // 4. Persist
             nodeRepository.save(node);
-            flowRepository.save(flow);
+            flow.setUpdatedBy(authContext.getUserId());
+            flow.setUpdatedAt(java.time.Instant.now());
+            flowRepository.saveAndFlush(flow);
 
             // 5. Map to response DTO
             return new CreateNodeDto(

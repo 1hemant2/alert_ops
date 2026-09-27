@@ -2,10 +2,16 @@ package com.alertops.flow.service;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import com.alertops.auth.model.User;
+import com.alertops.auth.repository.UserRepository;
 import com.alertops.flow.model.*;
 import com.alertops.flow.repository.*;
+import com.alertops.flow.dto.CreateNodeDto;
+import com.alertops.flow.exception.FlowException;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
+import com.alertops.team.model.TeamMember;
+import com.alertops.team.repository.TeamMemberRepository;
 
 import jakarta.transaction.Transactional;
 
@@ -22,10 +28,15 @@ public class FlowService {
 
       private final FlowRepository flowRepository;
       private final NodeRepository nodeRepository;
+      private final TeamMemberRepository teamMemberRepository;
+      private final UserRepository userRepository;
 
-    FlowService (FlowRepository flowRepository, NodeRepository nodeRepository) {
+    FlowService (FlowRepository flowRepository, NodeRepository nodeRepository,
+                 TeamMemberRepository teamMemberRepository, UserRepository userRepository) {
        this.flowRepository = flowRepository;
        this.nodeRepository = nodeRepository;
+       this.teamMemberRepository = teamMemberRepository;
+       this.userRepository = userRepository;
    }
 
     public Flow createFlow(String flowName) {
@@ -202,6 +213,86 @@ public class FlowService {
         } catch(Exception e) {
             throw e;
         }
+    }
+
+    @Transactional
+    public CreateNodeDto updateNode(UUID nodeId, String nodeName, int durationInMinutes, String email, Long version) {
+        AuthContext authContext = requireAuthContext();
+        Node node = nodeRepository.findById(nodeId).orElse(null);
+        if (node == null) throw FlowException.stepNotFound();
+        Flow flow = flowRepository.findByIdAndTeamId(node.getFlowId(), authContext.getTeamId());
+        if (flow == null) throw FlowException.stepNotFound();
+        requireCurrentVersion(flow, version);
+        validateStep(nodeName, durationInMinutes, email);
+
+        User user = userRepository.findByEmailIgnoreCase(email.trim());
+        if (user == null) throw FlowException.invalid("Choose a member of this team as the contact.");
+        TeamMember member = teamMemberRepository.findTeamMemeber(user.getId(), authContext.getTeamId());
+        if (member == null) throw FlowException.invalid("Choose a member of this team as the contact.");
+
+        node.setName(nodeName.trim());
+        node.setDuration(java.time.Duration.ofMinutes(durationInMinutes));
+        node.setEmail(user.getEmail());
+        nodeRepository.save(node);
+        touchFlow(flow, authContext);
+        flowRepository.saveAndFlush(flow);
+        return toNodeDto(node);
+    }
+
+    @Transactional
+    public void deleteNode(UUID nodeId, Long version) {
+        AuthContext authContext = requireAuthContext();
+        if (nodeId == null) throw FlowException.stepNotFound();
+        Node node = nodeRepository.findById(nodeId).orElse(null);
+        if (node == null) throw FlowException.stepNotFound();
+        Flow flow = flowRepository.findByIdAndTeamId(node.getFlowId(), authContext.getTeamId());
+        if (flow == null) throw FlowException.stepNotFound();
+        requireCurrentVersion(flow, version);
+
+        List<Node> remainingNodes = new ArrayList<>(nodeRepository.findAllByFlowIdOrderByPositionAsc(flow.getId()));
+        remainingNodes.removeIf(existing -> existing.getId().equals(nodeId));
+        BigInteger position = BigInteger.valueOf(1000);
+        for (Node remaining : remainingNodes) {
+            remaining.setPosition(position);
+            position = position.add(BigInteger.valueOf(1000));
+        }
+
+        nodeRepository.delete(node);
+        nodeRepository.saveAll(remainingNodes);
+        touchFlow(flow, authContext);
+        flowRepository.saveAndFlush(flow);
+    }
+
+    private AuthContext requireAuthContext() {
+        AuthContext authContext = AuthContextHolder.get();
+        if (authContext == null || authContext.getTeamId() == null) {
+            throw FlowException.stepNotFound();
+        }
+        return authContext;
+    }
+
+    private void requireCurrentVersion(Flow flow, Long version) {
+        if (version == null || !flow.getVersion().equals(version)) throw FlowException.staleVersion();
+    }
+
+    private void validateStep(String nodeName, int durationInMinutes, String email) {
+        if (nodeName == null || nodeName.isBlank() || nodeName.trim().length() > 100) {
+            throw FlowException.invalid("Step name is required and must be 100 characters or fewer.");
+        }
+        if (durationInMinutes < 0 || durationInMinutes > 10080) {
+            throw FlowException.invalid("Wait time must be between 0 and 10,080 minutes.");
+        }
+        if (email == null || email.isBlank()) throw FlowException.invalid("Choose a team member for this step.");
+    }
+
+    private void touchFlow(Flow flow, AuthContext authContext) {
+        flow.setUpdatedBy(authContext.getUserId());
+        flow.setUpdatedAt(Instant.now());
+    }
+
+    private CreateNodeDto toNodeDto(Node node) {
+        return new CreateNodeDto(node.getId(), node.getFlowId(), node.getName(),
+                Math.toIntExact(node.getDuration().toMinutes()), node.getEmail(), node.getPosition());
     }
 
 }
