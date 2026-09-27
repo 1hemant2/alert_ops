@@ -7,7 +7,7 @@ Reassessed: 2026-09-27. This list is based on the current source code. It contai
 ### 1. Close public account deletion
 
 - [x] Disable `DELETE /api/v1/auth/user` until safe self-service deletion semantics are defined. The old endpoint accepted a caller-supplied email or ID under a publicly permitted auth route. The route is denied in security configuration, the handler and email-delete path are removed, and `UserRepository` now uses UUID IDs to match the entity.
-- [ ] Add focused API tests confirming the route is denied and no account can be deleted through it.
+- [x] Add focused API tests confirming anonymous and authenticated requests are denied and do not call the user service.
 - **Done when:** the unsafe route stays unavailable until safe self-service deletion semantics are defined; focused API tests cover the denial.
 - **Evidence:** [auth controller](../src/main/java/com/alertops/auth/controller/UserController.java), [security rules](../src/main/java/com/alertops/security/SecurityConfig.java), [user repository](../src/main/java/com/alertops/auth/repository/UserRepository.java).
 
