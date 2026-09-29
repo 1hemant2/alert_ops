@@ -77,24 +77,6 @@ public class UserService {
         }
     }
 
-    public boolean deleteUser(Long id, String email) {
-        try {
-            boolean delted = false;
-            if(id != null) {// findById returns Optional<User>
-                userRepository.deleteById(id); // return null if not found
-                delted = true;
-            }
-            if(email != null) {
-                userRepository.deleteByEmail(email);
-                delted = true;
-            }
-            return delted;
-        } catch (Exception e) {
-            // log.error("❌ Error while Fetching user user", e);
-            throw new RuntimeException("Failed to fetch user", e);
-        }
-    }
-
     public void updateUserEmail(String email, String newEmail) {
         try {
             if(email != null) {
@@ -250,5 +232,4 @@ public class UserService {
 
 
 }
-
 

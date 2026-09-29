@@ -27,6 +27,11 @@ public class FlowExecutionState {
     private UUID nodeId;
     private String userEmail;
     private Duration duration;
+    @Column(name = "due_at")
+    private Instant dueAt;
+
+    @Column(name = "publication_pending", nullable = false)
+    private boolean publicationPending;
     private BigInteger position;
     private UUID processId;
     private Instant createdAt;
@@ -116,6 +121,22 @@ public class FlowExecutionState {
 
     public void setDuration(Duration duration) {
         this.duration = duration;
+    }
+
+    public Instant getDueAt() {
+        return dueAt;
+    }
+
+    public void setDueAt(Instant dueAt) {
+        this.dueAt = dueAt;
+    }
+
+    public boolean isPublicationPending() {
+        return publicationPending;
+    }
+
+    public void setPublicationPending(boolean publicationPending) {
+        this.publicationPending = publicationPending;
     }
 
     public BigInteger getPosition() {

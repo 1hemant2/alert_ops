@@ -7,28 +7,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow.model.Node;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
-import com.alertops.messaging.MessagePublisher;
+import com.alertops.messaging.StepSchedulingService;
 import com.alertops.task.model.Task;
 
 @Service
 public class FlowExecutionStateService {
     FlowExecutionStateRepository flowExecutionStateRepository;
     EscalationRepository escalationRepository;
-    MessagePublisher messagePublisher;
+    StepSchedulingService stepSchedulingService;
 
-    public FlowExecutionStateService(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository, MessagePublisher messagePublisher) {
+    public FlowExecutionStateService(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository, StepSchedulingService stepSchedulingService) {
          this.flowExecutionStateRepository = flowExecutionStateRepository;
          this.escalationRepository = escalationRepository;
-         this.messagePublisher = messagePublisher;
+         this.stepSchedulingService = stepSchedulingService;
     }
 
     @Transactional
-    public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId) {
+    public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId, UUID teamId) {
         try {
-            escalationRepository.updateStatus(escalationId, "RUNNING");
+            int claimedRows = escalationRepository.claimForStart(escalationId, teamId);
+            if (claimedRows != 1) {
+                throw EscalationException.startConflict();
+            }
 
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();
@@ -44,7 +48,7 @@ public class FlowExecutionStateService {
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             FlowExecutionState flowExecutionState = flowExecutionStateRepository.findTopByProcessIdOrderByPositionAsc(escalationId);
-            messagePublisher.publishWithDelay(flowExecutionState);
+            stepSchedulingService.schedule(flowExecutionState);
             return "Started Flow Execution for escalationId: " + escalationId;
         } catch (RuntimeException e) {
             throw e;

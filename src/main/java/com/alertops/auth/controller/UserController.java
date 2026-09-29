@@ -68,19 +68,4 @@ public class UserController {
         }
     }
 
-    @DeleteMapping("/user")
-    public ResponseEntity<?> deleteUser(@RequestBody UserDto req) {
-        try {
-            String email = req.getEmail();
-            Long id = req.getId();
-            boolean isDeleted = userService.deleteUser(id, email);
-            return isDeleted
-                    ? ResponseEntity.ok("User successfully deleted.")
-                    : ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to delete user.");
-        } catch (RuntimeException e) {
-            return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("⚠️ Could not create user: " + e.getMessage());
-        }
-    }
 }

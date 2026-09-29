@@ -64,6 +64,7 @@ public class SecurityConfig {
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/user").denyAll()
                         .requestMatchers("/api/v1/auth/**", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/team/join").permitAll()
                         .anyRequest().authenticated()
