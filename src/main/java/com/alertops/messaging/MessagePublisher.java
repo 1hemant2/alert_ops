@@ -1,38 +1,62 @@
 package com.alertops.messaging;
 
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import com.alertops.flow_execution_engine.model.FlowExecutionState;
-import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 
 
 @Component
 public class MessagePublisher {
-    @Autowired
-    RabbitTemplate rabbitTemplate;
-    FlowExecutionStateRepository flowExecutionStateRepository;
+    private static final long CONFIRM_TIMEOUT_SECONDS = 5;
 
-    MessagePublisher(FlowExecutionStateRepository flowExecutionStateRepository) {
-        this.flowExecutionStateRepository = flowExecutionStateRepository;
+    private final RabbitTemplate rabbitTemplate;
+
+    public MessagePublisher(RabbitTemplate rabbitTemplate) {
+        this.rabbitTemplate = rabbitTemplate;
     }
 
-    public void publishWithDelay(FlowExecutionState flowExecutionState) {
+    // Publishes a step after its wait is over; the timer retries if this fails.
+    public void publishEscalationStepReady(EscalationStepReadyMessage readyMessage) {
         try {
-            flowExecutionState.setExecutionState("ACTIVE");
+            // Tracks RabbitMQ's response for this message.
+            CorrelationData correlationData = new CorrelationData(UUID.randomUUID().toString());
+
             rabbitTemplate.convertAndSend(
-                RabbitMqConfig.NORMAL_EXCHANGE,
-                RabbitMqConfig.DELAY_ROUTING_KEY,
-                flowExecutionState,
-                message -> {
-                    message.getMessageProperties().setExpiration(String.valueOf(flowExecutionState.getDuration().toMillis()));
-                    message.getMessageProperties().setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
-                    return message;
-                }
+                RabbitMqConfig.ESCALATION_STEP_READY_EXCHANGE,
+                RabbitMqConfig.ESCALATION_STEP_READY_ROUTING_KEY,
+                readyMessage,
+                amqpMessage -> {
+                    // Keep the message after a RabbitMQ restart; its wait is already over.
+                    amqpMessage.getMessageProperties().setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT);
+                    return amqpMessage;
+                },
+                correlationData
             );
-            flowExecutionStateRepository.save(flowExecutionState);
-        } catch (RuntimeException e) {
-            throw new RuntimeException("Failed to publish delayed message", e);
+
+            // Wait up to five seconds for RabbitMQ to accept the message.
+            CorrelationData.Confirm confirm = correlationData.getFuture()
+                    .get(CONFIRM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            // A message can be accepted but still have no queue to reach.
+            if (correlationData.getReturned() != null) {
+                throw new IllegalStateException("RabbitMQ returned the ready message as unroutable");
+            }
+            if (!confirm.isAck()) {
+                throw new IllegalStateException("RabbitMQ did not confirm the ready message: " + confirm.getReason());
+            }
+        } catch (InterruptedException e) {
+            // Keep the interruption signal for shutdown.
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting for RabbitMQ to confirm the ready message", e);
+        } catch (ExecutionException | TimeoutException | RuntimeException e) {
+            // A retry can duplicate an email if the app crashes after SMTP accepts it.
+            throw new RuntimeException("Failed to publish ready message", e);
         }
     }
 }

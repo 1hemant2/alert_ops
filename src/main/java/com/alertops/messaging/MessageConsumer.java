@@ -1,5 +1,6 @@
 package com.alertops.messaging;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -16,29 +17,30 @@ public class MessageConsumer {
    private final Notification notification;
    private final FlowExecutionStateRepository flowExecutionStateRepository;
    private final EscalationRepository escalationRepository;
-   private final MessagePublisher messagePublisher;
+   private final StepSchedulingService stepSchedulingService;
 
 
     public MessageConsumer(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository,
-        Notification notification, MessagePublisher messagePublisher
+        Notification notification, StepSchedulingService stepSchedulingService
     ) {
         this.flowExecutionStateRepository = flowExecutionStateRepository;
         this.escalationRepository = escalationRepository;
         this.notification = notification;
-        this.messagePublisher = messagePublisher;
+        this.stepSchedulingService = stepSchedulingService;
     }
 
 
-    @RabbitListener(queues = RabbitMqConfig.FINAL_QUEUE)
+    @RabbitListener(queues = RabbitMqConfig.ESCALATION_STEP_READY_QUEUE)
     @Transactional
-    public void onMessage(FlowExecutionState queuedState) {
-        if (queuedState == null || queuedState.getId() == null) {
+    public void onMessage(EscalationStepReadyMessage readyMessage) {
+        if (readyMessage == null || readyMessage.stepId() == null || readyMessage.dueAt() == null) {
             return;
         }
 
-        FlowExecutionState currentState = flowExecutionStateRepository.findById(queuedState.getId()).orElse(null);
+        FlowExecutionState currentState = flowExecutionStateRepository.findById(readyMessage.stepId()).orElse(null);
         if (currentState == null
-                || currentState.getSendAttemptCount() != queuedState.getSendAttemptCount()
+                || currentState.getSendAttemptCount() != readyMessage.sendAttemptCount()
+                || !readyMessage.dueAt().equals(currentState.getDueAt())
                 || !"ACTIVE".equals(currentState.getExecutionState())
                 || !"NOT_SENT".equals(currentState.getNotificationState())
                 || currentState.getProcessId() == null) {
@@ -50,81 +52,60 @@ public class MessageConsumer {
             return;
         }
 
+        if (currentState.getDueAt().isAfter(Instant.now())) {
+            // Do not send an early or legacy message; schedule it for the saved due time.
+            stepSchedulingService.rescheduleStepAtDueTime(currentState);
+            return;
+        }
+
         int claimedRows = flowExecutionStateRepository.claimForDelivery(
-                currentState.getId(), queuedState.getSendAttemptCount());
+                currentState.getId(), readyMessage.sendAttemptCount(), readyMessage.dueAt());
         if (claimedRows != 1) {
             return;
         }
 
         // The bulk update bypasses the persistence context, so keep the managed copy aligned.
         currentState.setExecutionState("PROCESSING");
+        currentState.setPublicationPending(false);
         consume(currentState, escalation);
     }
 
 
     private void consume(FlowExecutionState flowExecutionState, Escalation escalation) {
-        try {
-            String esclationStatus  = escalation.getStatus();
-            String flowExecutionNodeStatus = flowExecutionState.getExecutionState();
-            String notificationStatus = flowExecutionState.getNotificationState();
-            boolean retryOnFailureEnabled = flowExecutionState.isRetryOnFailureEnabled();
-            int maxRetryAttempts = flowExecutionState.getMaxRetryAttempts();
-            int sendAttemptCount = flowExecutionState.getSendAttemptCount();
-            FlowExecutionState nextNode = flowExecutionStateRepository.
-                                            findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "PENDING");
+        boolean retryOnFailureEnabled = flowExecutionState.isRetryOnFailureEnabled();
+        int maxRetryAttempts = flowExecutionState.getMaxRetryAttempts();
+        int sendAttemptCount = flowExecutionState.getSendAttemptCount();
+        FlowExecutionState nextNode = flowExecutionStateRepository
+                .findFirstByProcessIdAndExecutionStateOrderByPositionAsc(
+                        flowExecutionState.getProcessId(), "PENDING");
 
-            if(esclationStatus.equals("RUNNING") && flowExecutionNodeStatus.equals("PROCESSING") ) {
-                if(notificationStatus.equals("NOT_SENT")) {
-                    boolean mailSent = notification.sendEmail(flowExecutionState);
-                    // Persist total attempts, including successful SMTP submissions.
-                    flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
-                    if(mailSent) {
-                       // change node status terminal, notification status sent
-                       flowExecutionState.setExecutionState("TERMINAL");
-                       flowExecutionState.setNotificationState("SENT");
-                       flowExecutionStateRepository.save(flowExecutionState);
-                       if(nextNode == null) {
-                          escalation.setStatus("COMPLETED"); 
-                          escalation.setResolutionType("EXHAUSTED"); 
-                          escalationRepository.save(escalation);
-                       } else {
-                           messagePublisher.publishWithDelay(nextNode);
-                       }
-                    } else {
-                        if(retryOnFailureEnabled && sendAttemptCount < maxRetryAttempts) {
-                           // don't change node status, notification_status, increase retry count push the same node
-                            // publish current node again to delay Q.
-                            flowExecutionStateRepository.save(flowExecutionState);
-                            messagePublisher.publishWithDelay(flowExecutionState);
-                        } else {
-                            // change the node status as failed, notification status failed, push the next node
-                            flowExecutionState.setExecutionState("TERMINAL");
-                            flowExecutionState.setNotificationState("FAILED");
-                            if(nextNode == null) {
-                               escalation.setStatus("COMPLETED");
-                               escalation.setResolutionType("EXHAUSTED"); 
-                               escalationRepository.save(escalation);
-                            } else {
-                                messagePublisher.publishWithDelay(nextNode);
-                            }
-                        }
-                    }
-                    flowExecutionStateRepository.save(flowExecutionState);
-                }
-            } 
-        } catch (Exception e) {
-            //send the email node has been failed to execute 
-            flowExecutionState.setExecutionState("FAILED");
+        boolean mailSent = notification.sendEmail(flowExecutionState);
+        // Persist total attempts, including successful SMTP submissions.
+        flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
+        if (mailSent) {
+            flowExecutionState.setExecutionState("TERMINAL");
+            flowExecutionState.setNotificationState("SENT");
+            flowExecutionStateRepository.save(flowExecutionState);
+            if (nextNode == null) {
+                escalation.setStatus("COMPLETED");
+                escalation.setResolutionType("EXHAUSTED");
+                escalationRepository.save(escalation);
+            } else {
+                stepSchedulingService.schedule(nextNode);
+            }
+        } else if (retryOnFailureEnabled && sendAttemptCount < maxRetryAttempts) {
+            flowExecutionStateRepository.save(flowExecutionState);
+            stepSchedulingService.schedule(flowExecutionState);
+        } else {
+            flowExecutionState.setExecutionState("TERMINAL");
             flowExecutionState.setNotificationState("FAILED");
             flowExecutionStateRepository.save(flowExecutionState);
-            FlowExecutionState nextNode = flowExecutionStateRepository.
-                                            findFirstByProcessIdAndExecutionStateOrderByPositionAsc(flowExecutionState.getProcessId(), "PENDING");
-            if(nextNode == null) {
-               escalation.setStatus("COMPLETED");
-               escalation.setResolutionType("EXHAUSTED"); 
-               escalationRepository.save(escalation);
+            if (nextNode == null) {
+                escalation.setStatus("COMPLETED");
+                escalation.setResolutionType("EXHAUSTED");
+                escalationRepository.save(escalation);
             } else {
-                messagePublisher.publishWithDelay(nextNode);
+                stepSchedulingService.schedule(nextNode);
             }
         }
     }

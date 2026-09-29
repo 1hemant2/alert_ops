@@ -1,6 +1,6 @@
 # AlertOps: critical path to product release
 
-Reassessed: 2026-09-27. This list is based on the current source code. It contains only critical bugs to fix first and the two product features selected for this release. Runtime behavior has not been verified in this review.
+Reassessed: 2026-09-28. This list contains critical bugs to fix first and the two product features selected for this release. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
 
 ## Fix these bugs first, in order
 
@@ -13,13 +13,15 @@ Reassessed: 2026-09-27. This list is based on the current source code. It contai
 
 ### 2. Make escalation execution safe under duplicate messages and restarts
 
-- [x] Reload the saved step for each queue message and atomically claim an eligible delivery. Ignore duplicate deliveries and messages for an older send attempt. Unit tests cover these consumer decisions; database concurrency integration coverage is still needed.
+- [x] Reload the saved step for each queue message and atomically claim an eligible delivery. Ignore duplicate deliveries and messages for an older send attempt. Unit tests cover these consumer decisions, and PostgreSQL integration tests prove concurrent deliveries can claim a step only once.
 - [x] When an unexpected processing error occurs, look for the next `PENDING` step before deciding the escalation is exhausted.
-- [ ] Persist when a step is due so recovery does not restart its full wait. Make the database-to-queue handoff recoverable and prevent consumer crashes from losing or duplicating scheduled work.
+- [x] Persist each step's due time and pending-publication flag on the execution-state row. Publish immediately after the scheduling transaction commits, confirm RabbitMQ acceptance, and retry failed publications while the backend remains running. Startup recovery republishes outstanding steps with only the remaining delay; there is no separate outbox table or recurring idle poll. Existing active steps without a due time are recovered from their saved timestamps.
 - [x] Claim a start by changing the escalation from `IDLE` to `RUNNING` with a conditional database update, so only one simultaneous request can create step states.
-- [ ] Add database integration tests proving that duplicate starts create one state set and duplicate deliveries cannot advance a step twice.
+- [ ] Add database integration tests proving that duplicate starts create one state set. Concurrent delivery claims are already covered in PostgreSQL.
 - **Done when:** duplicate messages, repeated starts, consumer crashes, and application restarts do not skip or advance a step twice; the remaining SMTP uncertainty after a send succeeds but before the database records it is explicitly handled or documented. Focused integration tests exercise these cases.
 - **Evidence:** [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), [reconciler](../src/main/java/com/alertops/messaging/ReconcilerService.java), [publisher](../src/main/java/com/alertops/messaging/MessagePublisher.java), [start use case](../src/main/java/com/alertops/flow_execution_engine/application/StartFlowExecutionUseCase.java).
+
+The scheduling integration tests cover publication after commit, no publication on rollback, startup recovery, failed-publication retries, preserved due times, and late confirmations for old attempts. Recovery checks run on startup or after a publication failure; a healthy idle backend does not poll the database. SMTP remains outside the database transaction: if the mail server accepts an email and the backend stops before `SENT` commits, redelivery can send that email again. The scheduling fix does not guarantee exactly-once email delivery.
 
 ### 3. Verify the email address used to accept an invitation
 
@@ -54,5 +56,3 @@ Reassessed: 2026-09-27. This list is based on the current source code. It contai
 - [ ] All four critical fixes above are complete.
 - [ ] Both product features work together in a deployed end-to-end run: webhook event → one task and run → email → recipient acknowledgement → no later step sent.
 - [ ] The same journey works after a restart and a duplicate webhook or queue delivery. The UI shows saved server state. `SENT` continues to mean SMTP acceptance unless actual delivery tracking is added.
-
-No services were started, tests run, or emails sent for this document update.

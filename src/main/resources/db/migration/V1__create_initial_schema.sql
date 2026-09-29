@@ -100,6 +100,8 @@ CREATE TABLE flow_execution_state (
     node_id UUID,
     user_email VARCHAR(255),
     duration NUMERIC(21, 0),
+    due_at TIMESTAMP(6) WITH TIME ZONE,
+    publication_pending BOOLEAN NOT NULL DEFAULT FALSE,
     position NUMERIC(38, 0),
     process_id UUID,
     created_at TIMESTAMP(6) WITH TIME ZONE,
@@ -115,3 +117,8 @@ CREATE INDEX team_member_team_id_idx ON team_member(team_id);
 CREATE INDEX team_member_user_id_idx ON team_member(user_id);
 CREATE INDEX node_flow_id_idx ON node(flow_id);
 CREATE INDEX tasks_team_id_idx ON tasks(team_id);
+CREATE INDEX flow_execution_state_pending_publication_idx
+    ON flow_execution_state (due_at, id)
+    WHERE execution_state = 'ACTIVE'
+      AND notification_state = 'NOT_SENT'
+      AND publication_pending = TRUE;
