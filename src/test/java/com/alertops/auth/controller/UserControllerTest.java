@@ -2,7 +2,10 @@ package com.alertops.auth.controller;
 
 import com.alertops.auth.dto.UserRegisterDto;
 import com.alertops.auth.dto.UserResponseDto;
+import com.alertops.auth.dto.EmailVerificationResendRequest;
 import com.alertops.auth.model.User;
+import com.alertops.auth.dto.UserLoginDto;
+import com.alertops.auth.service.EmailVerificationRequiredException;
 import com.alertops.auth.service.UserService;
 import com.alertops.caching.IntentCache;
 import org.junit.jupiter.api.Test;
@@ -13,6 +16,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class UserControllerTest {
@@ -37,5 +41,30 @@ class UserControllerTest {
         assertEquals("Avery", body.name());
         assertEquals("avery@example.com", body.email());
         assertEquals(createdAt, body.createdAt());
+    }
+
+    @Test
+    void loginRejectsAnUnverifiedAccountWithoutIssuingAccess() {
+        UserService userService = mock(UserService.class);
+        IntentCache intentCache = mock(IntentCache.class);
+        when(userService.login(org.mockito.ArgumentMatchers.any(UserLoginDto.class)))
+                .thenThrow(new EmailVerificationRequiredException());
+
+        var response = new UserController(userService, intentCache).loginUser(new UserLoginDto());
+
+        assertEquals(403, response.getStatusCode().value());
+        assertEquals("EMAIL_NOT_VERIFIED", ((java.util.Map<?, ?>) response.getBody()).get("code"));
+    }
+
+    @Test
+    void resendVerificationAcceptsAnEmailWithoutRevealingAccountState() {
+        UserService userService = mock(UserService.class);
+        IntentCache intentCache = mock(IntentCache.class);
+
+        var response = new UserController(userService, intentCache)
+                .resendVerificationEmail(new EmailVerificationResendRequest("member@example.com"));
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(userService).resendVerificationEmail("member@example.com");
     }
 }

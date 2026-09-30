@@ -64,7 +64,7 @@ export function JoinTeamPage() {
           <div><dt>Invitation expires</dt><dd>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(preview.data.expiresAt))}</dd></div>
         </dl>
         {!sessionToken ? <>
-          <InlineNotice>Sign in or create an account with the invited email address to accept.</InlineNotice>
+          <InlineNotice>Sign in or create an account with the invited email address, then verify it before accepting.</InlineNotice>
           <div className="join-actions">
             <Link className="button button-primary" to="/login">Sign in to accept <span>→</span></Link>
             <Link className="button button-secondary" to="/register">Create an account</Link>

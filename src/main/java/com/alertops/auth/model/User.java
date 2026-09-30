@@ -23,6 +23,9 @@ public class  User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
     //this row column will not be updated.
     @Column(name = "created_at", updatable = false)
     @org.hibernate.annotations.CreationTimestamp // auto create a new date
@@ -55,6 +58,14 @@ public class  User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
     }
 
     public Date getCreatedAt() {

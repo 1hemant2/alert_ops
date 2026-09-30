@@ -34,8 +34,8 @@ Configure Tailwind as a Vite plugin and import it in the root CSS. Set `VITE_API
 
 | UI action | Backend contract | Notes for implementation |
 | --- | --- | --- |
-| Register | `POST /api/v1/auth/register` with `{name,email,password}` | `userName` exists in the DTO but is unused by the service. Log in after registration. |
-| Log in | `POST /api/v1/auth/login` with `{email,password}` | Token is at `data["jwt-token"]` in the response. |
+| Register | `POST /api/v1/auth/register` with `{name,email,password}` | The account starts unverified and the UI sends the user to `/verify-email` after the verification message is sent. |
+| Log in | `POST /api/v1/auth/login` with `{email,password}` | Verified credentials receive the token at `data["jwt-token"]`; unverified accounts receive `EMAIL_NOT_VERIFIED` and use the verification screen. |
 | List / create teams | `GET /api/v1/team`, `POST /api/v1/team` with `{teamName}` | List returns `{id,name}[]`; create returns `{teamId,teamName,userId,role}`. |
 | Select team | `GET /api/v1/team/select?teamId=...` | Response is `{data:{token}}`; use this team token for team scoped requests. |
 | List / create tasks | `GET /api/v1/task?page=0&size=20&sortBy=createdAt&sortDir=desc`, `POST /api/v1/task` with `{name,description}` | List is an array, not a Spring `Page`. Create returns a text message containing the ID; refetch the list. |
@@ -66,7 +66,8 @@ The follow-on backend and UI tickets are in [Team management UI task list](team-
 | Route | Page | Main content |
 | --- | --- | --- |
 | `/` | Public overview | What AlertOps does; concise architecture diagram; sign-in CTA; explain SMTP email requirements and the meaning of `SENT`. |
-| `/register`, `/login` | Authentication | Simple forms with visible API errors. |
+| `/register`, `/login` | Authentication | Simple forms with visible API errors; unverified users are sent to the verification screen after login. |
+| `/verify-email?token=...` | Email verification | Confirm the one-time link with an explicit `POST`, request another link for the entered email, and continue to teams or an invitation. |
 | `/teams` | Team picker | List teams, create team, select team. After create, select the new team automatically. |
 | `/app/:teamId` | Team overview | Guided four-step demo: task → flow → nodes → escalation. Show counts only if API results are loaded. |
 | `/app/:teamId/members` | Members | Team-scoped member directory and owner/admin invitation form. The server enforces invitation permission and SMTP delivery. |

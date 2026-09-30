@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.stereotype.Service;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 //import com.alertops.auth.component.AppConfig;
 //import com.alertops.repository.RoleRepository;
 //import com.alertops.team.repository.RoleRepository;
@@ -30,6 +31,7 @@ public class UserService {
     private PasswordEncoder passwordEncoder;
     private AuthenticationManager authenticationManager;
     private  JwtUtil jwtUtil;
+    private final EmailVerificationService emailVerificationService;
 //    private  final RoleRepository roleRepository;
 //    private final AppConfig appConfig;
 
@@ -37,44 +39,59 @@ public class UserService {
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager,
-                       JwtUtil jwtUtil
+                       JwtUtil jwtUtil,
+                       EmailVerificationService emailVerificationService
                        ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
+        this.emailVerificationService = emailVerificationService;
     }
 
-    public User createUser(UserRegisterDto userObj) {
-        try {
-            User user = new User();
-            user.setEmail(userObj.getEmail());
-            user.setName(userObj.getName());
-            user.setPassword(passwordEncoder.encode(userObj.getPassword()));
-            return userRepository.save(user);
-        } catch (RuntimeException e) {
-            throw new RuntimeException(e);
-        }
+    @Transactional
+    public User createUser(UserRegisterDto registrationRequest) {
+        User user = new User();
+        user.setEmail(registrationRequest.getEmail());
+        user.setName(registrationRequest.getName());
+        user.setPassword(passwordEncoder.encode(registrationRequest.getPassword()));
+        user.setEmailVerified(false);
+        User savedUser = userRepository.save(user);
+        emailVerificationService.sendVerificationLink(savedUser);
+        return savedUser;
     }
 
-    public Map<String, Object> Login(UserLoginDto userObj) {
+    public Map<String, Object> login(UserLoginDto loginRequest) {
         try {
-            UsernamePasswordAuthenticationToken authInputToken = new UsernamePasswordAuthenticationToken(userObj.getEmail(), userObj.getPassword());
+            UsernamePasswordAuthenticationToken authInputToken = new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword());
             System.out.println("AUTH PASSED");
-            User user = userRepository.findByEmail(userObj.getEmail());
-            Map<String, Object> obj = new HashMap<> ();
-            obj.put("email", userObj.getEmail());
+            User user = userRepository.findByEmail(loginRequest.getEmail());
+            Map<String, Object> jwtClaims = new HashMap<> ();
+            jwtClaims.put("email", loginRequest.getEmail());
 
             authenticationManager.authenticate(authInputToken);
-            String token = jwtUtil.generateToken(
+            if (!user.isEmailVerified()) {
+                throw new EmailVerificationRequiredException();
+            }
+            String jwtToken = jwtUtil.generateToken(
                                  user.getId().toString(),
-                                 obj, 
+                                 jwtClaims,
                                  6000
-                            );
-            return Map.of("jwt-token", token);
+            );
+            return Map.of("jwt-token", jwtToken);
+        } catch (EmailVerificationRequiredException e) {
+            throw e;
         } catch (RuntimeException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void resendVerificationEmail(String emailAddress) {
+        emailVerificationService.resendVerificationLink(emailAddress);
+    }
+
+    public void verifyEmailAddress(String verificationTokenValue) {
+        emailVerificationService.verifyEmailAddress(verificationTokenValue);
     }
 
     public void updateUserEmail(String email, String newEmail) {
@@ -232,4 +249,3 @@ public class UserService {
 
 
 }
-

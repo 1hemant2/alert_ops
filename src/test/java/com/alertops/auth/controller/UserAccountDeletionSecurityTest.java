@@ -1,5 +1,7 @@
 package com.alertops.auth.controller;
 
+import com.alertops.auth.model.User;
+import com.alertops.auth.repository.UserRepository;
 import com.alertops.auth.service.UserService;
 import com.alertops.caching.IntentCache;
 import com.alertops.security.JwtUtil;
@@ -14,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.Mockito.mock;
@@ -45,11 +48,18 @@ class UserAccountDeletionSecurityTest {
     @MockitoBean
     private TeamMemberRepository teamMemberRepository;
 
+    @MockitoBean
+    private UserRepository userRepository;
+
     @BeforeEach
     void setUp() {
         Claims claims = mock(Claims.class);
         when(jwtUtil.parse(TOKEN)).thenReturn(claims);
         when(claims.getSubject()).thenReturn(USER_ID.toString());
+
+        User verifiedUser = new User();
+        verifiedUser.setEmailVerified(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(verifiedUser));
     }
 
     @Test

@@ -18,6 +18,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.beans.factory.annotation.Value;
 import com.alertops.team.repository.TeamMemberRepository;
+import com.alertops.auth.repository.UserRepository;
 
 import java.util.Arrays;
 import java.util.List;
@@ -46,8 +47,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil, TeamMemberRepository teamMemberRepository) {
-        return new JwtAuthenticationFilter(jwtUtil, teamMemberRepository);
+    public JwtAuthenticationFilter jwtAuthenticationFilter(
+            JwtUtil jwtUtil,
+            TeamMemberRepository teamMemberRepository,
+            UserRepository userRepository) {
+        return new JwtAuthenticationFilter(jwtUtil, teamMemberRepository, userRepository);
     }
 
     @Bean

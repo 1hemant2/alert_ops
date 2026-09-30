@@ -162,6 +162,8 @@ ALERTOPS_EMAIL_FROM=alerts@example.com
 
 SMTP authentication and STARTTLS default to enabled. For an implicit TLS server on port `465`, set `SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true` and `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false`. Configure `ALERTOPS_EMAIL_FROM` with a sender address verified by your SMTP provider; the SMTP login may not be a valid sender. Keep provider credentials out of source control.
 
+New registrations receive a one-time email verification link before they can use team features. The link points to `ALERTOPS_UI_BASE_URL` and expires after 30 minutes by default; change that window with `ALERTOPS_EMAIL_VERIFICATION_TTL`.
+
 Team invitation links point to the UI origin configured with `ALERTOPS_UI_BASE_URL` (defaults to `http://localhost:5173` for local development). Set this to the deployed UI origin when sending invitations outside local development.
 
 If SMTP is not configured or the SMTP server rejects a send, the notification is recorded as failed and follows the node's configured retry/fallback path. A node marked `SENT` means the SMTP server accepted the message; AlertOps does not claim that it reached the recipient's inbox.

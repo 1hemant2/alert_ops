@@ -1,5 +1,6 @@
 package com.alertops.messaging;
 
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -15,16 +16,21 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
+import com.alertops.flow.model.Node;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
+import com.alertops.task.model.Task;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +90,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Autowired private MessageConsumer consumer;
     @Autowired private FlowExecutionStateRepository states;
     @Autowired private EscalationRepository escalations;
+    @Autowired private FlowExecutionStateService flowExecutionStateService;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private DataSource dataSource;
     @Autowired private RabbitTemplate rabbit;
@@ -346,6 +353,77 @@ class StepSchedulingPostgresIntegrationTest {
         assertThat(claimed.isPublicationPending()).isFalse();
     }
 
+    @Test
+    void concurrentStartsCreateOnlyOneSetOfExecutionStates() throws Exception {
+        UUID teamId = UUID.randomUUID();
+        Escalation escalation = new Escalation();
+        escalation.setStatus("IDLE");
+        escalation.setTeamId(teamId);
+        UUID escalationId = escalations.saveAndFlush(escalation).getId();
+
+        Task task = new Task();
+        task.setDescription("Duplicate start test");
+        List<Node> nodes = List.of(node(0, "first@example.test"), node(1, "second@example.test"));
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            Future<Throwable> first = submitStartAttempt(
+                    workers, ready, start, task, nodes, escalationId, teamId);
+            Future<Throwable> second = submitStartAttempt(
+                    workers, ready, start, task, nodes, escalationId, teamId);
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            Throwable firstFailure = first.get(10, TimeUnit.SECONDS);
+            Throwable secondFailure = second.get(10, TimeUnit.SECONDS);
+            int successfulStarts = (firstFailure == null ? 1 : 0) + (secondFailure == null ? 1 : 0);
+            assertThat(successfulStarts).isEqualTo(1);
+
+            Throwable conflict = firstFailure == null ? secondFailure : firstFailure;
+            assertThat(conflict).isInstanceOf(EscalationException.class);
+            assertThat(((EscalationException) conflict).getCode())
+                    .isEqualTo("ESCALATION_START_CONFLICT");
+        } finally {
+            workers.shutdownNow();
+        }
+
+        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo("RUNNING");
+        assertThat(states.findAllByProcessIdOrderByPositionAsc(escalationId)).hasSize(2);
+        assertThat(timers.activeTimerCount()).isEqualTo(1);
+    }
+
+    private Future<Throwable> submitStartAttempt(
+            ExecutorService workers,
+            CountDownLatch ready,
+            CountDownLatch start,
+            Task task,
+            List<Node> nodes,
+            UUID escalationId,
+            UUID teamId
+    ) {
+        return workers.submit(() -> {
+            ready.countDown();
+            start.await();
+            try {
+                flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
+                return null;
+            } catch (Throwable failure) {
+                return failure;
+            }
+        });
+    }
+
+    private static Node node(int position, String email) {
+        Node node = new Node();
+        node.setPosition(BigInteger.valueOf(position));
+        node.setDuration(Duration.ofMinutes(5));
+        node.setEmail(email);
+        return node;
+    }
+
     private FlowExecutionState createStep(String executionState, Duration duration, boolean pending, Instant dueAt) {
         Escalation escalation = new Escalation();
         escalation.setStatus("RUNNING");
@@ -416,7 +494,7 @@ class StepSchedulingPostgresIntegrationTest {
     @EntityScan(basePackageClasses = FlowExecutionState.class)
     @EnableJpaRepositories(basePackageClasses = FlowExecutionStateRepository.class)
     @Import({StepSchedulingService.class, StepTimerRegistry.class, ReconcilerService.class,
-            MessagePublisher.class, MessageConsumer.class})
+            MessagePublisher.class, MessageConsumer.class, FlowExecutionStateService.class})
     static class Config {
         @Bean RabbitTemplate rabbitTemplate() { return mock(RabbitTemplate.class); }
 
