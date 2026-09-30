@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a small, independently deployed web app that lets a reviewer run the real AlertOps workflow: sign in, choose a team, create a task, configure an ordered escalation flow, start an escalation, and inspect its progress. Keep the interface useful for operating the demo and for explaining the engineering behind it. Every displayed status must come from the API; explanatory diagrams may describe the architecture but must be labeled as explanations.
+Build an independently deployed web app that lets users run the AlertOps workflow: sign in, choose a team, create a task, configure an ordered escalation flow, start an escalation, and inspect its progress. This document records the initial UI implementation scope; the project goal is a production-ready product, with current release priorities in [the product launch checklist](product-launch-readiness.md). Every displayed status must come from the API; explanatory diagrams may describe the architecture but must be labeled as explanations.
 
 ## Stack and deployment boundary
 
@@ -45,7 +45,7 @@ Configure Tailwind as a Vite plugin and import it in the root CSS. Set `VITE_API
 | List / read escalations | `GET /api/v1/escalation/all?page=0&size=20&sortBy=createdAt&sortDir=desc`, `GET /api/v1/escalation?escalationId=...` | Escalation includes `id,name,taskId,flowId,status,resolutionType,createdAt`. |
 | Create / start escalation | `POST /api/v1/escalation/create` with `{escalationName,taskId,flowId}`; `POST /api/v1/escalation/start` with `{escalationId}` | Creation currently returns HTTP 400 despite persisting. Fix before enabling create. Start requires at least one flow node. |
 
-The initial auth token has no team ID. Team selection issues a new JWT with team ID; this is a required step before task, flow, and escalation calls. Store only the active token in `sessionStorage` for this demo, hydrate it on reload, and clear it on logout and unauthorized responses. Keep the active team ID in the route. On team switch, request a new team token and clear TanStack Query's cache so data from the previous team cannot appear. Do not decode a token as the source of permissions; the API decides access.
+The initial auth token has no team ID. Team selection issues a new JWT with team ID; this is a required step before task, flow, and escalation calls. Store only the active token in `sessionStorage`, hydrate it on reload, and clear it on logout and unauthorized responses. Keep the active team ID in the route. On team switch, request a new team token and clear TanStack Query's cache so data from the previous team cannot appear. Do not decode a token as the source of permissions; the API decides access.
 
 ## Backend gates to finish before calling the UI complete
 
@@ -53,7 +53,7 @@ The initial auth token has no team ID. Team selection issues a new JWT with team
 2. **Make registration safe:** `UserController#registerUser` returns the `User` entity, including its password hash. Return a DTO with only public fields. Never show the current response body in the UI.
 3. **Enable browser access:** there is no CORS configuration in `SecurityConfig`. Add an allowlist for the separately deployed UI origin and allow `Authorization`, `Content-Type`, and the used methods, including `OPTIONS`. Keep the origin configurable. The local Vite proxy only solves local development.
 4. **Expose execution evidence:** add `GET /api/v1/escalation/{id}/execution-states`, scoped by the selected team, ordered by node position. Return a small DTO: `nodeId`, `userEmail`, `executionState`, `notificationState`, `sendAttemptCount`, `createdAt`, `updatedAt`. This lets the detail page show the actual durable queue workflow. Return 404 when the escalation is outside the team. Do not expose internal entities directly.
-5. **Secure flow node reads and writes:** `getNodesByFlowId`, node creation, and reorder currently look up a flow/node by ID without consistently checking the selected team's ownership. Enforce team membership on all three before exposing the controls in a public demo.
+5. **Secure flow node reads and writes:** `getNodesByFlowId`, node creation, and reorder currently look up a flow/node by ID without consistently checking the selected team's ownership. Enforce team membership on all three before exposing the controls to users.
 6. **Make reorder reliable before enabling it:** verify version increments, moving to first position, and reindexing. The current `newPosition.compareTo(BigInteger.valueOf(50)) < 50` condition is always true for a `compareTo` result. Add focused service tests for order and stale version handling.
 7. **Email delivery:** `Notification#sendEmail` sends a styled HTML message rendered from Markdown, with a Markdown plain-text fallback, through Spring Mail when SMTP is configured. A missing SMTP configuration or send error returns failure so the saved node state follows the existing retry/failure path. The UI should explain that `SENT` means accepted by SMTP, not confirmed delivery. Configurable retry rules are future backend work; node creation has no retry settings today.
 
@@ -69,7 +69,7 @@ The follow-on backend and UI tickets are in [Team management UI task list](team-
 | `/register`, `/login` | Authentication | Simple forms with visible API errors; unverified users are sent to the verification screen after login. |
 | `/verify-email?token=...` | Email verification | Confirm the one-time link with an explicit `POST`, request another link for the entered email, and continue to teams or an invitation. |
 | `/teams` | Team picker | List teams, create team, select team. After create, select the new team automatically. |
-| `/app/:teamId` | Team overview | Guided four-step demo: task → flow → nodes → escalation. Show counts only if API results are loaded. |
+| `/app/:teamId` | Team overview | Guided setup: task → flow → nodes → escalation. Show counts only if API results are loaded. |
 | `/app/:teamId/members` | Members | Team-scoped member directory and owner/admin invitation form. The server enforces invitation permission and SMTP delivery. |
 | `/join?token=...` | Join team | Preview the invitation, sign in or register with the invited address, accept it, then select the team. |
 | `/app/:teamId/tasks` | Tasks | Table and create form; task detail text used in notifications. |
@@ -124,7 +124,7 @@ Each ticket is a reviewable commit or small PR. Finish its acceptance checks bef
 
 ## Definition of done
 
-- A new reviewer can complete the full demo from a fresh account without using curl or the database.
+- A new user can complete the initial workflow from a fresh account without using curl or the database.
 - The UI is served from its own static deployment and calls the API through a documented public origin or edge route.
 - All live statuses and node progress are sourced from the API; email status wording reflects SMTP acceptance rather than inbox delivery.
 - Tenant switching does not mix data, and the backend checks team ownership for every exposed flow operation.

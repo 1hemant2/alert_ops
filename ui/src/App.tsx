@@ -15,6 +15,7 @@ import { FlowDetailPage } from './features/flows/FlowDetailPage'
 import { FlowsPage } from './features/flows/FlowsPage'
 import { EscalationDetailPage } from './features/escalations/EscalationDetailPage'
 import { EscalationsPage } from './features/escalations/EscalationsPage'
+import { AcknowledgeEscalationPage } from './features/escalations/AcknowledgeEscalationPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,7 @@ function AppRoutes() {
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/verify-email" element={<VerifyEmailPage />} />
+    <Route path="/acknowledge" element={<AcknowledgeEscalationPage />} />
     <Route path="/join" element={<JoinTeamPage />} />
     <Route element={<RequireAuth />}>
       <Route path="/teams" element={<TeamPickerPage />} />

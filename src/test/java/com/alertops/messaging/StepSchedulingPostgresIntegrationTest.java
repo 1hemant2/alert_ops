@@ -29,7 +29,9 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
+import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
 import com.alertops.task.model.Task;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -90,7 +92,9 @@ class StepSchedulingPostgresIntegrationTest {
     @Autowired private MessageConsumer consumer;
     @Autowired private FlowExecutionStateRepository states;
     @Autowired private EscalationRepository escalations;
+    @Autowired private EscalationAcknowledgementTokenRepository acknowledgementTokens;
     @Autowired private FlowExecutionStateService flowExecutionStateService;
+    @Autowired private EscalationAcknowledgementService acknowledgementService;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private DataSource dataSource;
     @Autowired private RabbitTemplate rabbit;
@@ -123,6 +127,7 @@ class StepSchedulingPostgresIntegrationTest {
         CLOCK.set(Instant.now());
         reset(rabbit, notification);
         states.deleteAll();
+        acknowledgementTokens.deleteAll();
         escalations.deleteAll();
         confirmPublishes();
     }
@@ -130,12 +135,13 @@ class StepSchedulingPostgresIntegrationTest {
     @AfterEach
     void clearRowsBeforeTheNextSpringContextStarts() {
         states.deleteAll();
+        acknowledgementTokens.deleteAll();
         escalations.deleteAll();
     }
 
     @Test
     void zeroDelayStepPublishesOnlyAfterItsDatabaseCommit() throws Exception {
-        when(notification.sendEmail(any())).thenReturn(true);
+        when(notification.sendEmail(any(), anyString())).thenReturn(true);
         CountDownLatch delivered = new CountDownLatch(1);
         doAnswer(invocation -> {
             EscalationStepReadyMessage payload = invocation.getArgument(2);
@@ -171,7 +177,7 @@ class StepSchedulingPostgresIntegrationTest {
         assertThat(saved.getExecutionState()).isEqualTo("TERMINAL");
         assertThat(saved.getNotificationState()).isEqualTo("SENT");
         assertThat(saved.isPublicationPending()).isFalse();
-        verify(notification, times(1)).sendEmail(any());
+        verify(notification, times(1)).sendEmail(any(), anyString());
     }
 
     @Test
@@ -354,6 +360,77 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
+    void acknowledgementWaitsForAnInFlightEmailAndStopsTheNextStep() throws Exception {
+        CountDownLatch emailStarted = new CountDownLatch(1);
+        CountDownLatch finishEmail = new CountDownLatch(1);
+        when(notification.sendEmail(any(), anyString())).thenAnswer(invocation -> {
+            emailStarted.countDown();
+            assertThat(finishEmail.await(10, TimeUnit.SECONDS)).isTrue();
+            return true;
+        });
+
+        Instant dueAt = Instant.now().minusSeconds(2).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        FlowExecutionState activeStep = transaction().execute(
+                status -> createStep("ACTIVE", Duration.ZERO, false, dueAt));
+        FlowExecutionState nextStep = transaction().execute(status -> {
+            FlowExecutionState step = new FlowExecutionState();
+            step.setProcessId(activeStep.getProcessId());
+            step.setExecutionState("PENDING");
+            step.setNotificationState("NOT_SENT");
+            step.setDuration(Duration.ZERO);
+            step.setUserEmail("recipient@example.test");
+            return states.save(step);
+        });
+        String link = transaction().execute(status -> acknowledgementService.createAcknowledgementUrl(
+                escalations.findById(activeStep.getProcessId()).orElseThrow(), "recipient@example.test"));
+        String rawToken = link.substring(link.indexOf("token=") + "token=".length());
+
+        CountDownLatch acknowledgementStarted = new CountDownLatch(1);
+        ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            Future<?> delivery = workers.submit(() -> consumer.onMessage(
+                    new EscalationStepReadyMessage(activeStep.getId(), 0, dueAt)));
+            assertThat(emailStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> acknowledgement = workers.submit(() -> {
+                acknowledgementStarted.countDown();
+                return acknowledgementService.acknowledge(rawToken);
+            });
+            assertThat(acknowledgementStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            boolean waitedForEmail = false;
+            try {
+                acknowledgement.get(200, TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.TimeoutException expected) {
+                waitedForEmail = true;
+            }
+            assertThat(waitedForEmail).isTrue();
+
+            finishEmail.countDown();
+            delivery.get(10, TimeUnit.SECONDS);
+            acknowledgement.get(10, TimeUnit.SECONDS);
+        } finally {
+            finishEmail.countDown();
+            workers.shutdownNow();
+        }
+
+        Escalation acknowledged = escalations.findById(activeStep.getProcessId()).orElseThrow();
+        assertThat(acknowledged.getStatus()).isEqualTo("COMPLETED");
+        assertThat(acknowledged.getResolutionType()).isEqualTo("ACKNOWLEDGED");
+        assertThat(acknowledged.getIssueSolvedBy()).isEqualTo("recipient@example.test");
+
+        Instant lateDueAt = Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        transaction().executeWithoutResult(status -> {
+            FlowExecutionState queuedNextStep = states.findById(nextStep.getId()).orElseThrow();
+            queuedNextStep.setExecutionState("ACTIVE");
+            queuedNextStep.setDueAt(lateDueAt);
+            states.save(queuedNextStep);
+        });
+        consumer.onMessage(new EscalationStepReadyMessage(nextStep.getId(), 0, lateDueAt));
+
+        verify(notification, times(1)).sendEmail(any(), anyString());
+    }
+
+    @Test
     void concurrentStartsCreateOnlyOneSetOfExecutionStates() throws Exception {
         UUID teamId = UUID.randomUUID();
         Escalation escalation = new Escalation();
@@ -494,7 +571,8 @@ class StepSchedulingPostgresIntegrationTest {
     @EntityScan(basePackageClasses = FlowExecutionState.class)
     @EnableJpaRepositories(basePackageClasses = FlowExecutionStateRepository.class)
     @Import({StepSchedulingService.class, StepTimerRegistry.class, ReconcilerService.class,
-            MessagePublisher.class, MessageConsumer.class, FlowExecutionStateService.class})
+            MessagePublisher.class, MessageConsumer.class, FlowExecutionStateService.class,
+            EscalationAcknowledgementService.class})
     static class Config {
         @Bean RabbitTemplate rabbitTemplate() { return mock(RabbitTemplate.class); }
 

@@ -34,6 +34,8 @@ public class Escalation {
 
     private String issueSolvedBy;
 
+    private Instant acknowledgedAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
@@ -124,7 +126,14 @@ public class Escalation {
         this.issueSolvedBy = issueSolvedBy;
     }
 
+    public Instant getAcknowledgedAt() {
+        return acknowledgedAt;
+    }
+
+    public void setAcknowledgedAt(Instant acknowledgedAt) {
+        this.acknowledgedAt = acknowledgedAt;
+    }
+
     
 }
-
 

@@ -23,6 +23,7 @@ public class FlowExecutionState {
     private String executionState;
     private String notificationState;
     private UUID taskId;
+    @Column(name = "task_details", columnDefinition = "TEXT")
     private String taskDetails;
     private UUID nodeId;
     private String userEmail;

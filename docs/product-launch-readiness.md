@@ -32,18 +32,19 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ### 4. Align task description limits with the database
 
-- [ ] The task form accepts 1,000 characters, but the initial database migration gives `tasks.description` and `flow_execution_state.task_details` only 255 characters. Add a new Flyway migration and matching API limits so a valid form or webhook payload cannot fail later when a run starts.
+- [x] The task form accepts up to 1,000 characters, and migration V3 changes both `tasks.description` and `flow_execution_state.task_details` to PostgreSQL `TEXT`. The saved task context can therefore survive task creation, run start, and email creation without the original 255-character database limit.
 - **Done when:** the allowed maximum length survives task creation, run start, saved state reads, and email creation.
-- **Evidence:** [task form](../ui/src/features/tasks/TasksPage.tsx), [initial schema](../src/main/resources/db/migration/V1__create_initial_schema.sql).
+- **Evidence:** [task form](../ui/src/features/tasks/TasksPage.tsx), [task entity](../src/main/java/com/alertops/task/model/Task.java), [context migration](../src/main/resources/db/migration/V3__use_text_for_task_context.sql).
 
 ## Then build these two product features
 
 ### Feature 1: Acknowledge an escalation from email
 
-- [ ] Put an **Acknowledge** button in every escalation email. It opens a confirmation page for that specific run and recipient. The confirmation action records acknowledgement and stops later steps. The link needs a scoped, expiring token and must be safe to use more than once.
-- [ ] Make the confirmation a deliberate `POST`; opening the link with `GET` must not acknowledge anything, since mail scanners can open links automatically. The worker must recheck the saved run status before a later send. Show the acknowledged status, person, and time in the run detail UI.
-- **Done when:** acknowledgement before the next step prevents that step from sending; an expired or invalid link cannot acknowledge; repeated clicks return the same result; a completed run cannot be changed incorrectly. Cover the race between acknowledgement and an in-flight send.
-- **Evidence of current gap:** [run API](../src/main/java/com/alertops/flow_execution_engine/controller/EscalationController.java), [email template](../src/main/java/com/alertops/messaging/Notification.java).
+- [x] Put an **Acknowledge** button in every escalation email. It opens a confirmation page for that specific run and recipient. The confirmation action records acknowledgement and stops later steps. The link uses a recipient-scoped, expiring token; only its hash is stored.
+- [x] Make confirmation a deliberate `POST`; the email link opens a page and a read-only preview first. The worker and acknowledgement action lock the run row while making their state changes. If a send is already in progress, it finishes before acknowledgement is accepted; ready later steps then see the completed run and are ignored. The run detail shows who acknowledged and when.
+- [x] Focused tests cover valid, expired, repeated, invalid-state, and wrong-recipient acknowledgement cases; anonymous API access is limited to the token endpoints and `GET` cannot confirm. A PostgreSQL integration case exercises acknowledgement while a send is in flight.
+- **Done when:** acknowledgement before the next step prevents that step from sending; expired or invalid links cannot acknowledge; repeated clicks return the saved result; completed runs cannot be changed incorrectly; acknowledgement and in-flight sends are serialized.
+- **Evidence:** [acknowledgement API](../src/main/java/com/alertops/flow_execution_engine/controller/EscalationAcknowledgementController.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), [email template](../src/main/java/com/alertops/messaging/Notification.java), [confirmation page](../ui/src/features/escalations/AcknowledgeEscalationPage.tsx), [database migration](../src/main/resources/db/migration/V4__add_escalation_acknowledgement.sql).
 
 ### Feature 2: Create and start an escalation through a webhook
 

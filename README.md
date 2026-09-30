@@ -1,6 +1,6 @@
 # AlertOps
 
-**AlertOps** is a multi-tenant backend alerting and escalation platform designed to model real-world incident flows—where alerts are delayed, retried, escalated, and recovered reliably under failure.
+**AlertOps** is a multi-tenant alerting and escalation product being built for production use. It coordinates incident response across teams, with delayed steps, retries, and recovery after failures.
 
 The system treats **time, retries, and ownership** as first-class concerns, using queue-driven execution instead of cron-based scheduling or in-memory timers.
 
@@ -100,9 +100,9 @@ AlertOps optimizes for **reliability and determinism**, not minimal code.
 ## What This Project Is (and Is Not)
 
 ### It Is
-- A backend-focused system design project
-- A practical exploration of alerting and escalation workflows
-- A demonstration of queue-based, time-aware execution
+- A product for teams to configure and run incident escalation workflows
+- An open-source service being prepared for real users
+- A backend and UI that together support the full response workflow
 
 ### It Is Not
 - A UI-centric application
@@ -163,6 +163,8 @@ ALERTOPS_EMAIL_FROM=alerts@example.com
 SMTP authentication and STARTTLS default to enabled. For an implicit TLS server on port `465`, set `SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true` and `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false`. Configure `ALERTOPS_EMAIL_FROM` with a sender address verified by your SMTP provider; the SMTP login may not be a valid sender. Keep provider credentials out of source control.
 
 New registrations receive a one-time email verification link before they can use team features. The link points to `ALERTOPS_UI_BASE_URL` and expires after 30 minutes by default; change that window with `ALERTOPS_EMAIL_VERIFICATION_TTL`.
+
+Escalation emails include an acknowledgement button scoped to the assigned recipient and run. Opening the email link only previews the run; the recipient must confirm on the page to stop later steps. These links expire after 72 hours by default; configure `ALERTOPS_ACKNOWLEDGEMENT_TTL` to change the lifetime. Keep `ALERTOPS_UI_BASE_URL` set to the deployed UI origin so email links open the right application.
 
 Team invitation links point to the UI origin configured with `ALERTOPS_UI_BASE_URL` (defaults to `http://localhost:5173` for local development). Set this to the deployed UI origin when sending invitations outside local development.
 
