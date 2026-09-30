@@ -94,8 +94,20 @@ export interface Escalation {
   flowId: string
   status: string
   resolutionType?: string | null
+  issueSolvedBy?: string | null
+  acknowledgedAt?: string | null
   createdAt: string
   updatedAt?: string
+}
+
+export interface EscalationAcknowledgement {
+  escalationName: string
+  recipientEmail: string
+  status: string
+  expiresAt: string
+  acknowledgedAt?: string | null
+  acknowledgedBy?: string | null
+  alreadyAcknowledged: boolean
 }
 
 export interface ExecutionState {

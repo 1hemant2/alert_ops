@@ -44,6 +44,7 @@ export function EscalationDetailPage() {
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
     <PageHeader eyebrow={`EXECUTION / ${item.id.slice(0, 8).toUpperCase()}`} title={item.name} description="Durable progress for this team scoped escalation." action={<StatusBadge status={item.status} />} />
     <InlineNotice>Each active step emails its configured recipient with the task context. SENT means the email service accepted the message; it does not confirm delivery.</InlineNotice>
+    {item.resolutionType === 'ACKNOWLEDGED' && item.acknowledgedAt && <InlineNotice tone="success">Acknowledged by <strong>{item.issueSolvedBy}</strong> at {formatDate(item.acknowledgedAt)}. Remaining steps were stopped.</InlineNotice>}
     <div className="detail-summary-grid">
       <Card className="detail-summary-card"><span className="eyebrow">TASK CONTEXT</span><strong>{task?.name ?? item.taskId.slice(0, 8)}</strong><p>{task?.description || 'Task details are not available.'}</p></Card>
       <Card className="detail-summary-card"><span className="eyebrow">ESCALATION PATH</span>{flow.data ? <Link className="detail-link" to={`/app/${teamId}/flows/${flow.data.id}`}>{flow.data.name} <span>↗</span></Link> : <strong>{item.flowId.slice(0, 8)}</strong>}<p>{nodes.data ? `${nodes.data.length} configured response ${nodes.data.length === 1 ? 'step' : 'steps'}` : 'Loading path configuration…'}</p></Card>

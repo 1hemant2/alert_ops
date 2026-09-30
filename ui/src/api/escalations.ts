@@ -1,5 +1,5 @@
 import { jsonBody, request } from './client'
-import type { Escalation, ExecutionState } from './types'
+import type { Escalation, EscalationAcknowledgement, ExecutionState } from './types'
 
 export function getEscalations(): Promise<Escalation[]> {
   return request<Escalation[]>('/api/v1/escalation/all?page=0&size=100&sortBy=createdAt&sortDir=desc')
@@ -29,4 +29,20 @@ export function startEscalation(escalationId: string): Promise<string> {
 
 export function getExecutionStates(escalationId: string): Promise<ExecutionState[]> {
   return request<ExecutionState[]>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/execution-states`)
+}
+
+export function previewEscalationAcknowledgement(token: string): Promise<EscalationAcknowledgement> {
+  return request<EscalationAcknowledgement>('/api/v1/escalation/acknowledgement/preview', {
+    method: 'POST',
+    public: true,
+    body: jsonBody({ token }),
+  })
+}
+
+export function acknowledgeEscalation(token: string): Promise<EscalationAcknowledgement> {
+  return request<EscalationAcknowledgement>('/api/v1/escalation/acknowledgement/confirm', {
+    method: 'POST',
+    public: true,
+    body: jsonBody({ token }),
+  })
 }
