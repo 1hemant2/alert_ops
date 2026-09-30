@@ -1,6 +1,6 @@
 # AlertOps: critical path to product release
 
-Reassessed: 2026-09-28. This list contains critical bugs to fix first and the two product features selected for this release. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
+Reassessed: 2026-09-30. This list contains critical bugs to fix first and the two product features selected for this release. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
 
 ## Fix these bugs first, in order
 
@@ -25,9 +25,10 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ### 3. Verify the email address used to accept an invitation
 
-- [ ] Registration currently allows a user to claim any email address, while invitation acceptance trusts the email on the signed-in account. Require proof of control of that address before the invite grants team membership.
-- **Done when:** an unverified account cannot accept an invite for its claimed address; verified accounts can accept once; tests cover wrong account, expired link, and repeat acceptance.
-- **Evidence:** [registration](../src/main/java/com/alertops/auth/service/UserService.java), [invite acceptance](../src/main/java/com/alertops/team/service/TeamInvitationService.java).
+- [x] Registration creates an unverified account and sends a one-time, expiring verification link. Login rejects unverified accounts before issuing a JWT, and the UI routes them to the verification screen.
+- [x] Invitation acceptance checks the current database user, requires a verified address, and compares that address with the invite before creating membership.
+- **Done when:** an unverified account cannot accept an invite for its claimed address; verified accounts can accept once; tests cover wrong account, expired link, repeat acceptance, and the verification state change.
+- **Evidence:** [verification service](../src/main/java/com/alertops/auth/service/EmailVerificationService.java), [registration](../src/main/java/com/alertops/auth/service/UserService.java), [security filter](../src/main/java/com/alertops/security/JwtAuthenticationFilter.java), [invite acceptance](../src/main/java/com/alertops/team/service/TeamInvitationService.java), [migration](../src/main/resources/db/migration/V2__add_email_verification.sql).
 
 ### 4. Align task description limits with the database
 

@@ -12,6 +12,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import com.alertops.team.model.TeamMember;
 import com.alertops.team.repository.TeamMemberRepository;
+import com.alertops.auth.model.User;
+import com.alertops.auth.repository.UserRepository;
 
 import java.io.IOException;
 import java.util.List;
@@ -27,10 +29,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final TeamMemberRepository teamMemberRepository;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, TeamMemberRepository teamMemberRepository) {
+    public JwtAuthenticationFilter(
+            JwtUtil jwtUtil,
+            TeamMemberRepository teamMemberRepository,
+            UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
         this.teamMemberRepository = teamMemberRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -50,10 +57,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String header = request.getHeader("Authorization");
             if (header != null && header.startsWith("Bearer ")) {
-                String token = header.substring(7);
+                String jwtToken = header.substring(7);
                 Claims claims;
                 try {
-                    claims = jwtUtil.parse(token);
+                    claims = jwtUtil.parse(jwtToken);
                 } catch (JwtException | IllegalArgumentException e) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     return;
@@ -65,14 +72,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                UUID teamId = parseUuid(claims.get("teamId", String.class));
+                if (requiresVerifiedAccount(request)) {
+                    User currentUser = userRepository.findById(userId).orElse(null);
+                    if (currentUser == null) {
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "The account no longer exists.");
+                        return;
+                    }
+                    if (!currentUser.isEmailVerified()) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                                "Verify your email address before using team features.");
+                        return;
+                    }
+                }
+
+                UUID selectedTeamId = parseUuid(claims.get("teamId", String.class));
                 if (requiresTeamMembership(request)) {
-                    if (teamId == null) {
+                    if (selectedTeamId == null) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN, "Select a team before using this resource.");
                         return;
                     }
 
-                    TeamMember membership = teamMemberRepository.findTeamMemeber(userId, teamId);
+                    TeamMember membership = teamMemberRepository.findTeamMemeber(userId, selectedTeamId);
                     if (membership == null) {
                         response.sendError(HttpServletResponse.SC_FORBIDDEN, "You are no longer a member of this team.");
                         return;
@@ -81,16 +101,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // Use the current role so role changes take effect without waiting for this token to expire.
                     AuthContextHolder.set(new AuthContext(
                             userId,
-                            teamId,
+                            selectedTeamId,
                             membership.getRole(),
-                            token,
+                            jwtToken,
                             claims.get("email", String.class)));
                 } else {
                     AuthContextHolder.set(new AuthContext(
                             userId,
-                            teamId,
+                            selectedTeamId,
                             claims.get("roles", String.class),
-                            token,
+                            jwtToken,
                             claims.get("email", String.class)));
                 }
 
@@ -127,6 +147,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || isPathOrSubpath(path, "/api/v1/task")
                 || isPathOrSubpath(path, "/api/v1/flow")
                 || isPathOrSubpath(path, "/api/v1/escalation");
+    }
+
+    private boolean requiresVerifiedAccount(HttpServletRequest request) {
+        String path = request.getServletPath();
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())
+                || path.startsWith("/api/v1/auth/")) {
+            // Auth endpoints include login, verification, and resend for unverified users.
+            return false;
+        }
+        if (path.equals(TEAM_JOIN_ENDPOINT) && "GET".equalsIgnoreCase(request.getMethod())) {
+            // Invitation preview is read-only and can be opened before sign-in.
+            return false;
+        }
+        // Every other authenticated API must be used by a verified account.
+        return true;
     }
 
     private boolean isPathOrSubpath(String path, String basePath) {

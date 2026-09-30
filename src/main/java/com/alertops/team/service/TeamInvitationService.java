@@ -42,7 +42,7 @@ public class TeamInvitationService {
     private final InviteRepository inviteRepository;
     private final UserRepository userRepository;
     private final TeamInvitationMailer invitationMailer;
-    private final String uiBaseUrl;
+    private final String invitationUiBaseUrl;
 
     public TeamInvitationService(
             GrantPermission grantPermission,
@@ -51,14 +51,14 @@ public class TeamInvitationService {
             InviteRepository inviteRepository,
             UserRepository userRepository,
             TeamInvitationMailer invitationMailer,
-            @Value("${alertops.ui.base-url}") String uiBaseUrl) {
+            @Value("${alertops.ui.base-url}") String invitationUiBaseUrl) {
         this.grantPermission = grantPermission;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.inviteRepository = inviteRepository;
         this.userRepository = userRepository;
         this.invitationMailer = invitationMailer;
-        this.uiBaseUrl = uiBaseUrl == null ? "" : uiBaseUrl.replaceAll("/+$", "");
+        this.invitationUiBaseUrl = invitationUiBaseUrl == null ? "" : invitationUiBaseUrl.replaceAll("/+$", "");
     }
 
     @Transactional
@@ -90,7 +90,7 @@ public class TeamInvitationService {
                 team.getId(), email, TeamConstant.INVITED.name())) {
             throw new InviteConflictException("An invitation for this email is already pending.");
         }
-        if (uiBaseUrl.isBlank()) {
+        if (invitationUiBaseUrl.isBlank()) {
             throw new IllegalStateException("The invitation link URL is not configured.");
         }
 
@@ -103,15 +103,15 @@ public class TeamInvitationService {
         invite.setStatus(TeamConstant.INVITED.name());
         Invite savedInvite = inviteRepository.saveAndFlush(invite);
 
-        String invitationUrl = uiBaseUrl + "/join?token=" + savedInvite.getToken();
+        String invitationUrl = invitationUiBaseUrl + "/join?token=" + savedInvite.getToken();
         invitationMailer.sendInvitation(savedInvite, team, invitationUrl);
 
         Instant expiresAt = savedInvite.getCreatedAt().plus(savedInvite.getTtl());
         return new InviteResponseDto(savedInvite.getEmail(), savedInvite.getRole(), team.getName(), expiresAt);
     }
 
-    public InvitePreviewDto preview(UUID token) {
-        Invite invite = findInvite(token);
+    public InvitePreviewDto preview(UUID inviteToken) {
+        Invite invite = findInvite(inviteToken);
         assertInviteIsPending(invite);
         Team team = teamRepository.findById(invite.getTeamId())
                 .orElseThrow(() -> new InviteNotFoundException());
@@ -123,15 +123,20 @@ public class TeamInvitationService {
     }
 
     @Transactional
-    public InviteAcceptanceResponse accept(UUID token) {
+    public InviteAcceptanceResponse accept(UUID inviteToken) {
         AuthContext context = AuthContextHolder.get();
         if (context == null || context.getUserId() == null || context.getEmail() == null) {
             throw new AccessDeniedException("Sign in with the invited email address to accept this invitation.");
         }
 
-        Invite invite = inviteRepository.findByTokenForUpdate(token).orElseThrow(InviteNotFoundException::new);
+        Invite invite = inviteRepository.findByTokenForUpdate(inviteToken).orElseThrow(InviteNotFoundException::new);
         assertInviteIsPending(invite);
-        if (!context.getEmail().trim().equalsIgnoreCase(invite.getEmail())) {
+        User signedInUser = userRepository.findById(context.getUserId())
+                .orElseThrow(() -> new AccessDeniedException("Your account could not be found."));
+        if (!signedInUser.isEmailVerified()) {
+            throw new AccessDeniedException("Verify your email address before accepting an invitation.");
+        }
+        if (!signedInUser.getEmail().trim().equalsIgnoreCase(invite.getEmail())) {
             throw new AccessDeniedException("Sign in with the email address this invitation was sent to.");
         }
         if (teamMemberRepository.existsByUserIdAndTeamId(context.getUserId(), invite.getTeamId())) {
@@ -140,22 +145,22 @@ public class TeamInvitationService {
 
         Team team = teamRepository.findById(invite.getTeamId())
                 .orElseThrow(() -> new InviteNotFoundException());
-        TeamMember member = new TeamMember();
-        member.setTeamId(team.getId());
-        member.setUserId(context.getUserId());
-        member.setRole(invite.getRole());
-        teamMemberRepository.save(member);
+        TeamMember teamMember = new TeamMember();
+        teamMember.setTeamId(team.getId());
+        teamMember.setUserId(context.getUserId());
+        teamMember.setRole(invite.getRole());
+        teamMemberRepository.save(teamMember);
 
         invite.setStatus(TeamConstant.ACCEPTED.name());
         inviteRepository.save(invite);
         return new InviteAcceptanceResponse(team.getId(), team.getName(), invite.getRole());
     }
 
-    private Invite findInvite(UUID token) {
-        if (token == null) {
+    private Invite findInvite(UUID inviteToken) {
+        if (inviteToken == null) {
             throw new InviteNotFoundException();
         }
-        return inviteRepository.findByToken(token).orElseThrow(InviteNotFoundException::new);
+        return inviteRepository.findByToken(inviteToken).orElseThrow(InviteNotFoundException::new);
     }
 
     private void assertInviteIsPending(Invite invite) {
