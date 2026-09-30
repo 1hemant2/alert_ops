@@ -32,9 +32,9 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ### 4. Align task description limits with the database
 
-- [ ] The task form accepts 1,000 characters, but the initial database migration gives `tasks.description` and `flow_execution_state.task_details` only 255 characters. Add a new Flyway migration and matching API limits so a valid form or webhook payload cannot fail later when a run starts.
+- [x] The task form accepts up to 1,000 characters, and migration V3 changes both `tasks.description` and `flow_execution_state.task_details` to PostgreSQL `TEXT`. The saved task context can therefore survive task creation, run start, and email creation without the original 255-character database limit.
 - **Done when:** the allowed maximum length survives task creation, run start, saved state reads, and email creation.
-- **Evidence:** [task form](../ui/src/features/tasks/TasksPage.tsx), [initial schema](../src/main/resources/db/migration/V1__create_initial_schema.sql).
+- **Evidence:** [task form](../ui/src/features/tasks/TasksPage.tsx), [task entity](../src/main/java/com/alertops/task/model/Task.java), [context migration](../src/main/resources/db/migration/V3__use_text_for_task_context.sql).
 
 ## Then build these two product features
 
