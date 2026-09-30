@@ -19,3 +19,19 @@ export function register(payload: RegisterRequest): Promise<User> {
     public: true,
   })
 }
+
+export function verifyEmail(verificationToken: string): Promise<{ emailVerified: boolean; message: string }> {
+  return request<{ emailVerified: boolean; message: string }>('/api/v1/auth/verify-email', {
+    method: 'POST',
+    body: jsonBody({ token: verificationToken }),
+    public: true,
+  })
+}
+
+export function resendVerificationEmail(emailAddress: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/api/v1/auth/resend-verification', {
+    method: 'POST',
+    body: jsonBody({ email: emailAddress }),
+    public: true,
+  })
+}

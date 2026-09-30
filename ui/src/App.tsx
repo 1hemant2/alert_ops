@@ -6,7 +6,7 @@ import { SessionProvider } from './app/Session'
 import { useSession } from './app/useSession'
 import { PublicPage } from './pages/PublicPage'
 import { TeamOverviewPage } from './pages/TeamOverviewPage'
-import { LoginPage, RegisterPage } from './features/auth/AuthPages'
+import { LoginPage, RegisterPage, VerifyEmailPage } from './features/auth/AuthPages'
 import { TeamPickerPage } from './features/teams/TeamPickerPage'
 import { TeamMembersPage } from './features/teams/TeamMembersPage'
 import { JoinTeamPage } from './features/teams/JoinTeamPage'
@@ -53,6 +53,7 @@ function AppRoutes() {
     <Route path="/" element={<HomeRedirect />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
+    <Route path="/verify-email" element={<VerifyEmailPage />} />
     <Route path="/join" element={<JoinTeamPage />} />
     <Route element={<RequireAuth />}>
       <Route path="/teams" element={<TeamPickerPage />} />
