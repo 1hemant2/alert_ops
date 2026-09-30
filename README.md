@@ -1,6 +1,6 @@
 # AlertOps
 
-**AlertOps** is a multi-tenant backend alerting and escalation platform designed to model real-world incident flows—where alerts are delayed, retried, escalated, and recovered reliably under failure.
+**AlertOps** is a multi-tenant alerting and escalation product being built for production use. It coordinates incident response across teams, with delayed steps, retries, and recovery after failures.
 
 The system treats **time, retries, and ownership** as first-class concerns, using queue-driven execution instead of cron-based scheduling or in-memory timers.
 
@@ -100,9 +100,9 @@ AlertOps optimizes for **reliability and determinism**, not minimal code.
 ## What This Project Is (and Is Not)
 
 ### It Is
-- A backend-focused system design project
-- A practical exploration of alerting and escalation workflows
-- A demonstration of queue-based, time-aware execution
+- A product for teams to configure and run incident escalation workflows
+- An open-source service being prepared for real users
+- A backend and UI that together support the full response workflow
 
 ### It Is Not
 - A UI-centric application

@@ -36,7 +36,7 @@ docker run --rm -p 8080:8080 alertops-ui
 
 The container serves only the static UI on port `8080`; it does not contain or start the Java API. Nginx falls back to `index.html` for React Router paths and exposes `/health` for a simple host check.
 
-## Demo walkthrough
+## Product walkthrough
 
 1. Register an account and sign in.
 2. Create or select a team.
