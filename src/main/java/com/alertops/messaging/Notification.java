@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.HtmlUtils;
 
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 
@@ -37,9 +38,13 @@ public class Notification {
         this.fromAddress = fromAddress == null ? "" : fromAddress.trim();
     }
 
-    public boolean sendEmail(FlowExecutionState flowExecutionState) {
+    public boolean sendEmail(FlowExecutionState flowExecutionState, String acknowledgementUrl) {
         if (flowExecutionState == null || isBlank(flowExecutionState.getUserEmail())) {
             logger.warn("Email notification skipped because the recipient address is missing");
+            return false;
+        }
+        if (isBlank(acknowledgementUrl)) {
+            logger.warn("Email notification skipped because the acknowledgement link is missing");
             return false;
         }
 
@@ -63,7 +68,7 @@ public class Notification {
                 subjectDetails = subjectDetails.substring(0, 97) + "...";
             }
 
-            String markdown = buildMarkdown(flowExecutionState, taskDetails);
+            String markdown = buildMarkdown(flowExecutionState, taskDetails, acknowledgementUrl);
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(
                     message,
@@ -79,7 +84,7 @@ public class Notification {
             alternative.addBodyPart(plainPart);
 
             var htmlPart = new MimeBodyPart();
-            htmlPart.setContent(buildHtml(markdown), "text/html; charset=" + StandardCharsets.UTF_8.name());
+            htmlPart.setContent(buildHtml(markdown, acknowledgementUrl), "text/html; charset=" + StandardCharsets.UTF_8.name());
             alternative.addBodyPart(htmlPart);
             message.setContent(alternative);
 
@@ -92,7 +97,7 @@ public class Notification {
         }
     }
 
-    private String buildMarkdown(FlowExecutionState state, String taskDetails) {
+    private String buildMarkdown(FlowExecutionState state, String taskDetails, String acknowledgementUrl) {
         String details = taskDetails.isBlank() ? "No task details were provided." : taskDetails;
         String recipient = Objects.toString(state.getUserEmail(), "unknown");
         String escalationId = Objects.toString(state.getProcessId(), "unknown");
@@ -110,15 +115,17 @@ public class Notification {
                 - **Escalation ID:** %s
                 - **Assigned user:** %s
 
+                [Review and acknowledge this escalation](%s)
+
                 Review this alert and follow your team's incident response procedure.
 
                 ---
 
                 *Automated notification from AlertOps. Replies may not be monitored.*
-                """.formatted(details, escalationId, recipient);
+                """.formatted(details, escalationId, recipient, acknowledgementUrl);
     }
 
-    private String buildHtml(String markdown) {
+    private String buildHtml(String markdown, String acknowledgementUrl) {
         String renderedMarkdown = HTML_RENDERER.render(MARKDOWN_PARSER.parse(markdown))
                 .replace("<h1>", "<h1 style=\"margin:0 0 14px;color:#14283f;font-size:26px;line-height:1.25;\">")
                 .replace("<h2>", "<h2 style=\"margin:26px 0 8px;color:#14283f;font-size:16px;line-height:1.4;\">")
@@ -157,6 +164,9 @@ public class Notification {
                             ACTION NEEDED &nbsp;·&nbsp; A response step is assigned to you
                           </div>
                           <div style="color:#314156;font-size:15px;line-height:1.65;">{{MARKDOWN_HTML}}</div>
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;"><tr><td bgcolor="#4b18f5" style="border-radius:8px;background:#4b18f5;">
+                            <a href="{{ACKNOWLEDGEMENT_URL}}" style="display:inline-block;padding:14px 22px;border-radius:8px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Acknowledge escalation</a>
+                          </td></tr></table>
                         </td></tr>
                         <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;line-height:1.5;">
                           Sent automatically by AlertOps. Please use your team's usual incident response channel.
@@ -167,7 +177,8 @@ public class Notification {
                   </table>
                 </body>
                 </html>
-                """.replace("{{MARKDOWN_HTML}}", renderedMarkdown);
+                """.replace("{{ACKNOWLEDGEMENT_URL}}", HtmlUtils.htmlEscape(acknowledgementUrl))
+                .replace("{{MARKDOWN_HTML}}", renderedMarkdown);
     }
 
     private boolean isBlank(String value) {

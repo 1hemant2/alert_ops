@@ -69,6 +69,9 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/user").denyAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/escalation/acknowledgement/preview",
+                                "/api/v1/escalation/acknowledgement/confirm").permitAll()
                         .requestMatchers("/api/v1/auth/**", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/team/join").permitAll()
                         .anyRequest().authenticated()

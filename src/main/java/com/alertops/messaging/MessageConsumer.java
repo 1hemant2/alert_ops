@@ -11,6 +11,7 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
 
 @Component
 public class MessageConsumer {
@@ -18,15 +19,18 @@ public class MessageConsumer {
    private final FlowExecutionStateRepository flowExecutionStateRepository;
    private final EscalationRepository escalationRepository;
    private final StepSchedulingService stepSchedulingService;
+   private final EscalationAcknowledgementService acknowledgementService;
 
 
     public MessageConsumer(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository,
-        Notification notification, StepSchedulingService stepSchedulingService
+        Notification notification, StepSchedulingService stepSchedulingService,
+        EscalationAcknowledgementService acknowledgementService
     ) {
         this.flowExecutionStateRepository = flowExecutionStateRepository;
         this.escalationRepository = escalationRepository;
         this.notification = notification;
         this.stepSchedulingService = stepSchedulingService;
+        this.acknowledgementService = acknowledgementService;
     }
 
 
@@ -47,7 +51,8 @@ public class MessageConsumer {
             return;
         }
 
-        Escalation escalation = escalationRepository.findById(currentState.getProcessId()).orElse(null);
+        // Lock the run while checking and sending so acknowledgement cannot race a new step.
+        Escalation escalation = escalationRepository.findByIdForUpdate(currentState.getProcessId()).orElse(null);
         if (escalation == null || !"RUNNING".equals(escalation.getStatus())) {
             return;
         }
@@ -79,7 +84,9 @@ public class MessageConsumer {
                 .findFirstByProcessIdAndExecutionStateOrderByPositionAsc(
                         flowExecutionState.getProcessId(), "PENDING");
 
-        boolean mailSent = notification.sendEmail(flowExecutionState);
+        String acknowledgementUrl = acknowledgementService.createAcknowledgementUrl(
+                escalation, flowExecutionState.getUserEmail());
+        boolean mailSent = notification.sendEmail(flowExecutionState, acknowledgementUrl);
         // Persist total attempts, including successful SMTP submissions.
         flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
         if (mailSent) {

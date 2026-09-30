@@ -164,6 +164,8 @@ SMTP authentication and STARTTLS default to enabled. For an implicit TLS server 
 
 New registrations receive a one-time email verification link before they can use team features. The link points to `ALERTOPS_UI_BASE_URL` and expires after 30 minutes by default; change that window with `ALERTOPS_EMAIL_VERIFICATION_TTL`.
 
+Escalation emails include an acknowledgement button scoped to the assigned recipient and run. Opening the email link only previews the run; the recipient must confirm on the page to stop later steps. These links expire after 72 hours by default; configure `ALERTOPS_ACKNOWLEDGEMENT_TTL` to change the lifetime. Keep `ALERTOPS_UI_BASE_URL` set to the deployed UI origin so email links open the right application.
+
 Team invitation links point to the UI origin configured with `ALERTOPS_UI_BASE_URL` (defaults to `http://localhost:5173` for local development). Set this to the deployed UI origin when sending invitations outside local development.
 
 If SMTP is not configured or the SMTP server rejects a send, the notification is recorded as failed and follows the node's configured retry/fallback path. A node marked `SENT` means the SMTP server accepted the message; AlertOps does not claim that it reached the recipient's inbox.
