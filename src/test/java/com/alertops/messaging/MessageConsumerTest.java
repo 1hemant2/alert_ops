@@ -4,6 +4,7 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -29,8 +30,9 @@ class MessageConsumerTest {
     private final EscalationRepository escalationRepository = mock(EscalationRepository.class);
     private final Notification notification = mock(Notification.class);
     private final StepSchedulingService stepSchedulingService = mock(StepSchedulingService.class);
+    private final EscalationAcknowledgementService acknowledgementService = mock(EscalationAcknowledgementService.class);
     private final MessageConsumer consumer = new MessageConsumer(
-            stateRepository, escalationRepository, notification, stepSchedulingService);
+            stateRepository, escalationRepository, notification, stepSchedulingService, acknowledgementService);
 
     @Test
     void ignoresMessageFromOlderSendAttempt() {
@@ -49,7 +51,7 @@ class MessageConsumerTest {
         EscalationStepReadyMessage queuedState = queuedState(0);
         FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
-        when(escalationRepository.findById(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(0);
 
         consumer.onMessage(queuedState);
@@ -63,14 +65,16 @@ class MessageConsumerTest {
         EscalationStepReadyMessage queuedState = queuedState(0);
         FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
-        when(escalationRepository.findById(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
-        when(notification.sendEmail(currentState)).thenReturn(true);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token")).thenReturn(true);
 
         consumer.onMessage(queuedState);
         consumer.onMessage(queuedState);
 
-        verify(notification, times(1)).sendEmail(currentState);
+        verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token");
         verify(stateRepository, times(1)).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
         assertEquals("TERMINAL", currentState.getExecutionState());
         assertEquals("SENT", currentState.getNotificationState());
@@ -84,11 +88,14 @@ class MessageConsumerTest {
         FlowExecutionState nextState = currentState("PENDING", "NOT_SENT", 0);
         nextState.setId(UUID.fromString("51000000-0000-0000-0000-000000000003"));
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
-        when(escalationRepository.findById(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(stateRepository.findFirstByProcessIdAndExecutionStateOrderByPositionAsc(ESCALATION_ID, "PENDING"))
                 .thenReturn(nextState, nextState);
-        when(notification.sendEmail(currentState)).thenThrow(new RuntimeException("unexpected processing error"));
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
+                .thenThrow(new RuntimeException("unexpected processing error"));
 
         assertThrows(RuntimeException.class, () -> consumer.onMessage(queuedState));
 
@@ -105,7 +112,7 @@ class MessageConsumerTest {
         FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
         currentState.setDueAt(dueAt);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
-        when(escalationRepository.findById(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
 
         consumer.onMessage(earlyMessage);
 

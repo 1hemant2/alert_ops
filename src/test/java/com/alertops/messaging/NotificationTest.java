@@ -38,7 +38,7 @@ class NotificationTest {
 
         Notification notification = new Notification(senderProvider, "alerts@example.com");
 
-        assertTrue(notification.sendEmail(state));
+        assertTrue(notification.sendEmail(state, "https://alerts.example.com/acknowledge?token=sample-token"));
 
         verify(mailSender).send(mimeMessage);
         Multipart parts = assertInstanceOf(Multipart.class, mimeMessage.getContent());
@@ -49,9 +49,12 @@ class NotificationTest {
         assertTrue(markdown.contains("## Incident summary"));
         assertTrue(markdown.contains("**backlog**"));
         assertTrue(markdown.contains(escalationId.toString()));
+        assertTrue(markdown.contains("https://alerts.example.com/acknowledge?token=sample-token"));
         assertTrue(html.contains("<strong style="));
         assertTrue(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
         assertTrue(html.contains("ESCALATION NOTIFICATION"));
+        assertTrue(html.contains("Acknowledge escalation"));
+        assertTrue(html.contains("href=\"https://alerts.example.com/acknowledge?token=sample-token\""));
         assertTrue(html.contains("width:100%;"));
         assertTrue(!html.contains("<img src=x"));
     }
