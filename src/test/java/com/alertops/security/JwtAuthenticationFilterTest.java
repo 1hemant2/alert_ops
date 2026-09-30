@@ -1,5 +1,7 @@
 package com.alertops.security;
 
+import com.alertops.auth.model.User;
+import com.alertops.auth.repository.UserRepository;
 import com.alertops.team.model.TeamMember;
 import com.alertops.team.repository.TeamMemberRepository;
 import io.jsonwebtoken.Claims;
@@ -12,6 +14,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -28,12 +31,16 @@ class JwtAuthenticationFilterTest {
 
     private final JwtUtil jwtUtil = mock(JwtUtil.class);
     private final TeamMemberRepository teamMemberRepository = mock(TeamMemberRepository.class);
+    private final UserRepository userRepository = mock(UserRepository.class);
     private final Claims claims = mock(Claims.class);
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtUtil, teamMemberRepository);
+        filter = new JwtAuthenticationFilter(jwtUtil, teamMemberRepository, userRepository);
+        User verifiedUser = new User();
+        verifiedUser.setEmailVerified(true);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(verifiedUser));
         when(jwtUtil.parse(TOKEN)).thenReturn(claims);
         when(claims.getSubject()).thenReturn(USER_ID.toString());
         when(claims.get("teamId", String.class)).thenReturn(TEAM_ID.toString());
@@ -62,6 +69,20 @@ class JwtAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(requestFor("/api/v1/task"), response, (request, response1) -> { });
+
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
+        verifyNoInteractions(teamMemberRepository);
+    }
+
+    @Test
+    void deniesTeamFeaturesForAnUnverifiedUser() throws Exception {
+        User unverifiedUser = new User();
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(unverifiedUser));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(requestFor("/api/v1/team"), response, (request, response1) -> {
+            throw new AssertionError("Unverified users must not reach team controllers");
+        });
 
         assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
         verifyNoInteractions(teamMemberRepository);

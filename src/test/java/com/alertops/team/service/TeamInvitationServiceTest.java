@@ -1,6 +1,7 @@
 package com.alertops.team.service;
 
 import com.alertops.auth.repository.UserRepository;
+import com.alertops.auth.model.User;
 import com.alertops.messaging.TeamInvitationMailer;
 import com.alertops.permissions.GrantPermission;
 import com.alertops.security.AuthContext;
@@ -45,10 +46,10 @@ class TeamInvitationServiceTest {
     private final TeamMemberRepository teamMemberRepository = mock(TeamMemberRepository.class);
     private final InviteRepository inviteRepository = mock(InviteRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
-    private final TeamInvitationMailer mailer = mock(TeamInvitationMailer.class);
+    private final TeamInvitationMailer invitationMailer = mock(TeamInvitationMailer.class);
     private final TeamInvitationService service = new TeamInvitationService(
             new GrantPermission(), teamRepository, teamMemberRepository, inviteRepository,
-            userRepository, mailer, "https://alerts.example.com");
+            userRepository, invitationMailer, "https://alerts.example.com");
 
     @AfterEach
     void clearAuthContext() {
@@ -80,7 +81,7 @@ class TeamInvitationServiceTest {
         verify(inviteRepository).saveAndFlush(inviteCaptor.capture());
         Invite createdInvite = inviteCaptor.getValue();
         assertThat(createdInvite.getToken()).isNotNull();
-        verify(mailer).sendInvitation(eq(createdInvite), eq(team), eq(
+        verify(invitationMailer).sendInvitation(eq(createdInvite), eq(team), eq(
                 "https://alerts.example.com/join?token=" + createdInvite.getToken()));
     }
 
@@ -89,12 +90,12 @@ class TeamInvitationServiceTest {
         AuthContextHolder.set(new AuthContext(MEMBER_ID, TEAM_ID, "USER", "jwt", "member@example.com"));
         assertThrows(AccessDeniedException.class,
                 () -> service.createInvite(new InviteDtoReq("person@example.com", "USER", 24L)));
-        verifyNoInteractions(teamRepository, teamMemberRepository, inviteRepository, userRepository, mailer);
+        verifyNoInteractions(teamRepository, teamMemberRepository, inviteRepository, userRepository, invitationMailer);
 
         AuthContextHolder.set(new AuthContext(MEMBER_ID, TEAM_ID, "ADMIN", "jwt", "admin@example.com"));
         assertThrows(AccessDeniedException.class,
                 () -> service.createInvite(new InviteDtoReq("person@example.com", "ADMIN", 24L)));
-        verifyNoInteractions(teamRepository, teamMemberRepository, inviteRepository, userRepository, mailer);
+        verifyNoInteractions(teamRepository, teamMemberRepository, inviteRepository, userRepository, invitationMailer);
     }
 
     @Test
@@ -105,7 +106,7 @@ class TeamInvitationServiceTest {
                 () -> service.createInvite(new InviteDtoReq("not-an-email", "USER", 24L)));
         assertThrows(IllegalArgumentException.class,
                 () -> service.createInvite(new InviteDtoReq("person@example.com", "USER", 0L)));
-        verifyNoInteractions(teamRepository, teamMemberRepository, inviteRepository, userRepository, mailer);
+        verifyNoInteractions(teamRepository, teamMemberRepository, inviteRepository, userRepository, invitationMailer);
     }
 
     @Test
@@ -114,6 +115,10 @@ class TeamInvitationServiceTest {
         Invite invite = pendingInvite("user@example.com");
         Team team = team();
         when(inviteRepository.findByTokenForUpdate(INVITE_TOKEN)).thenReturn(Optional.of(invite));
+        User user = new User();
+        user.setEmail("user@example.com");
+        user.setEmailVerified(true);
+        when(userRepository.findById(MEMBER_ID)).thenReturn(Optional.of(user));
         when(teamMemberRepository.existsByUserIdAndTeamId(MEMBER_ID, TEAM_ID)).thenReturn(false);
         when(teamRepository.findById(TEAM_ID)).thenReturn(Optional.of(team));
 
@@ -132,9 +137,38 @@ class TeamInvitationServiceTest {
         AuthContextHolder.set(new AuthContext(MEMBER_ID, null, null, "jwt", "someone-else@example.com"));
         Invite invite = pendingInvite("user@example.com");
         when(inviteRepository.findByTokenForUpdate(INVITE_TOKEN)).thenReturn(Optional.of(invite));
+        User user = new User();
+        user.setEmail("someone-else@example.com");
+        user.setEmailVerified(true);
+        when(userRepository.findById(MEMBER_ID)).thenReturn(Optional.of(user));
 
         assertThrows(AccessDeniedException.class, () -> service.accept(INVITE_TOKEN));
         verifyNoInteractions(teamRepository, teamMemberRepository);
+    }
+
+    @Test
+    void rejectsInviteAcceptanceBeforeEmailVerification() {
+        AuthContextHolder.set(new AuthContext(MEMBER_ID, null, null, "jwt", "user@example.com"));
+        Invite invite = pendingInvite("user@example.com");
+        when(inviteRepository.findByTokenForUpdate(INVITE_TOKEN)).thenReturn(Optional.of(invite));
+        User user = new User();
+        user.setEmail("user@example.com");
+        when(userRepository.findById(MEMBER_ID)).thenReturn(Optional.of(user));
+
+        assertThrows(AccessDeniedException.class, () -> service.accept(INVITE_TOKEN));
+        verifyNoInteractions(teamRepository, teamMemberRepository);
+        assertThat(invite.getStatus()).isEqualTo(TeamConstant.INVITED.name());
+    }
+
+    @Test
+    void rejectsAnInvitationThatWasAlreadyAccepted() {
+        AuthContextHolder.set(new AuthContext(MEMBER_ID, null, null, "jwt", "user@example.com"));
+        Invite invite = pendingInvite("user@example.com");
+        invite.setStatus(TeamConstant.ACCEPTED.name());
+        when(inviteRepository.findByTokenForUpdate(INVITE_TOKEN)).thenReturn(Optional.of(invite));
+
+        assertThrows(InviteConflictException.class, () -> service.accept(INVITE_TOKEN));
+        verifyNoInteractions(userRepository, teamRepository, teamMemberRepository);
     }
 
     @Test
