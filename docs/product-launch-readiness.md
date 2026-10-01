@@ -48,9 +48,10 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ### Feature 2: Create and start an escalation through a webhook
 
-- [ ] Let a team configure a webhook for a selected escalation path. A valid incoming event creates the task context and starts a run automatically. Give each webhook a revocable secret, validate payloads and size, limit abuse, and keep the secret out of responses after creation.
-- [ ] Require an event ID or idempotency key so retries return the existing run instead of starting another one. Return the run ID and enough error detail for the sender to retry safely. Add UI to create, view, rotate, and disable the webhook configuration.
-- **Done when:** a signed or secret-authenticated request starts one run on the configured team and path; retrying the same event does not create another; invalid credentials, foreign team IDs, and malformed payloads are rejected; the created run appears in the UI and can be acknowledged from its email.
+- [ ] Add source and optional priority, category, and reference URL to tasks, including manual create/edit, detail views, and email. Use wording that fits alerts, onboarding questions, and other requests. Default manual tasks to source “Manual”; show task source in every email subject and body.
+- [ ] Let a team configure a webhook with a default response path. A request may specify a same-team `flowId` to use another path; without it, use the default. Give each webhook a revocable secret, validate payloads and size, limit abuse, and keep the secret out of responses after creation.
+- [ ] Require `eventId`, `taskName`, `description`, and `source` in the request body before creating anything. Save the complete JSON event with the created task ID and run ID; show the event and its task link in the UI. Retries with the same event ID return the existing task and run. Add UI to create, view, rotate, and disable the webhook configuration.
+- **Done when:** a valid request starts one task and run on the configured team and selected path, with the full event saved and linked to both; a request missing required task fields or naming a foreign flow saves nothing; retries do not create another run; invalid credentials and malformed payloads are rejected; the run can be acknowledged from its email.
 - **Evidence of current gap:** [run API](../src/main/java/com/alertops/flow_execution_engine/controller/EscalationController.java), [current UI API](../ui/src/api/escalations.ts).
 
 ## Release check

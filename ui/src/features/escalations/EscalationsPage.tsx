@@ -39,7 +39,7 @@ export function EscalationsPage() {
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW EXECUTION</span><h2>Configure a run</h2></div><span className="form-number">03</span></div>
-        <p className="form-intro">Choose the incident context and the response path to run.</p>
+        <p className="form-intro">Choose the task context and the response path to run.</p>
         <form onSubmit={submit} className="form-stack">
           <Field label="Escalation name"><input required maxLength={120} value={name} onChange={event => setName(event.target.value)} placeholder="API latency response" /></Field>
           <Field label="Task"><select required value={taskId} onChange={event => setTaskId(event.target.value)}><option value="">Choose a task</option>{tasks.data?.map(task => <option key={task.id} value={task.id}>{task.name}</option>)}</select></Field>

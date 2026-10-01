@@ -60,15 +60,22 @@ public class Notification {
             }
 
             String taskDetails = Objects.toString(flowExecutionState.getTaskDetails(), "").trim();
-            String subjectDetails = taskDetails.replaceAll("[\\r\\n\\t]+", " ").replaceAll("\\s{2,}", " ").trim();
+            String taskName = sanitizeSubject(Objects.toString(flowExecutionState.getTaskName(), "").trim());
+            String taskSource = sanitizeSubject(Objects.toString(flowExecutionState.getTaskSource(), "Manual").trim());
+            if (taskSource.isEmpty()) {
+                taskSource = "Manual";
+            }
+            String subjectDetails = taskName.isEmpty()
+                    ? taskDetails.replaceAll("[\\r\\n\\t]+", " ").replaceAll("\\s{2,}", " ").trim()
+                    : taskName;
             if (subjectDetails.isEmpty()) {
-                subjectDetails = "Incident needs attention";
+                subjectDetails = taskName.isEmpty() ? "Response needed" : taskName;
             }
             if (subjectDetails.length() > 100) {
                 subjectDetails = subjectDetails.substring(0, 97) + "...";
             }
 
-            String markdown = buildMarkdown(flowExecutionState, taskDetails, acknowledgementUrl);
+            String markdown = buildMarkdown(flowExecutionState, taskName, taskSource, taskDetails, acknowledgementUrl);
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(
                     message,
@@ -76,7 +83,7 @@ public class Notification {
                     StandardCharsets.UTF_8.name());
             helper.setFrom(fromAddress);
             helper.setTo(flowExecutionState.getUserEmail().trim());
-            helper.setSubject("AlertOps alert: " + subjectDetails);
+            helper.setSubject("AlertOps · " + taskSource + " · " + subjectDetails);
 
             var alternative = new MimeMultipart("alternative");
             var plainPart = new MimeBodyPart();
@@ -97,16 +104,20 @@ public class Notification {
         }
     }
 
-    private String buildMarkdown(FlowExecutionState state, String taskDetails, String acknowledgementUrl) {
+    private String buildMarkdown(FlowExecutionState state, String taskName, String taskSource,
+                                 String taskDetails, String acknowledgementUrl) {
         String details = taskDetails.isBlank() ? "No task details were provided." : taskDetails;
         String recipient = Objects.toString(state.getUserEmail(), "unknown");
         String escalationId = Objects.toString(state.getProcessId(), "unknown");
         return """
-                # An escalation needs your attention
+                # A response needs your attention
 
-                AlertOps has activated a response workflow for an incident.
+                AlertOps has activated a response workflow.
 
-                ## Incident summary
+                ## Task
+
+                - **Title:** %s
+                - **Source:** %s
 
                 %s
 
@@ -117,12 +128,13 @@ public class Notification {
 
                 [Review and acknowledge this escalation](%s)
 
-                Review this alert and follow your team's incident response procedure.
+                Review this task and follow your team's response procedure.
 
                 ---
 
                 *Automated notification from AlertOps. Replies may not be monitored.*
-                """.formatted(details, escalationId, recipient, acknowledgementUrl);
+                """.formatted(taskName.isBlank() ? "Response needed" : taskName, taskSource, details,
+                        escalationId, recipient, acknowledgementUrl);
     }
 
     private String buildHtml(String markdown, String acknowledgementUrl) {
@@ -183,5 +195,9 @@ public class Notification {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String sanitizeSubject(String value) {
+        return value.replaceAll("[\\r\\n\\t]+", " ").replaceAll("\\s{2,}", " ").trim();
     }
 }

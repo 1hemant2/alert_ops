@@ -64,7 +64,32 @@ export interface Task {
   id: string
   name: string
   description: string
+  source: string
+  priority?: string | null
+  category?: string | null
+  referenceUrl?: string | null
   createdAt?: string
+}
+
+export interface WebhookConfiguration {
+  id: string
+  defaultFlowId: string
+  name: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+  lastTriggeredAt?: string | null
+  secret?: string | null
+}
+
+export interface WebhookEvent {
+  id: string
+  webhookId: string
+  eventId: string
+  receivedAt: string
+  payload: Record<string, unknown>
+  taskId: string
+  escalationId: string
 }
 
 export interface Flow {

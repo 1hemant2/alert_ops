@@ -14,7 +14,7 @@ import com.alertops.task.model.Task;
 
 import java.util.UUID;
 
-public interface TaskRepository extends JpaRepository<Task, Long> {
+public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     //find queries 
     @Query("SELECT t FROM Task t WHERE t.id = :taskId AND t.teamId = :teamId AND t.deleted = false")
@@ -22,6 +22,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     
     @Query("SELECT t from Task t where t.id = :taskId")
     Task findByTaskId(UUID taskId);
+
+    @Query("SELECT t FROM Task t WHERE t.id = :taskId AND t.teamId = :teamId AND t.deleted = false")
+    Task findTaskByIdAndTeamId(@Param("taskId") UUID taskId, @Param("teamId") UUID teamId);
 
     Page<TaskView> findByTeamId(UUID teamId, Pageable pageable);
 
@@ -39,6 +42,15 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
                                @Param("description") String description,
                                 @Param("teamId") UUID teamId
                             );
+
+    @Modifying
+    @Query("UPDATE Task t SET t.source = :source, t.priority = :priority, t.category = :category, t.referenceUrl = :referenceUrl WHERE t.id = :id AND t.teamId = :teamId")
+    void updateTaskDetails(@Param("id") UUID id,
+                           @Param("source") String source,
+                           @Param("priority") String priority,
+                           @Param("category") String category,
+                           @Param("referenceUrl") String referenceUrl,
+                           @Param("teamId") UUID teamId);
 
     // soft-delete queries
     @Modifying

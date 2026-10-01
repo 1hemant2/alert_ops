@@ -23,6 +23,10 @@ public class FlowExecutionState {
     private String executionState;
     private String notificationState;
     private UUID taskId;
+    @Column(name = "task_name", length = 120)
+    private String taskName;
+    @Column(name = "task_source", length = 120)
+    private String taskSource;
     @Column(name = "task_details", columnDefinition = "TEXT")
     private String taskDetails;
     private UUID nodeId;
@@ -91,6 +95,11 @@ public class FlowExecutionState {
     public void setTaskId(UUID taskId) {
         this.taskId = taskId;
     }
+
+    public String getTaskName() { return taskName; }
+    public void setTaskName(String taskName) { this.taskName = taskName; }
+    public String getTaskSource() { return taskSource; }
+    public void setTaskSource(String taskSource) { this.taskSource = taskSource; }
 
     public String getTaskDetails() {
         return taskDetails;

@@ -207,6 +207,11 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .task-copy strong { color: #29382f; font-size: 14px; }
 .task-copy p { color: #859087; font-size: 13px; line-height: 1.5; margin: 5px 0; }
 .task-copy small { color: #a4aca5; font-size: 12px; }
+.webhook-event-list { margin-top: 10px; display: grid; gap: 6px; }
+.webhook-event-list details { border: 1px solid #e7ece8; border-radius: 8px; padding: 7px 9px; background: #fbfcfb; }
+.webhook-event-list summary { cursor: pointer; color: #52645a; font-size: 12px; }
+.webhook-event-list p { margin: 8px 0; }
+.webhook-event-list pre { max-height: 180px; overflow: auto; margin: 0; padding: 9px; border-radius: 6px; background: #1d2923; color: #d8e5db; font-size: 11px; line-height: 1.4; }
 .task-id { color: #9ba69c; font: 12px ui-monospace, SFMono-Regular, monospace; }
 .flow-row { display: flex; align-items: center; gap: 11px; padding: 12px 0; border-top: 1px solid #f0f2ed; }
 .flow-row:hover .flow-row-copy strong { color: #799146; }

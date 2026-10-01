@@ -41,7 +41,7 @@ export function TeamPickerPage() {
 
   return (
     <div className="team-picker">
-      <div className="eyebrow">YOUR WORKSPACES</div><h1>Choose your team</h1><p className="page-lede">Manage incident tasks and escalation paths with your team.</p>
+      <div className="eyebrow">YOUR WORKSPACES</div><h1>Choose your team</h1><p className="page-lede">Manage tasks and response paths with your team.</p>
       <div className="team-picker-grid">
         <Card className="team-list-card">
           <div className="card-heading"><div><span className="eyebrow">AVAILABLE</span><h2>Teams</h2></div><span className="count-pill">{teams.data?.length ?? '—'}</span></div>

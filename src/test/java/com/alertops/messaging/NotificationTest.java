@@ -46,7 +46,7 @@ class NotificationTest {
 
         String markdown = parts.getBodyPart(0).getContent().toString();
         String html = parts.getBodyPart(1).getContent().toString();
-        assertTrue(markdown.contains("## Incident summary"));
+        assertTrue(markdown.contains("## Task"));
         assertTrue(markdown.contains("**backlog**"));
         assertTrue(markdown.contains(escalationId.toString()));
         assertTrue(markdown.contains("https://alerts.example.com/acknowledge?token=sample-token"));
