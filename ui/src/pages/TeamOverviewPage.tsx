@@ -22,7 +22,7 @@ export function TeamOverviewPage() {
   return <>
     <PageHeader eyebrow="CONTROL ROOM / OVERVIEW" title="Your response, in order." description="A durable escalation workflow from the first alert to the final handoff." action={<Link className="button button-primary" to={`${base}/escalations`}>New escalation <span>＋</span></Link>} />
     <div className="metrics-grid">
-      <Metric label="Tasks" value={tasks.data?.length} loading={tasks.isPending} detail="Incident context" mark="T" />
+      <Metric label="Tasks" value={tasks.data?.length} loading={tasks.isPending} detail="Response context" mark="T" />
       <Metric label="Escalation paths" value={flows.data?.length} loading={flows.isPending} detail="Ordered response steps" mark="↗" />
       <Metric label="Escalations" value={escalations.data?.length} loading={escalations.isPending} detail="Team executions" mark="E" />
       <Metric label="Currently running" value={escalations.data?.filter(item => item.status === 'RUNNING').length} loading={escalations.isPending} detail="Read from saved state" mark="↗" accent />

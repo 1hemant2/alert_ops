@@ -16,6 +16,7 @@ import { FlowsPage } from './features/flows/FlowsPage'
 import { EscalationDetailPage } from './features/escalations/EscalationDetailPage'
 import { EscalationsPage } from './features/escalations/EscalationsPage'
 import { AcknowledgeEscalationPage } from './features/escalations/AcknowledgeEscalationPage'
+import { WebhooksPage } from './features/webhooks/WebhooksPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,7 @@ function AppRoutes() {
         <Route path="/app/:teamId" element={<AppShell />}>
           <Route index element={<TeamOverviewPage />} />
           <Route path="members" element={<TeamMembersPage />} />
+          <Route path="webhooks" element={<WebhooksPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="flows" element={<FlowsPage />} />
           <Route path="flows/:flowId" element={<FlowDetailPage />} />

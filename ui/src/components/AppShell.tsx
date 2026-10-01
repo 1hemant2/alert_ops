@@ -33,6 +33,7 @@ export function AppShell() {
           <div className="nav-section-title">WORKSPACE</div>
           <NavLink end to={base} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph"><NavIcon name="overview" /></span>Overview</NavLink>
           <NavLink to={`${base}/members`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph"><NavIcon name="members" /></span>Members</NavLink>
+          <NavLink to={`${base}/webhooks`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph"><NavIcon name="escalations" /></span>Webhooks</NavLink>
           <NavLink to={`${base}/tasks`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph"><NavIcon name="tasks" /></span>Tasks</NavLink>
           <NavLink to={`${base}/flows`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph"><NavIcon name="flows" /></span>Escalation paths</NavLink>
           <NavLink to={`${base}/escalations`} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><span className="nav-glyph"><NavIcon name="escalations" /></span>Escalations</NavLink>
