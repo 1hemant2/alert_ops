@@ -39,6 +39,8 @@ public class FlowExecutionStateService {
                 flowExecutionState.setExecutionState("PENDING");
                 flowExecutionState.setNotificationState("NOT_SENT");
                 flowExecutionState.setTaskDetails(task.getDescription());
+                flowExecutionState.setTaskName(task.getName());
+                flowExecutionState.setTaskSource(task.getSource());
                 flowExecutionState.setNodeId(node.getId());
                 flowExecutionState.setUserEmail(node.getEmail());
                 flowExecutionState.setDuration(node.getDuration());

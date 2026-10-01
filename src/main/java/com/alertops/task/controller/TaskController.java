@@ -24,7 +24,8 @@ public class TaskController {
     public ResponseEntity<?> createTask(@RequestBody CreateTask req) {
             String name = req.getName();
             String descripton = req.getDescription();
-            Task savedTask = taskService.createTask(name, descripton);
+            Task savedTask = taskService.createTask(name, descripton, req.getSource(), req.getPriority(),
+                    req.getCategory(), req.getReferenceUrl());
             return ResponseEntity.ok("task created with id: " + savedTask.getId());
     }
 
@@ -43,6 +44,12 @@ public class TaskController {
         return  ResponseEntity.ok(taskService.updateTaskDescription(req.getId(), req.getDescription()));
     }
 
+    @PutMapping("/details")
+    public ResponseEntity<?> updateTaskDetails(@RequestBody UpdateTaskRequestDTO req) {
+        return ResponseEntity.ok(taskService.updateTaskDetails(req.getId(), req.getSource(), req.getPriority(),
+                req.getCategory(), req.getReferenceUrl()));
+    }
+
     @DeleteMapping
     public ResponseEntity<?> deleteTaskById(@RequestParam UUID taskId) {
         return  ResponseEntity.ok(taskService.deleteTaskById(taskId));
@@ -53,4 +60,3 @@ public class TaskController {
         return ResponseEntity.ok(taskService.getTasksByTeamId(page, size, sortBy, sortDir));
     }
 }
-

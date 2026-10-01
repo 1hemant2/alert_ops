@@ -37,7 +37,7 @@ public class SecurityConfig {
                 .filter(origin -> !origin.isEmpty())
                 .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-AlertOps-Webhook-Secret"));
         configuration.setExposedHeaders(List.of("Location"));
         configuration.setAllowCredentials(false);
 
@@ -70,6 +70,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/auth/user").denyAll()
                         .requestMatchers(HttpMethod.POST,
+                                "/api/v1/webhooks/*/events",
                                 "/api/v1/escalation/acknowledgement/preview",
                                 "/api/v1/escalation/acknowledgement/confirm").permitAll()
                         .requestMatchers("/api/v1/auth/**", "/actuator/health/**").permitAll()

@@ -33,27 +33,28 @@ public class EscalationService {
     }
 
     public Escalation createEscalation(String name, UUID taskId, UUID flowId) {
-        try {
-            AuthContext authContext = AuthContextHolder.get();
-            UUID teamId = authContext.getTeamId();
-
-            if (teamId == null
-                    || flowRepository.findByIdAndTeamId(flowId, teamId) == null
-                    || taskRepository.findById(taskId, teamId) == null) {
-                throw new RuntimeException("Task and flow must belong to the selected team");
-            }
-
-            Escalation escalation = new Escalation();
-            escalation.setName(name);
-            escalation.setTaskId(taskId);
-            escalation.setFlowId(flowId);
-            escalation.setStatus("IDLE");
-            escalation.setTeamId(teamId);
-            escalation.setResolutionType(null);
-            return escalationRepository.save(escalation);
-        } catch (RuntimeException e) {
-            throw e;
+        AuthContext authContext = AuthContextHolder.get();
+        if (authContext == null || authContext.getTeamId() == null) {
+            throw new RuntimeException("Team is required to create an escalation");
         }
+        return createEscalationForTeam(name, taskId, flowId, authContext.getTeamId());
+    }
+
+    public Escalation createEscalationForTeam(String name, UUID taskId, UUID flowId, UUID teamId) {
+        if (teamId == null
+                || flowRepository.findByIdAndTeamId(flowId, teamId) == null
+                || taskRepository.findById(taskId, teamId) == null) {
+            throw new RuntimeException("Task and flow must belong to the selected team");
+        }
+
+        Escalation escalation = new Escalation();
+        escalation.setName(name);
+        escalation.setTaskId(taskId);
+        escalation.setFlowId(flowId);
+        escalation.setStatus("IDLE");
+        escalation.setTeamId(teamId);
+        escalation.setResolutionType(null);
+        return escalationRepository.save(escalation);
     }
 
     public List<Escalation> getEscalations(int page, int size, String sortBy, String sortDir) {

@@ -33,6 +33,14 @@ public class StartFlowExecutionUseCase {
         AuthContext authContext = AuthContextHolder.get();
         UUID teamId = authContext.getTeamId();
 
+        return executeForTeam(flowExecutionStateService, escalationId, teamId);
+    }
+
+    public String executeForTeam(FlowExecutionStateService flowExecutionStateService, UUID escalationId, UUID teamId) {
+        if (teamId == null) {
+            throw new RuntimeException("Team is required to start an escalation");
+        }
+
         Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, teamId);
  
         if (escalation == null) {
@@ -51,8 +59,7 @@ public class StartFlowExecutionUseCase {
         }
 
         UUID taskId = escalation.getTaskId();
-        Task task = taskRepository.findByTaskId(taskId);
-        System.out.println("taskId -> " + taskId);
+        Task task = taskRepository.findTaskByIdAndTeamId(taskId, teamId);
         if(task == null) {
             throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
         }

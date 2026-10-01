@@ -164,6 +164,10 @@ SMTP authentication and STARTTLS default to enabled. For an implicit TLS server 
 
 New registrations receive a one-time email verification link before they can use team features. The link points to `ALERTOPS_UI_BASE_URL` and expires after 30 minutes by default; change that window with `ALERTOPS_EMAIL_VERIFICATION_TTL`.
 
+### Webhook task triggers
+
+Team owners and admins can create a webhook from the Webhooks page. The generated secret is shown only once. Send `POST /api/v1/webhooks/{webhookId}/events` with the `X-AlertOps-Webhook-Secret` header. The JSON body must include nonblank `eventId`, `taskName`, `description`, and `source`; optional `priority`, `category`, `referenceUrl`, and any additional fields are saved with the task event. Add `flowId` to use another response path belonging to the same team; otherwise the webhook default is used. The response returns the created `taskId` and `escalationId`.
+
 Escalation emails include an acknowledgement button scoped to the assigned recipient and run. Opening the email link only previews the run; the recipient must confirm on the page to stop later steps. These links expire after 72 hours by default; configure `ALERTOPS_ACKNOWLEDGEMENT_TTL` to change the lifetime. Keep `ALERTOPS_UI_BASE_URL` set to the deployed UI origin so email links open the right application.
 
 Team invitation links point to the UI origin configured with `ALERTOPS_UI_BASE_URL` (defaults to `http://localhost:5173` for local development). Set this to the deployed UI origin when sending invitations outside local development.

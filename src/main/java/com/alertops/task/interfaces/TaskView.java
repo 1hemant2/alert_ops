@@ -7,5 +7,9 @@ public interface TaskView {
     UUID getId();
     String getName();
     String getDescription();
+    String getSource();
+    String getPriority();
+    String getCategory();
+    String getReferenceUrl();
     Instant getCreatedAt();
 }
