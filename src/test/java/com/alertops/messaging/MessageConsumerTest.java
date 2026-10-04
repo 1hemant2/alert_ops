@@ -140,7 +140,7 @@ class MessageConsumerTest {
     private Escalation runningEscalation() {
         Escalation escalation = new Escalation();
         escalation.setId(ESCALATION_ID);
-        escalation.setStatus("RUNNING");
+        escalation.setStatus("OPEN");
         return escalation;
     }
 }

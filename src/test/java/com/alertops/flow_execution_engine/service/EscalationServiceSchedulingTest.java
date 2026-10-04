@@ -1,0 +1,104 @@
+package com.alertops.flow_execution_engine.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
+
+import com.alertops.flow.model.Flow;
+import com.alertops.flow.repository.FlowRepository;
+import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
+import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
+import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.repository.EscalationRepository;
+import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
+import com.alertops.security.AuthContext;
+import com.alertops.security.AuthContextHolder;
+import com.alertops.task.interfaces.TaskView;
+import com.alertops.task.repository.TaskRepository;
+
+class EscalationServiceSchedulingTest {
+    private final EscalationRepository escalations = mock(EscalationRepository.class);
+    private final FlowExecutionStateRepository states = mock(FlowExecutionStateRepository.class);
+    private final FlowRepository flows = mock(FlowRepository.class);
+    private final TaskRepository tasks = mock(TaskRepository.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final Instant now = Instant.parse("2026-01-01T00:00:00Z");
+    private final EscalationService service = new EscalationService(
+            escalations, states, flows, tasks, events, Clock.fixed(now, ZoneOffset.UTC));
+
+    @AfterEach
+    void clearContext() {
+        AuthContextHolder.clear();
+    }
+
+    @Test
+    void scheduledStartStoresUtcInstantAndTimezone() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        when(flows.findByIdAndTeamId(flowId, teamId)).thenReturn(new Flow());
+        when(tasks.findById(taskId, teamId)).thenReturn(mock(TaskView.class));
+        when(escalations.save(any(Escalation.class))).thenAnswer(invocation -> {
+            Escalation saved = invocation.getArgument(0);
+            saved.setId(escalationId);
+            return saved;
+        });
+        Escalation scheduled = new Escalation();
+        scheduled.setId(escalationId);
+        scheduled.setTeamId(teamId);
+        scheduled.setStatus("IDLE");
+        when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(scheduled);
+        when(escalations.scheduleIdle(any(), any(), any(), any())).thenReturn(1);
+
+        ScheduledEscalationRequest schedule = new ScheduledEscalationRequest();
+        schedule.setScheduleDate(LocalDate.of(2026, 1, 1));
+        schedule.setScheduleTime(LocalTime.of(10, 0));
+        schedule.setTimezone("Asia/Kolkata");
+
+        service.createEscalationForTeam("Database outage", taskId, flowId, teamId);
+        Escalation result = service.schedule(escalationId, schedule);
+
+        assertEquals("SCHEDULED", result.getStatus());
+        assertEquals(Instant.parse("2026-01-01T04:30:00Z"), result.getScheduledStartAt());
+        assertEquals("Asia/Kolkata", result.getScheduleTimezone());
+        verify(events).publishEvent(new EscalationStartSchedule(escalationId, result.getScheduledStartAt()));
+    }
+
+    @Test
+    void scheduledStartMustBeFutureAndUseAnUnambiguousLocalTime() {
+        UUID teamId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Escalation idle = new Escalation();
+        idle.setStatus("IDLE");
+        when(escalations.findByIdAndTeamId(any(), any())).thenReturn(idle);
+        ScheduledEscalationRequest inThePast = new ScheduledEscalationRequest();
+        inThePast.setScheduleDate(LocalDate.of(2025, 12, 31));
+        inThePast.setScheduleTime(LocalTime.NOON);
+        inThePast.setTimezone("UTC");
+
+        assertThrows(IllegalArgumentException.class, () -> service.schedule(UUID.randomUUID(), inThePast));
+
+        ScheduledEscalationRequest daylightSavingGap = new ScheduledEscalationRequest();
+        daylightSavingGap.setScheduleDate(LocalDate.of(2026, 3, 8));
+        daylightSavingGap.setScheduleTime(LocalTime.of(2, 30));
+        daylightSavingGap.setTimezone("America/New_York");
+
+        assertThrows(IllegalArgumentException.class, () -> service.schedule(UUID.randomUUID(), daylightSavingGap));
+    }
+}
