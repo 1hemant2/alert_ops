@@ -1,6 +1,7 @@
 package com.alertops.flow_execution_engine.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -124,6 +125,23 @@ class EscalationServiceSchedulingTest {
                 EscalationException.class, () -> service.schedule(escalationId, schedule));
 
         assertEquals(409, conflict.getStatus().value());
+        verify(auditService, never()).record(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void scheduleDoesNotExposeAnEscalationFromAnotherTeam() {
+        UUID authenticatedTeamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), authenticatedTeamId, "TEAM_OWNER", "token", "owner@example.com"));
+        when(escalations.findByIdAndTeamId(escalationId, authenticatedTeamId)).thenReturn(null);
+
+        Escalation result = service.schedule(escalationId, new ScheduledEscalationRequest());
+
+        assertNull(result);
+        verify(escalations).findByIdAndTeamId(escalationId, authenticatedTeamId);
+        verify(escalations, never()).scheduleIdle(any(), any(), any(), any(), any(), any());
         verify(auditService, never()).record(any());
         verify(events, never()).publishEvent(any());
     }
