@@ -24,6 +24,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.alertops.flow.model.Flow;
 import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.audit.model.AuditAction;
@@ -216,13 +217,17 @@ class EscalationServiceSchedulingTest {
         inThePast.setScheduleTime(LocalTime.NOON);
         inThePast.setTimezone("UTC");
 
-        assertThrows(IllegalArgumentException.class, () -> service.schedule(UUID.randomUUID(), inThePast));
+        EscalationException pastTime = assertThrows(
+                EscalationException.class, () -> service.schedule(UUID.randomUUID(), inThePast));
+        assertEquals(400, pastTime.getStatus().value());
 
         ScheduledEscalationRequest daylightSavingGap = new ScheduledEscalationRequest();
         daylightSavingGap.setScheduleDate(LocalDate.of(2026, 3, 8));
         daylightSavingGap.setScheduleTime(LocalTime.of(2, 30));
         daylightSavingGap.setTimezone("America/New_York");
 
-        assertThrows(IllegalArgumentException.class, () -> service.schedule(UUID.randomUUID(), daylightSavingGap));
+        EscalationException daylightSavingError = assertThrows(
+                EscalationException.class, () -> service.schedule(UUID.randomUUID(), daylightSavingGap));
+        assertEquals(400, daylightSavingError.getStatus().value());
     }
 }

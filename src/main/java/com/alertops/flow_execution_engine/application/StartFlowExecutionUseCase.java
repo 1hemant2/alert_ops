@@ -33,20 +33,26 @@ public class StartFlowExecutionUseCase {
 
     public String  execute(FlowExecutionStateService flowExecutionStateService, UUID escalationId) {
         AuthContext authContext = AuthContextHolder.get();
+        if (authContext == null) {
+            throw EscalationException.unauthorized();
+        }
         UUID teamId = authContext.getTeamId();
 
         return executeForTeam(flowExecutionStateService, escalationId, teamId);
     }
 
     public String executeForTeam(FlowExecutionStateService flowExecutionStateService, UUID escalationId, UUID teamId) {
+        if (escalationId == null) {
+            throw EscalationException.invalidRequest("An escalationId is required.");
+        }
         if (teamId == null) {
-            throw new RuntimeException("Team is required to start an escalation");
+            throw EscalationException.forbidden("Select a team before starting an escalation.");
         }
 
         Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, teamId);
  
         if (escalation == null) {
-          throw new RuntimeException("Escalation not found for id: " + escalationId);
+          throw EscalationException.notFound();
         }
  
         if (escalation.getStatus() != EscalationStatus.IDLE) {
@@ -57,13 +63,13 @@ public class StartFlowExecutionUseCase {
         List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
 
         if(nodes.size() == 0) {
-            throw new RuntimeException("Must be at least single node to start the escalation");
+            throw EscalationException.invalidRequest("The escalation flow must contain at least one step.");
         }
 
         UUID taskId = escalation.getTaskId();
         Task task = taskRepository.findTaskByIdAndTeamId(taskId, teamId);
         if(task == null) {
-            throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
+            throw EscalationException.invalidRequest("The escalation task is not available in this team.");
         }
 
         return flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
@@ -92,15 +98,15 @@ public class StartFlowExecutionUseCase {
             UUID teamId,
             EscalationStatus expectedStatus) {
         if (teamId == null) {
-            throw new RuntimeException("Team is required to start an escalation");
+            throw EscalationException.forbidden("Select a team before starting an escalation.");
         }
         List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(escalation.getFlowId());
         if (nodes.isEmpty()) {
-            throw new RuntimeException("Must be at least single node to start the escalation");
+            throw EscalationException.invalidRequest("The escalation flow must contain at least one step.");
         }
         Task task = taskRepository.findTaskByIdAndTeamId(escalation.getTaskId(), teamId);
         if (task == null) {
-            throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
+            throw EscalationException.invalidRequest("The escalation task is not available in this team.");
         }
         return flowExecutionStateService.startFlowExecution(
                 task, nodes, escalation.getId(), teamId, expectedStatus);

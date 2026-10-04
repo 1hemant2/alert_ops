@@ -59,7 +59,7 @@ Review these requirements in order. A checked **Requirements agreed** box means 
   - [x] Centralize the allowed status and resolution values and prevent arbitrary values from being persisted.
   - [x] Add the minimum lifecycle actor, timestamp, and safe failure fields, including the scheduling user required for notification.
   - [ ] Make repeated cancellation idempotent and return the saved cancelled result.
-  - [ ] Map validation, authentication, team isolation, and transition conflicts to the agreed HTTP responses.
+  - [x] Map validation, authentication, team isolation, and transition conflicts to the agreed HTTP responses through typed escalation errors, global bad-request handling, and the security authentication entry point.
   - [ ] Add the durable `START_FAILED` notification and UI described in Requirement 1.
   - [ ] Add focused transition, authorization, stale-callback, idempotency, and concurrency tests, including start/schedule, start/cancel, start/reschedule, acknowledgement/send, and failure/cancellation races.
 - **Done when:** No generic status mutation path remains; every transition follows the agreed state graph and team boundary; concurrent actions have one winner; terminal states cannot be reopened; required audit data is saved; invalid actions return the agreed API response; and focused unit plus PostgreSQL integration tests prove the lifecycle.

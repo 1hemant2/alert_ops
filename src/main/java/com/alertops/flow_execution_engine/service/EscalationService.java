@@ -16,6 +16,7 @@ import com.alertops.audit.model.AuditAction;
 import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.model.AuditEvent;
 import com.alertops.audit.service.AuditService;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -57,8 +58,11 @@ public class EscalationService {
 
     public Escalation createEscalation(String name, UUID taskId, UUID flowId) {
         AuthContext authContext = AuthContextHolder.get();
-        if (authContext == null || authContext.getTeamId() == null) {
-            throw new RuntimeException("Team is required to create an escalation");
+        if (authContext == null) {
+            throw EscalationException.unauthorized();
+        }
+        if (authContext.getTeamId() == null) {
+            throw EscalationException.forbidden("Select a team before creating an escalation.");
         }
         return createEscalationForTeam(name, taskId, flowId, authContext.getTeamId());
     }
@@ -69,7 +73,7 @@ public class EscalationService {
         if (teamId == null
                 || flowRepository.findByIdAndTeamId(flowId, teamId) == null
                 || taskRepository.findById(taskId, teamId) == null) {
-            throw new RuntimeException("Task and flow must belong to the selected team");
+            throw EscalationException.invalidRequest("Task and flow must belong to the selected team");
         }
 
         Escalation escalation = new Escalation();
@@ -92,7 +96,7 @@ public class EscalationService {
             return null;
         }
         if (escalation.getStatus() != EscalationStatus.IDLE) {
-            throw new IllegalStateException("Only an idle escalation can be scheduled");
+            throw EscalationException.transitionConflict("Only an idle escalation can be scheduled");
         }
         EscalationStatus fromStatus = escalation.getStatus();
 
@@ -104,7 +108,7 @@ public class EscalationService {
                 scheduledStartAt,
                 timezone);
         if (updated != 1) {
-            throw new IllegalStateException("Only an idle escalation can be scheduled");
+            throw EscalationException.transitionConflict("Only an idle escalation can be scheduled");
         }
         escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(scheduledStartAt);
@@ -129,7 +133,7 @@ public class EscalationService {
             return null;
         }
         if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
-            throw new IllegalStateException("Only scheduled escalations can be rescheduled");
+            throw EscalationException.transitionConflict("Only scheduled escalations can be rescheduled");
         }
         EscalationStatus fromStatus = escalation.getStatus();
         Instant scheduledStartAt = resolveScheduledStart(schedule);
@@ -139,7 +143,7 @@ public class EscalationService {
                 scheduledStartAt,
                 schedule.getTimezone().trim());
         if (updated != 1) {
-            throw new IllegalStateException("Only scheduled escalations can be rescheduled");
+            throw EscalationException.transitionConflict("Only scheduled escalations can be rescheduled");
         }
         escalation.setScheduledStartAt(scheduledStartAt);
         escalation.setScheduleTimezone(schedule.getTimezone().trim());
@@ -168,7 +172,7 @@ public class EscalationService {
             return escalation;
         }
         if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
-            throw new IllegalStateException("Only scheduled escalations can be cancelled");
+            throw EscalationException.transitionConflict("Only scheduled escalations can be cancelled");
         }
         Instant cancelledAt = clock.instant();
         int updated = escalationRepository.cancelScheduled(
@@ -179,7 +183,7 @@ public class EscalationService {
             if (current != null && current.getStatus() == EscalationStatus.CANCELLED) {
                 return current;
             }
-            throw new IllegalStateException("Only scheduled escalations can be cancelled");
+            throw EscalationException.transitionConflict("Only scheduled escalations can be cancelled");
         }
         escalation.setStatus(EscalationStatus.CANCELLED);
         escalation.setCancelledAt(cancelledAt);
@@ -261,20 +265,23 @@ public class EscalationService {
 
     private AuthContext requireTeamContext() {
         AuthContext authContext = AuthContextHolder.get();
-        if (authContext == null || authContext.getTeamId() == null) {
-            throw new RuntimeException("Team is required for this escalation action");
+        if (authContext == null) {
+            throw EscalationException.unauthorized();
+        }
+        if (authContext.getTeamId() == null) {
+            throw EscalationException.forbidden("Select a team before using this escalation action.");
         }
         return authContext;
     }
 
     private AuditActor requireSchedulingActor(AuthContext authContext) {
         if (authContext == null) {
-            throw new RuntimeException("Authenticated user is required for scheduling");
+            throw EscalationException.unauthorized();
         }
         UUID userId = requireActorId(authContext);
         String email = authContext.getEmail();
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("Authenticated user email is required for scheduling");
+            throw EscalationException.unauthorized();
         }
         return new AuditActor(userId, email.trim());
     }
@@ -282,7 +289,7 @@ public class EscalationService {
     private UUID requireActorId(AuthContext authContext) {
         UUID userId = authContext == null ? null : authContext.getUserId();
         if (userId == null) {
-            throw new RuntimeException("Authenticated user is required for this escalation action");
+            throw EscalationException.unauthorized();
         }
         return userId;
     }
@@ -293,7 +300,8 @@ public class EscalationService {
         if (schedule == null || schedule.getScheduleDate() == null
                 || schedule.getScheduleTime() == null || schedule.getTimezone() == null
                 || schedule.getTimezone().isBlank()) {
-            throw new IllegalArgumentException("A scheduled escalation requires date, time, and timezone");
+            throw EscalationException.invalidRequest(
+                    "A scheduled escalation requires date, time, and timezone");
         }
 
         // Convert the user's timezone text (for example, "Asia/Kolkata") into
@@ -302,7 +310,7 @@ public class EscalationService {
         try {
             zone = ZoneId.of(schedule.getTimezone().trim());
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("Timezone must be a valid IANA timezone", e);
+            throw EscalationException.invalidRequest("Timezone must be a valid IANA timezone");
         }
 
         // Combine the separate calendar date and wall-clock time entered by the user.
@@ -314,7 +322,8 @@ public class EscalationService {
         // Reject both cases instead of silently choosing the wrong instant.
         var offsets = zone.getRules().getValidOffsets(local);
         if (offsets.size() != 1) {
-            throw new IllegalArgumentException("The selected local time is ambiguous or does not exist in this timezone");
+            throw EscalationException.invalidRequest(
+                    "The selected local time is ambiguous or does not exist in this timezone");
         }
 
         // Apply the timezone's one valid offset to get an absolute UTC moment.
@@ -325,7 +334,7 @@ public class EscalationService {
         // Scheduling in the past (or exactly now) is rejected. The injected Clock keeps
         // this comparison testable and ensures all scheduling decisions use one time source.
         if (!start.isAfter(clock.instant())) {
-            throw new IllegalArgumentException("Scheduled start time must be in the future");
+            throw EscalationException.invalidRequest("Scheduled start time must be in the future");
         }
         return start;
     }
