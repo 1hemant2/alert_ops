@@ -26,14 +26,18 @@ import javax.sql.DataSource;
 import com.alertops.flow.model.Node;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.audit.model.AuditEventEntity;
+import com.alertops.audit.model.AuditEntityType;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
+import com.alertops.audit.repository.AuditEventRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
 import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
+import com.alertops.audit.service.AuditService;
 import com.alertops.task.model.Task;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -95,6 +99,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Autowired private MessageConsumer consumer;
     @Autowired private FlowExecutionStateRepository states;
     @Autowired private EscalationRepository escalations;
+    @Autowired private AuditEventRepository auditEvents;
     @Autowired private EscalationAcknowledgementTokenRepository acknowledgementTokens;
     @Autowired private FlowExecutionStateService flowExecutionStateService;
     @Autowired private EscalationAcknowledgementService acknowledgementService;
@@ -131,6 +136,7 @@ class StepSchedulingPostgresIntegrationTest {
         reset(rabbit, notification);
         states.deleteAll();
         acknowledgementTokens.deleteAll();
+        auditEvents.deleteAll();
         escalations.deleteAll();
         confirmPublishes();
     }
@@ -139,6 +145,7 @@ class StepSchedulingPostgresIntegrationTest {
     void clearRowsBeforeTheNextSpringContextStarts() {
         states.deleteAll();
         acknowledgementTokens.deleteAll();
+        auditEvents.deleteAll();
         escalations.deleteAll();
     }
 
@@ -470,7 +477,12 @@ class StepSchedulingPostgresIntegrationTest {
             workers.shutdownNow();
         }
 
-        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo(EscalationStatus.OPEN);
+        Escalation started = escalations.findById(escalationId).orElseThrow();
+        assertThat(started.getStatus()).isEqualTo(EscalationStatus.OPEN);
+        assertThat(auditEvents.findAllByEntityTypeAndEntityIdOrderByOccurredAtAscIdAsc(
+                AuditEntityType.ESCALATION.name(), escalationId))
+                .extracting(AuditEventEntity::getAction)
+                .contains("STARTED");
         assertThat(states.findAllByProcessIdOrderByPositionAsc(escalationId)).hasSize(2);
         assertThat(timers.activeTimerCount()).isEqualTo(1);
     }
@@ -593,11 +605,11 @@ class StepSchedulingPostgresIntegrationTest {
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class, RedisAutoConfiguration.class,
             RedisRepositoriesAutoConfiguration.class})
-    @EntityScan(basePackageClasses = FlowExecutionState.class)
-    @EnableJpaRepositories(basePackageClasses = FlowExecutionStateRepository.class)
+    @EntityScan(basePackageClasses = {FlowExecutionState.class, AuditEventEntity.class})
+    @EnableJpaRepositories(basePackageClasses = {FlowExecutionStateRepository.class, AuditEventRepository.class})
     @Import({StepSchedulingService.class, StepTimerRegistry.class, ReconcilerService.class,
             MessagePublisher.class, MessageConsumer.class, FlowExecutionStateService.class,
-            EscalationAcknowledgementService.class})
+            EscalationAcknowledgementService.class, AuditService.class})
     static class Config {
         @Bean RabbitTemplate rabbitTemplate() { return mock(RabbitTemplate.class); }
 

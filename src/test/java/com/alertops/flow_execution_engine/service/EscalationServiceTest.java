@@ -8,12 +8,16 @@ import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepositor
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 import com.alertops.task.repository.TaskRepository;
+import com.alertops.audit.service.AuditService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -24,8 +28,11 @@ class EscalationServiceTest {
     private final FlowExecutionStateRepository executionStateRepository = mock(FlowExecutionStateRepository.class);
     private final FlowRepository flowRepository = mock(FlowRepository.class);
     private final TaskRepository taskRepository = mock(TaskRepository.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final AuditService auditService = mock(AuditService.class);
     private final EscalationService service = new EscalationService(
-            escalationRepository, executionStateRepository, flowRepository, taskRepository);
+            escalationRepository, executionStateRepository, flowRepository, taskRepository,
+            events, Clock.systemUTC(), auditService);
 
     @AfterEach
     void clearContext() {
