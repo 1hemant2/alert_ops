@@ -88,6 +88,24 @@ class EscalationStartRetryServiceTest {
         verify(escalations, never()).save(any(Escalation.class));
     }
 
+    @Test
+    void cancellationWinnerIsNotOverwrittenByAnExhaustedStartRetry() {
+        Escalation cancelled = new Escalation();
+        cancelled.setId(escalationId);
+        cancelled.setStatus(EscalationStatus.CANCELLED);
+        when(escalations.findByIdForUpdate(escalationId)).thenReturn(Optional.of(cancelled));
+
+        Optional<Instant> result = retryService.recordFailureAndPlanRetry(
+                escalationId, retryAt, "START_ATTEMPT_FAILED");
+
+        assertTrue(result.isEmpty());
+        assertEquals(EscalationStatus.CANCELLED, cancelled.getStatus());
+        verify(escalations, never()).save(any(Escalation.class));
+        verify(auditService, never()).record(any());
+        verify(failureNotifications, never()).createPendingNotifications(any(), any());
+        verify(events, never()).publishEvent(any());
+    }
+
     private Escalation scheduledEscalation(int retryCount) {
         Escalation escalation = new Escalation();
         escalation.setId(escalationId);
