@@ -17,6 +17,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(EscalationController.class)
@@ -47,6 +49,28 @@ class EscalationSecurityTest {
     void anonymousEscalationRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/escalation")
                         .param("escalationId", UUID.randomUUID().toString()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousScheduleRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/{escalationId}/schedule", UUID.randomUUID())
+                        .contentType(APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousRescheduleRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/{escalationId}/reschedule", UUID.randomUUID())
+                        .contentType(APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anonymousCancelRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/{escalationId}/cancel", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
     }
 }
