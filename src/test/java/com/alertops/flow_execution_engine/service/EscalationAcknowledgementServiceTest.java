@@ -23,6 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
@@ -43,7 +45,7 @@ class EscalationAcknowledgementServiceTest {
         escalation = new Escalation();
         escalation.setId(ESCALATION_ID);
         escalation.setName("Database outage");
-        escalation.setStatus("OPEN");
+        escalation.setStatus(EscalationStatus.OPEN);
 
         token = new EscalationAcknowledgementToken();
         token.setEscalationId(ESCALATION_ID);
@@ -82,8 +84,8 @@ class EscalationAcknowledgementServiceTest {
         verify(escalationRepository, never()).save(any(Escalation.class));
 
         var result = service.acknowledge(RAW_TOKEN);
-        assertEquals("COMPLETED", escalation.getStatus());
-        assertEquals("ACKNOWLEDGED", escalation.getResolutionType());
+        assertEquals(EscalationStatus.COMPLETED, escalation.getStatus());
+        assertEquals(EscalationResolutionType.ACKNOWLEDGED, escalation.getResolutionType());
         assertEquals("oncall@example.com", escalation.getIssueSolvedBy());
         assertNotNull(escalation.getAcknowledgedAt());
         assertTrue(result.alreadyAcknowledged());
@@ -93,8 +95,8 @@ class EscalationAcknowledgementServiceTest {
 
     @Test
     void repeatedAcknowledgementReturnsTheSavedResult() {
-        escalation.setStatus("COMPLETED");
-        escalation.setResolutionType("ACKNOWLEDGED");
+        escalation.setStatus(EscalationStatus.COMPLETED);
+        escalation.setResolutionType(EscalationResolutionType.ACKNOWLEDGED);
         escalation.setIssueSolvedBy("ONCALL@example.com ");
         escalation.setAcknowledgedAt(Instant.now().minusSeconds(30));
         token.setExpiresAt(Instant.now().minusSeconds(1));
@@ -118,7 +120,7 @@ class EscalationAcknowledgementServiceTest {
                 () -> service.acknowledge(RAW_TOKEN));
 
         assertEquals(HttpStatus.GONE, error.getStatusCode());
-        assertEquals("OPEN", escalation.getStatus());
+        assertEquals(EscalationStatus.OPEN, escalation.getStatus());
         verify(escalationRepository, never()).save(any(Escalation.class));
     }
 
@@ -135,8 +137,8 @@ class EscalationAcknowledgementServiceTest {
 
     @Test
     void finishedRunCannotBeChangedByAnUnusedToken() {
-        escalation.setStatus("COMPLETED");
-        escalation.setResolutionType("EXHAUSTED");
+        escalation.setStatus(EscalationStatus.COMPLETED);
+        escalation.setResolutionType(EscalationResolutionType.EXHAUSTED);
         when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(escalation));
 
@@ -149,8 +151,8 @@ class EscalationAcknowledgementServiceTest {
 
     @Test
     void aTokenCannotBeUsedByAnotherRecipientAfterAcknowledgement() {
-        escalation.setStatus("COMPLETED");
-        escalation.setResolutionType("ACKNOWLEDGED");
+        escalation.setStatus(EscalationStatus.COMPLETED);
+        escalation.setResolutionType(EscalationResolutionType.ACKNOWLEDGED);
         escalation.setIssueSolvedBy("another@example.com");
         when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(escalation));

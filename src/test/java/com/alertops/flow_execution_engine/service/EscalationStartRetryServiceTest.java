@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 class EscalationStartRetryServiceTest {
@@ -47,7 +48,7 @@ class EscalationStartRetryServiceTest {
         Optional<Instant> result = retryService.recordFailureAndPlanRetry(escalationId, retryAt);
 
         assertTrue(result.isEmpty());
-        assertEquals("START_FAILED", escalation.getStatus());
+        assertEquals(EscalationStatus.START_FAILED, escalation.getStatus());
         assertEquals(3, escalation.getScheduledStartRetryCount());
         assertNull(escalation.getScheduledStartNextRetryAt());
         verify(escalations).save(escalation);
@@ -66,7 +67,7 @@ class EscalationStartRetryServiceTest {
     private Escalation scheduledEscalation(int retryCount) {
         Escalation escalation = new Escalation();
         escalation.setId(escalationId);
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartRetryCount(retryCount);
         return escalation;
     }

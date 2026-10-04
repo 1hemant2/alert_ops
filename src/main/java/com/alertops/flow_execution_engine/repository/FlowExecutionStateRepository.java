@@ -30,7 +30,8 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
              AND state.dueAt IS NOT NULL
              AND EXISTS (
                  SELECT escalation.id FROM Escalation escalation
-                 WHERE escalation.id = state.processId AND escalation.status = 'OPEN'
+                 WHERE escalation.id = state.processId
+                   AND escalation.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN
              )
            ORDER BY state.dueAt ASC, state.id ASC
            """)
@@ -43,7 +44,8 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
              AND state.publicationPending = true
              AND EXISTS (
                  SELECT escalation.id FROM Escalation escalation
-                 WHERE escalation.id = state.processId AND escalation.status = 'OPEN'
+                 WHERE escalation.id = state.processId
+                   AND escalation.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN
              )
            """)
    long countPendingPublications();

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 /** Persists the retry policy for scheduled escalation starts. */
@@ -40,13 +41,13 @@ public class EscalationStartRetryService {
         }
 
         Escalation escalation = escalationRepository.findByIdForUpdate(escalationId).orElse(null);
-        if (escalation == null || !"SCHEDULED".equals(escalation.getStatus())) {
+        if (escalation == null || escalation.getStatus() != EscalationStatus.SCHEDULED) {
             return Optional.empty();
         }
 
         int retriesUsed = escalation.getScheduledStartRetryCount();
         if (retriesUsed >= maxRetries) {
-            escalation.setStatus("START_FAILED");
+            escalation.setStatus(EscalationStatus.START_FAILED);
             escalation.setScheduledStartNextRetryAt(null);
             escalationRepository.save(escalation);
             return Optional.empty();

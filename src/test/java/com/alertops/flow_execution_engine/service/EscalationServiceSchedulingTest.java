@@ -23,6 +23,7 @@ import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.security.AuthContext;
@@ -62,7 +63,7 @@ class EscalationServiceSchedulingTest {
         Escalation scheduled = new Escalation();
         scheduled.setId(escalationId);
         scheduled.setTeamId(teamId);
-        scheduled.setStatus("IDLE");
+        scheduled.setStatus(EscalationStatus.IDLE);
         when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(scheduled);
         when(escalations.scheduleIdle(any(), any(), any(), any())).thenReturn(1);
 
@@ -74,7 +75,7 @@ class EscalationServiceSchedulingTest {
         service.createEscalationForTeam("Database outage", taskId, flowId, teamId);
         Escalation result = service.schedule(escalationId, schedule);
 
-        assertEquals("SCHEDULED", result.getStatus());
+        assertEquals(EscalationStatus.SCHEDULED, result.getStatus());
         assertEquals(Instant.parse("2026-01-01T04:30:00Z"), result.getScheduledStartAt());
         assertEquals("Asia/Kolkata", result.getScheduleTimezone());
         verify(events).publishEvent(new EscalationStartSchedule(escalationId, result.getScheduledStartAt()));
@@ -85,7 +86,7 @@ class EscalationServiceSchedulingTest {
         UUID teamId = UUID.randomUUID();
         AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
         Escalation idle = new Escalation();
-        idle.setStatus("IDLE");
+        idle.setStatus(EscalationStatus.IDLE);
         when(escalations.findByIdAndTeamId(any(), any())).thenReturn(idle);
         ScheduledEscalationRequest inThePast = new ScheduledEscalationRequest();
         inThePast.setScheduleDate(LocalDate.of(2025, 12, 31));

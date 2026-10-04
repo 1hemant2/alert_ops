@@ -26,6 +26,8 @@ import javax.sql.DataSource;
 import com.alertops.flow.model.Node;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -61,6 +63,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -414,8 +417,8 @@ class StepSchedulingPostgresIntegrationTest {
         }
 
         Escalation acknowledged = escalations.findById(activeStep.getProcessId()).orElseThrow();
-        assertThat(acknowledged.getStatus()).isEqualTo("COMPLETED");
-        assertThat(acknowledged.getResolutionType()).isEqualTo("ACKNOWLEDGED");
+        assertThat(acknowledged.getStatus()).isEqualTo(EscalationStatus.COMPLETED);
+        assertThat(acknowledged.getResolutionType()).isEqualTo(EscalationResolutionType.ACKNOWLEDGED);
         assertThat(acknowledged.getIssueSolvedBy()).isEqualTo("recipient@example.test");
 
         Instant lateDueAt = Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
@@ -434,7 +437,7 @@ class StepSchedulingPostgresIntegrationTest {
     void concurrentStartsCreateOnlyOneSetOfExecutionStates() throws Exception {
         UUID teamId = UUID.randomUUID();
         Escalation escalation = new Escalation();
-        escalation.setStatus("IDLE");
+        escalation.setStatus(EscalationStatus.IDLE);
         escalation.setTeamId(teamId);
         UUID escalationId = escalations.saveAndFlush(escalation).getId();
 
@@ -467,9 +470,31 @@ class StepSchedulingPostgresIntegrationTest {
             workers.shutdownNow();
         }
 
-        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo("OPEN");
+        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo(EscalationStatus.OPEN);
         assertThat(states.findAllByProcessIdOrderByPositionAsc(escalationId)).hasSize(2);
         assertThat(timers.activeTimerCount()).isEqualTo(1);
+    }
+
+    @Test
+    void databaseRejectsUnknownEscalationLifecycleValues() {
+        Escalation escalation = new Escalation();
+        escalation.setStatus(EscalationStatus.IDLE);
+        UUID escalationId = escalations.saveAndFlush(escalation).getId();
+
+        assertThatThrownBy(() -> updateEscalationColumn(escalationId, "status", "NOT_A_STATUS"))
+                .isInstanceOf(SQLException.class);
+        assertThatThrownBy(() -> updateEscalationColumn(escalationId, "resolution_type", "NOT_A_RESOLUTION"))
+                .isInstanceOf(SQLException.class);
+    }
+
+    private void updateEscalationColumn(UUID escalationId, String column, String value) throws SQLException {
+        String sql = "UPDATE " + SCHEMA + ".escalation SET " + column + " = ? WHERE id = ?";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, value);
+            statement.setObject(2, escalationId);
+            statement.executeUpdate();
+        }
     }
 
     private Future<Throwable> submitStartAttempt(
@@ -503,7 +528,7 @@ class StepSchedulingPostgresIntegrationTest {
 
     private FlowExecutionState createStep(String executionState, Duration duration, boolean pending, Instant dueAt) {
         Escalation escalation = new Escalation();
-        escalation.setStatus("OPEN");
+        escalation.setStatus(EscalationStatus.OPEN);
         escalations.save(escalation);
         FlowExecutionState step = new FlowExecutionState();
         step.setProcessId(escalation.getId());

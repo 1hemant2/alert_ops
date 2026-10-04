@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow.model.Node;
 import com.alertops.flow_execution_engine.exception.EscalationException;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -28,7 +29,7 @@ public class FlowExecutionStateService {
 
     @Transactional
     public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId, UUID teamId) {
-        return startFlowExecution(task, nodes, escalationId, teamId, "IDLE");
+        return startFlowExecution(task, nodes, escalationId, teamId, EscalationStatus.IDLE);
     }
 
     @Transactional
@@ -37,9 +38,9 @@ public class FlowExecutionStateService {
             List<Node> nodes,
             UUID escalationId,
             UUID teamId,
-            String expectedStatus) {
+            EscalationStatus expectedStatus) {
         try {
-            int claimedRows = "SCHEDULED".equals(expectedStatus)
+            int claimedRows = expectedStatus == EscalationStatus.SCHEDULED
                     ? escalationRepository.claimScheduledForStart(escalationId, teamId, java.time.Instant.now())
                     : escalationRepository.claimIdleForStart(escalationId, teamId);
             if (claimedRows != 1) {

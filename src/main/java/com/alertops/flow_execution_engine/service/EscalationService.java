@@ -11,6 +11,7 @@ import com.alertops.security.AuthContextHolder;
 import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -78,7 +79,7 @@ public class EscalationService {
         escalation.setFlowId(flowId);
         escalation.setTeamId(teamId);
         escalation.setResolutionType(null);
-        escalation.setStatus("IDLE");
+        escalation.setStatus(EscalationStatus.IDLE);
         return escalationRepository.save(escalation);
     }
 
@@ -90,7 +91,7 @@ public class EscalationService {
         if (escalation == null) {
             return null;
         }
-        if (!"IDLE".equals(escalation.getStatus())) {
+        if (escalation.getStatus() != EscalationStatus.IDLE) {
             throw new IllegalStateException("Only an idle escalation can be scheduled");
         }
 
@@ -101,7 +102,7 @@ public class EscalationService {
         if (updated != 1) {
             throw new IllegalStateException("Only an idle escalation can be scheduled");
         }
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(scheduledStartAt);
         escalation.setScheduleTimezone(timezone);
         escalation.setScheduledStartRetryCount(0);
@@ -119,7 +120,7 @@ public class EscalationService {
         if (escalation == null) {
             return null;
         }
-        if (!"SCHEDULED".equals(escalation.getStatus())) {
+        if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
             throw new IllegalStateException("Only scheduled escalations can be rescheduled");
         }
         Instant scheduledStartAt = resolveScheduledStart(schedule);
@@ -147,7 +148,7 @@ public class EscalationService {
         if (escalation == null) {
             return null;
         }
-        if (!"SCHEDULED".equals(escalation.getStatus())) {
+        if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
             throw new IllegalStateException("Only scheduled escalations can be cancelled");
         }
         Instant cancelledAt = clock.instant();
@@ -155,7 +156,7 @@ public class EscalationService {
         if (updated != 1) {
             throw new IllegalStateException("Only scheduled escalations can be cancelled");
         }
-        escalation.setStatus("CANCELLED");
+        escalation.setStatus(EscalationStatus.CANCELLED);
         escalation.setCancelledAt(cancelledAt);
         escalation.setScheduledStartNextRetryAt(null);
         Escalation saved = escalation;

@@ -23,6 +23,7 @@ import org.springframework.scheduling.TaskScheduler;
 
 import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 class EscalationStartSchedulerTest {
@@ -73,7 +74,7 @@ class EscalationStartSchedulerTest {
         UUID id = UUID.randomUUID();
         Escalation escalation = new Escalation();
         escalation.setId(id);
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(now);
         when(escalations.findById(id)).thenReturn(Optional.of(escalation));
         when(taskScheduler.schedule(any(Runnable.class), eq(now))).thenAnswer(invocation -> {
@@ -91,7 +92,7 @@ class EscalationStartSchedulerTest {
         Instant retryAt = now.plusSeconds(5);
         Escalation escalation = new Escalation();
         escalation.setId(id);
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(now);
         when(escalations.findById(id)).thenReturn(Optional.of(escalation));
         doThrow(new IllegalStateException("temporary failure"))

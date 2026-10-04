@@ -55,14 +55,14 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 - **Minimum v1 audit data:** Persist the scheduling user needed for failure notification, the latest scheduling actor after reschedule, start time, cancellation actor and time, start-failure time and safe reason, retry count, and the existing acknowledgement actor and time. A complete event timeline remains Requirement 5.
 - **Implementation checklist:**
   - [x] Remove the generic `updateEscalationStatus` method so callers cannot assign arbitrary status and resolution strings.
-  - [ ] Centralize the allowed status and resolution values and prevent arbitrary values from being persisted.
+  - [x] Centralize the allowed status and resolution values and prevent arbitrary values from being persisted.
   - [ ] Add the minimum lifecycle actor, timestamp, and safe failure fields, including the scheduling user required for notification.
   - [ ] Make repeated cancellation idempotent and return the saved cancelled result.
   - [ ] Map validation, authentication, team isolation, and transition conflicts to the agreed HTTP responses.
   - [ ] Add the durable `START_FAILED` notification and UI described in Requirement 1.
   - [ ] Add focused transition, authorization, stale-callback, idempotency, and concurrency tests, including start/schedule, start/cancel, start/reschedule, acknowledgement/send, and failure/cancellation races.
 - **Done when:** No generic status mutation path remains; every transition follows the agreed state graph and team boundary; concurrent actions have one winner; terminal states cannot be reopened; required audit data is saved; invalid actions return the agreed API response; and focused unit plus PostgreSQL integration tests prove the lifecycle.
-- **Evidence:** [escalation service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationService.java), [start use case](../src/main/java/com/alertops/flow_execution_engine/application/StartFlowExecutionUseCase.java), [conditional transition queries](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), and [message consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java).
+- **Evidence:** [escalation service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationService.java), [lifecycle enums](../src/main/java/com/alertops/flow_execution_engine/model/EscalationStatus.java), [conditional transition queries](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [lifecycle database constraints](../src/main/resources/db/migration/V8__constrain_escalation_lifecycle_values.sql), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), and [message consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java).
 
 ### Remaining requirements
 

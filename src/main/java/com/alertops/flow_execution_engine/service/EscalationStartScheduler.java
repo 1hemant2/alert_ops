@@ -26,6 +26,7 @@ import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 /** Durable one-time timers for escalation starts. PostgreSQL remains the source of truth. */
@@ -178,7 +179,7 @@ public class EscalationStartScheduler {
 
     private boolean isScheduled(Escalation escalation) {
         return escalation != null
-                && "SCHEDULED".equals(escalation.getStatus())
+                && escalation.getStatus() == EscalationStatus.SCHEDULED
                 && escalation.getScheduledStartAt() != null;
     }
 

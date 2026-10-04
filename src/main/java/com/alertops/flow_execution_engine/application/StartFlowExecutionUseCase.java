@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.alertops.flow.repository.NodeRepository;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
 import com.alertops.security.AuthContext;
@@ -48,7 +49,7 @@ public class StartFlowExecutionUseCase {
           throw new RuntimeException("Escalation not found for id: " + escalationId);
         }
  
-        if(!"IDLE".equals(escalation.getStatus())) {
+        if (escalation.getStatus() != EscalationStatus.IDLE) {
           throw EscalationException.startConflict();
         }
         
@@ -76,19 +77,20 @@ public class StartFlowExecutionUseCase {
             throw EscalationException.startConflict();
         }
         Escalation escalation = escalationRepository.findById(escalationId).orElse(null);
-        if (escalation == null || !"SCHEDULED".equals(escalation.getStatus())
+        if (escalation == null || escalation.getStatus() != EscalationStatus.SCHEDULED
                 || escalation.getScheduledStartAt() == null
                 || escalation.getScheduledStartAt().isAfter(now)) {
             throw EscalationException.startConflict();
         }
-        return startForTeam(flowExecutionStateService, escalation, escalation.getTeamId(), "SCHEDULED");
+        return startForTeam(
+                flowExecutionStateService, escalation, escalation.getTeamId(), EscalationStatus.SCHEDULED);
     }
 
     private String startForTeam(
             FlowExecutionStateService flowExecutionStateService,
             Escalation escalation,
             UUID teamId,
-            String expectedStatus) {
+            EscalationStatus expectedStatus) {
         if (teamId == null) {
             throw new RuntimeException("Team is required to start an escalation");
         }
