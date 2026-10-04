@@ -1,7 +1,9 @@
 package com.alertops.flow_execution_engine.service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.alertops.flow.model.Node;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEntityType;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -20,11 +26,17 @@ public class FlowExecutionStateService {
     FlowExecutionStateRepository flowExecutionStateRepository;
     EscalationRepository escalationRepository;
     StepSchedulingService stepSchedulingService;
+    AuditService auditService;
 
-    public FlowExecutionStateService(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository, StepSchedulingService stepSchedulingService) {
+    public FlowExecutionStateService(
+            FlowExecutionStateRepository flowExecutionStateRepository,
+            EscalationRepository escalationRepository,
+            StepSchedulingService stepSchedulingService,
+            AuditService auditService) {
          this.flowExecutionStateRepository = flowExecutionStateRepository;
          this.escalationRepository = escalationRepository;
          this.stepSchedulingService = stepSchedulingService;
+         this.auditService = Objects.requireNonNull(auditService, "auditService");
     }
 
     @Transactional
@@ -46,6 +58,10 @@ public class FlowExecutionStateService {
             if (claimedRows != 1) {
                 throw EscalationException.startConflict();
             }
+            EscalationStatus fromStatus = expectedStatus == null ? EscalationStatus.IDLE : expectedStatus;
+            auditService.record(new AuditEvent(
+                    AuditEntityType.ESCALATION, escalationId, AuditAction.STARTED, fromStatus.name(),
+                    EscalationStatus.OPEN.name(), null, null, Instant.now(), null, null));
 
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();

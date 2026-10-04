@@ -12,6 +12,10 @@ import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEntityType;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,27 +37,22 @@ public class EscalationService {
    private final TaskRepository taskRepository;
    private final ApplicationEventPublisher eventPublisher;
    private final Clock clock;
-
-    EscalationService(EscalationRepository escalationRepository,
-                      FlowExecutionStateRepository flowExecutionStateRepository,
-                      FlowRepository flowRepository,
-                      TaskRepository taskRepository) {
-       this(escalationRepository, flowExecutionStateRepository, flowRepository, taskRepository,
-               null, Clock.systemUTC());
-    }
+   private final AuditService auditService;
 
     public EscalationService(EscalationRepository escalationRepository,
                       FlowExecutionStateRepository flowExecutionStateRepository,
                       FlowRepository flowRepository,
                       TaskRepository taskRepository,
                       ApplicationEventPublisher eventPublisher,
-                      Clock clock) {
+                      Clock clock,
+                      AuditService auditService) {
        this.escalationRepository = escalationRepository;
        this.flowExecutionStateRepository = flowExecutionStateRepository;
        this.flowRepository = flowRepository;
        this.taskRepository = taskRepository;
        this.eventPublisher = eventPublisher;
        this.clock = clock;
+       this.auditService = Objects.requireNonNull(auditService, "auditService");
     }
 
     public Escalation createEscalation(String name, UUID taskId, UUID flowId) {
@@ -86,6 +85,7 @@ public class EscalationService {
     @Transactional
     public Escalation schedule(UUID escalationId, ScheduledEscalationRequest schedule) {
         AuthContext authContext = requireTeamContext();
+        AuditActor actor = requireSchedulingActor(authContext);
         Escalation escalation = escalationRepository.findByIdAndTeamId(
                 escalationId, authContext.getTeamId());
         if (escalation == null) {
@@ -94,11 +94,15 @@ public class EscalationService {
         if (escalation.getStatus() != EscalationStatus.IDLE) {
             throw new IllegalStateException("Only an idle escalation can be scheduled");
         }
+        EscalationStatus fromStatus = escalation.getStatus();
 
         Instant scheduledStartAt = resolveScheduledStart(schedule);
         String timezone = schedule.getTimezone().trim();
         int updated = escalationRepository.scheduleIdle(
-                escalationId, authContext.getTeamId(), scheduledStartAt, timezone);
+                escalationId,
+                authContext.getTeamId(),
+                scheduledStartAt,
+                timezone);
         if (updated != 1) {
             throw new IllegalStateException("Only an idle escalation can be scheduled");
         }
@@ -107,6 +111,9 @@ public class EscalationService {
         escalation.setScheduleTimezone(timezone);
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.SCHEDULED, fromStatus.name(),
+                EscalationStatus.SCHEDULED.name(), actor.userId(), actor.email(), clock.instant(), null, null));
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new EscalationStartSchedule(escalationId, scheduledStartAt));
         }
@@ -116,6 +123,7 @@ public class EscalationService {
     @Transactional
     public Escalation reschedule(UUID escalationId, ScheduledEscalationRequest schedule) {
         AuthContext authContext = requireTeamContext();
+        AuditActor actor = requireSchedulingActor(authContext);
         Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, authContext.getTeamId());
         if (escalation == null) {
             return null;
@@ -123,9 +131,13 @@ public class EscalationService {
         if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
             throw new IllegalStateException("Only scheduled escalations can be rescheduled");
         }
+        EscalationStatus fromStatus = escalation.getStatus();
         Instant scheduledStartAt = resolveScheduledStart(schedule);
         int updated = escalationRepository.rescheduleScheduled(
-                escalationId, authContext.getTeamId(), scheduledStartAt, schedule.getTimezone().trim());
+                escalationId,
+                authContext.getTeamId(),
+                scheduledStartAt,
+                schedule.getTimezone().trim());
         if (updated != 1) {
             throw new IllegalStateException("Only scheduled escalations can be rescheduled");
         }
@@ -133,6 +145,9 @@ public class EscalationService {
         escalation.setScheduleTimezone(schedule.getTimezone().trim());
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.RESCHEDULED, fromStatus.name(),
+                EscalationStatus.SCHEDULED.name(), actor.userId(), actor.email(), clock.instant(), null, null));
         Escalation saved = escalation;
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new EscalationStartSchedule(
@@ -144,6 +159,7 @@ public class EscalationService {
     @Transactional
     public Escalation cancelScheduled(UUID escalationId) {
         AuthContext authContext = requireTeamContext();
+        UUID cancelledByUserId = requireActorId(authContext);
         Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, authContext.getTeamId());
         if (escalation == null) {
             return null;
@@ -152,13 +168,18 @@ public class EscalationService {
             throw new IllegalStateException("Only scheduled escalations can be cancelled");
         }
         Instant cancelledAt = clock.instant();
-        int updated = escalationRepository.cancelScheduled(escalationId, authContext.getTeamId(), cancelledAt);
+        int updated = escalationRepository.cancelScheduled(
+                escalationId, authContext.getTeamId(), cancelledAt);
         if (updated != 1) {
             throw new IllegalStateException("Only scheduled escalations can be cancelled");
         }
         escalation.setStatus(EscalationStatus.CANCELLED);
         escalation.setCancelledAt(cancelledAt);
         escalation.setScheduledStartNextRetryAt(null);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.CANCELLED,
+                EscalationStatus.SCHEDULED.name(), EscalationStatus.CANCELLED.name(),
+                cancelledByUserId, null, cancelledAt, null, null));
         Escalation saved = escalation;
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new EscalationStartCancelled(saved.getId()));
@@ -177,15 +198,20 @@ public class EscalationService {
                 page = 0;
             }
 
-            if(!allowedSortBy.contains(sortBy)) {
-                sortBy = "createdAt";
+            String safeSortBy = sortBy == null ? "createdAt" : sortBy;
+            if (!allowedSortBy.contains(safeSortBy)) {
+                safeSortBy = "createdAt";
             }
 
-            if(!allowedSortDir.contains(sortDir)) {
-                sortDir = "asc";
+            String safeSortDir = sortDir == null ? "asc" : sortDir;
+            if (!allowedSortDir.contains(safeSortDir)) {
+                safeSortDir = "asc";
             }
 
-            Sort sort = Sort.by(Sort.Direction.valueOf(sortDir.toUpperCase()), sortBy);
+            Sort.Direction direction = "desc".equals(safeSortDir)
+                    ? Sort.Direction.DESC
+                    : Sort.Direction.ASC;
+            Sort sort = Sort.by(direction, safeSortBy);
             Pageable pageable = PageRequest.of(page, size, sort);
             Page<Escalation> escalationPage = escalationRepository.findByTeamId(teamId, pageable);
             List<Escalation> escalations = escalationPage.getContent();
@@ -233,6 +259,26 @@ public class EscalationService {
         return authContext;
     }
 
+    private AuditActor requireSchedulingActor(AuthContext authContext) {
+        if (authContext == null) {
+            throw new RuntimeException("Authenticated user is required for scheduling");
+        }
+        UUID userId = requireActorId(authContext);
+        String email = authContext.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Authenticated user email is required for scheduling");
+        }
+        return new AuditActor(userId, email.trim());
+    }
+
+    private UUID requireActorId(AuthContext authContext) {
+        UUID userId = authContext == null ? null : authContext.getUserId();
+        if (userId == null) {
+            throw new RuntimeException("Authenticated user is required for this escalation action");
+        }
+        return userId;
+    }
+
     private Instant resolveScheduledStart(ScheduledEscalationRequest schedule) {
         // A date and time by themselves are not enough to identify one real moment.
         // For example, "10:00" could mean 10:00 in India, London, or New York.
@@ -274,6 +320,9 @@ public class EscalationService {
             throw new IllegalArgumentException("Scheduled start time must be in the future");
         }
         return start;
+    }
+
+    private record AuditActor(UUID userId, String email) {
     }
 
 }

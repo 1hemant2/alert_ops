@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEntityType;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
@@ -17,12 +21,15 @@ import com.alertops.flow_execution_engine.repository.EscalationRepository;
 @Service
 public class EscalationStartRetryService {
     private final EscalationRepository escalationRepository;
+    private final AuditService auditService;
     private final int maxRetries;
 
     public EscalationStartRetryService(
             EscalationRepository escalationRepository,
-            @Value("${alertops.scheduler.start-max-retries:3}") int maxRetries) {
+            @Value("${alertops.scheduler.start-max-retries:3}") int maxRetries,
+            AuditService auditService) {
         this.escalationRepository = Objects.requireNonNull(escalationRepository, "escalationRepository");
+        this.auditService = Objects.requireNonNull(auditService, "auditService");
         if (maxRetries < 0) {
             throw new IllegalArgumentException("Scheduled-start max retries cannot be negative");
         }
@@ -35,7 +42,8 @@ public class EscalationStartRetryService {
      * scheduled escalation.
      */
     @Transactional
-    public Optional<Instant> recordFailureAndPlanRetry(UUID escalationId, Instant retryAt) {
+    public Optional<Instant> recordFailureAndPlanRetry(
+            UUID escalationId, Instant retryAt, String failureReason) {
         if (escalationId == null || retryAt == null) {
             return Optional.empty();
         }
@@ -49,6 +57,10 @@ public class EscalationStartRetryService {
         if (retriesUsed >= maxRetries) {
             escalation.setStatus(EscalationStatus.START_FAILED);
             escalation.setScheduledStartNextRetryAt(null);
+            auditService.record(new AuditEvent(
+                    AuditEntityType.ESCALATION, escalationId, AuditAction.START_FAILED,
+                    EscalationStatus.SCHEDULED.name(), EscalationStatus.START_FAILED.name(),
+                    null, null, Instant.now(), failureReason, null));
             escalationRepository.save(escalation);
             return Optional.empty();
         }
