@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.audit.model.AuditEvent;
@@ -22,12 +23,17 @@ import com.alertops.audit.model.AuditAction;
 import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.messaging.EscalationStartFailureNotificationRequested;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 class EscalationStartRetryServiceTest {
     private final EscalationRepository escalations = mock(EscalationRepository.class);
     private final AuditService auditService = mock(AuditService.class);
-    private final EscalationStartRetryService retryService = new EscalationStartRetryService(escalations, 3, auditService);
+    private final EscalationStartFailureNotificationService failureNotifications =
+            mock(EscalationStartFailureNotificationService.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final EscalationStartRetryService retryService = new EscalationStartRetryService(
+            escalations, 3, auditService, failureNotifications, events);
     private final UUID escalationId = UUID.randomUUID();
     private final Instant retryAt = Instant.parse("2026-01-01T00:00:05Z");
 
@@ -67,6 +73,8 @@ class EscalationStartRetryServiceTest {
         assertEquals(EscalationStatus.SCHEDULED.name(), audit.getValue().previousState());
         assertEquals(EscalationStatus.START_FAILED.name(), audit.getValue().newState());
         assertEquals("START_ATTEMPT_FAILED", audit.getValue().reason());
+        verify(failureNotifications).createPendingNotifications(escalation, "START_ATTEMPT_FAILED");
+        verify(events).publishEvent(new EscalationStartFailureNotificationRequested(escalationId));
     }
 
     @Test

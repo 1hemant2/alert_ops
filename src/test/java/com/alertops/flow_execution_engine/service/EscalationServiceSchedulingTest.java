@@ -75,7 +75,7 @@ class EscalationServiceSchedulingTest {
         scheduled.setTeamId(teamId);
         scheduled.setStatus(EscalationStatus.IDLE);
         when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(scheduled);
-        when(escalations.scheduleIdle(any(), any(), any(), any())).thenReturn(1);
+        when(escalations.scheduleIdle(any(), any(), any(), any(), any(), any())).thenReturn(1);
 
         ScheduledEscalationRequest schedule = new ScheduledEscalationRequest();
         schedule.setScheduleDate(LocalDate.of(2026, 1, 1));
@@ -88,6 +88,8 @@ class EscalationServiceSchedulingTest {
         assertEquals(EscalationStatus.SCHEDULED, result.getStatus());
         assertEquals(Instant.parse("2026-01-01T04:30:00Z"), result.getScheduledStartAt());
         assertEquals("Asia/Kolkata", result.getScheduleTimezone());
+        assertEquals(actorId, result.getScheduledByUserId());
+        assertEquals("owner@example.com", result.getScheduledByUserEmail());
         verify(events).publishEvent(new EscalationStartSchedule(escalationId, result.getScheduledStartAt()));
         ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditService).record(audit.capture());
@@ -186,7 +188,7 @@ class EscalationServiceSchedulingTest {
         scheduled.setTeamId(teamId);
         scheduled.setStatus(EscalationStatus.SCHEDULED);
         when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(scheduled);
-        when(escalations.rescheduleScheduled(any(), any(), any(), any())).thenReturn(1);
+        when(escalations.rescheduleScheduled(any(), any(), any(), any(), any(), any())).thenReturn(1);
 
         AuthContextHolder.set(new AuthContext(
                 latestActorId, teamId, "TEAM_OWNER", "token", "latest@example.com"));
@@ -198,6 +200,8 @@ class EscalationServiceSchedulingTest {
         Escalation result = service.reschedule(escalationId, reschedule);
 
         assertEquals(EscalationStatus.SCHEDULED, result.getStatus());
+        assertEquals(latestActorId, result.getScheduledByUserId());
+        assertEquals("latest@example.com", result.getScheduledByUserEmail());
         ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
         verify(auditService).record(audit.capture());
         assertEquals(AuditAction.RESCHEDULED, audit.getValue().action());
