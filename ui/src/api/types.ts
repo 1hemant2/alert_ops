@@ -121,6 +121,9 @@ export interface Escalation {
   resolutionType?: string | null
   issueSolvedBy?: string | null
   acknowledgedAt?: string | null
+  scheduledStartAt?: string | null
+  scheduleTimezone?: string | null
+  cancelledAt?: string | null
   createdAt: string
   updatedAt?: string
 }

@@ -163,6 +163,8 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .form-number { color: #a3b376; font: 600 18px/1.2 var(--font-sans); }
 .form-intro { color: #87928a; font-size: 14px; line-height: 1.6; margin: 13px 0 17px; }
 .form-stack { display: flex; flex-direction: column; gap: 14px; }
+.form-grid-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.button-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 7px; color: #48564d; font-size: 13px; font-weight: 700; }
 .field small { color: #9aa49c; font-size: 12px; font-weight: 450; line-height: 1.4; }
 .field input, .field textarea, .field select { width: 100%; border: 1px solid #e0e5dd; background: #fff; border-radius: 6px; min-height: 38px; padding: 9px 10px; color: #29382f; outline: none; font-size: 14px; font-weight: 450; transition: border .16s ease, box-shadow .16s ease; }
@@ -422,6 +424,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
   .page-header h1 { font-size: 34.0px; }
   .page-header-action { width: 100%; }
   .page-header-action .button { width: 100%; }
+  .form-grid-two { grid-template-columns: 1fr; }
   .metrics-grid { gap: 8px; }
   .metric-card { min-height: 113px; padding: 13px; }
   .metric-top { font-size: 13px; }
@@ -579,6 +582,12 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 .status-badge i { width: 7px; height: 7px; }
 .status-running { color: #175cd3; background: #eff8ff; border-color: #b2ddff; }
 .status-running i, .status-active i { background: #2e90fa; }
+.status-open { color: #175cd3; background: #eff8ff; border-color: #b2ddff; }
+.status-open i { background: #2e90fa; }
+.status-scheduled { color: #6941c6; background: #f9f5ff; border-color: #d6bbfb; }
+.status-scheduled i { background: #9e77ed; }
+.status-cancelled { color: #667085; background: #f2f4f7; border-color: #d0d5dd; }
+.status-cancelled i { background: #98a2b3; }
 .status-completed, .status-terminal { color: #067647; background: #ecfdf3; border-color: #abefc6; }
 .status-completed i, .status-terminal i { background: #12b76a; }
 .status-pending { color: #93370d; background: #fffaeb; border-color: #fedf89; }
@@ -591,6 +600,7 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 .form-number { color: var(--accent); font: 700 18px/1.2 var(--font-sans); }
 .form-intro, .invite-description { color: #667085; font-size: 14px; line-height: 1.6; margin: 16px 0 22px; }
 .form-stack { gap: 18px; }
+.form-grid-two { gap: 14px; }
 .field { gap: 8px; color: #344054; font-size: 13px; font-weight: 600; }
 .field small { color: #667085; font-size: 12px; line-height: 1.5; }
 .field input, .field textarea, .field select { min-height: 48px; padding: 11px 13px; border-color: #d0d5dd; border-radius: 10px; color: #101828; font-size: 14px; }
