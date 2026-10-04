@@ -224,22 +224,6 @@ public class EscalationService {
                 .toList();
     }
 
-    public Escalation updateEscalationStatus(UUID escalationId, String status, String resolutionType, String issueSolvedBy) {
-        try {
-            Escalation escalation = getEscalationById(escalationId);
-            if(escalation == null) {
-                return null;
-            }
-            escalation.setStatus(status);
-            escalation.setResolutionType(resolutionType);
-            escalation.setIssueSolvedBy(issueSolvedBy);
-            escalationRepository.save(escalation);
-            return escalation;
-        } catch (Exception e) {
-            throw e;
-        }
-    }
-
     private AuthContext requireTeamContext() {
         AuthContext authContext = AuthContextHolder.get();
         if (authContext == null || authContext.getTeamId() == null) {

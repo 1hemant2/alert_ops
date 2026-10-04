@@ -9,24 +9,63 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 ### 1. Scheduled escalation start
 
 - [x] **Requirements agreed**
-- [x] **Implementation complete locally**
+- [ ] **Implementation complete locally — durable `START_FAILED` notification pending**
 - [ ] **Implemented and verified in PostgreSQL/deployed flow**
-- **Requested behaviour:** When creating an escalation, choose **Start immediately** or **Schedule for later**. A scheduled escalation stores a date, time, and timezone, remains `SCHEDULED` until its start time, and then enters the same workflow as an immediate escalation. Before it starts, it can be rescheduled or cancelled. Only one-time schedules are in v1.
-- **Current state:** The local implementation is complete. The escalation stores a one-time UTC start instant and IANA timezone, exposes create/reschedule/cancel actions, schedules starts in memory from the durable database row, recovers scheduled rows on startup, and atomically claims a scheduled start before creating response steps. PostgreSQL integration and deployed end-to-end verification remain pending.
+- **Requested behaviour:** When creating an escalation, choose **Start immediately** or **Schedule for later**. A scheduled escalation stores a date, time, and timezone, remains `SCHEDULED` until its start time, and then enters the same workflow as an immediate escalation. Before it starts, it can be rescheduled or cancelled. Only one-time schedules are in v1. If all start attempts fail, the responsible users must be notified; that notification must survive an application crash or restart.
+- **Current state:** The core local scheduling implementation is complete. The escalation stores a one-time UTC start instant and IANA timezone, exposes create/reschedule/cancel actions, schedules starts in memory from the durable database row, recovers scheduled rows on startup, and atomically claims a scheduled start before creating response steps. Exhausted retries produce `START_FAILED`, but a durable user notification has not yet been implemented. PostgreSQL integration and deployed end-to-end verification also remain pending.
 - **Agreed product decisions:**
   - Put the schedule on the escalation run, not on the reusable task or escalation path.
   - Accept a local date/time plus an IANA timezone such as `Asia/Kolkata`; persist both the resolved UTC instant and the submitted timezone for accurate display and rescheduling.
   - Reject a scheduled time that is not in the future. Default the UI timezone to the browser timezone and allow the user to change it.
   - Allow reschedule and cancel only while the run is still `SCHEDULED`, enforced atomically so a start cannot race with either action.
   - Treat **Start immediately** as create-and-start, using the same start use case invoked when a scheduled time becomes due.
-  - Add a terminal `CANCELLED` state for a cancelled scheduled run. This must be reconciled with Requirement 2, whose listed lifecycle currently omits cancellation.
-- **Verification needed:** API validation and team isolation; timezone and daylight-saving conversion; start-at-time behaviour; restart recovery; duplicate trigger safety; reschedule/start and cancel/start races; UI state and actions; proof that recurring or cron schedules are not accepted.
+  - Add a terminal `CANCELLED` state for a cancelled scheduled run, consistent with the incident lifecycle in Requirement 2.
+  - When the retry limit is exhausted, change the escalation to `START_FAILED` and atomically persist a pending failure-notification obligation in PostgreSQL. Do not rely on the scheduler callback or an in-memory queue to remember that notification.
+  - Notify the user who scheduled the escalation and the team owner or administrators. If the application stops after recording `START_FAILED` but before notification delivery, startup recovery must find the pending notification and send it when the application is available again.
+  - Record successful delivery so normal recovery does not resend it. Prefer at-least-once delivery over losing the notification; the implementation must tolerate the narrow possibility of a duplicate if the application stops after the provider accepts the notification but before delivery is recorded.
+- **Verification needed:** API validation and team isolation; timezone and daylight-saving conversion; start-at-time behaviour; restart recovery; duplicate trigger safety; reschedule/start and cancel/start races; UI state and actions; proof that recurring or cron schedules are not accepted; exhausted retries persist `START_FAILED` and pending notification together; notification-delivery failure remains recoverable; application restart sends pending notifications; repeated recovery does not create avoidable duplicates; the correct user and team administrators are notified.
 - **Evidence:** [schedule migration](../src/main/resources/db/migration/V6__add_escalation_scheduling.sql), [scheduled-start scheduler](../src/main/java/com/alertops/flow_execution_engine/service/EscalationStartScheduler.java), [escalation service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationService.java), [start claims](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [creation UI](../ui/src/features/escalations/EscalationsPage.tsx), [schedule controls](../ui/src/features/escalations/EscalationDetailPage.tsx), [scheduling tests](../src/test/java/com/alertops/flow_execution_engine/service/EscalationServiceSchedulingTest.java).
-- **Local verification:** `mvn test` and `npm run build` pass. PostgreSQL/Testcontainers integration coverage is currently skipped in this environment, so the final readiness box stays open.
+- **Local verification:** Existing scheduling tests and `npm run build` pass. Durable failure notification and its crash/restart tests are still required. PostgreSQL/Testcontainers integration coverage is currently skipped in this environment, so the final readiness box stays open.
+
+### 2. Incident lifecycle
+
+- [x] **Requirements agreed**
+- [ ] **Implementation complete locally**
+- [ ] **Implemented and verified in PostgreSQL/deployed flow**
+- **Requested behaviour:** Every escalation follows one explicit lifecycle. Status changes happen only through named operations, invalid transitions are rejected consistently, simultaneous actions cannot both win, and terminal history remains available for investigation.
+- **Agreed statuses:**
+  - `IDLE`: created but not started or scheduled.
+  - `SCHEDULED`: waiting for its configured start time or an eligible start retry.
+  - `OPEN`: actively processing response steps.
+  - `COMPLETED`: terminal; `ACKNOWLEDGED` or `EXHAUSTED` records why it completed.
+  - `CANCELLED`: terminal; a scheduled escalation was cancelled before starting.
+  - `START_FAILED`: terminal for v1; all scheduled-start attempts were exhausted.
+- **Agreed transitions:**
+  - `IDLE` may become `OPEN` through **Start now** or `SCHEDULED` through **Schedule later**.
+  - `SCHEDULED` may remain `SCHEDULED` when rescheduled or when another start retry is allowed. It may become `OPEN` when its due start succeeds, `CANCELLED` when cancellation wins first, or `START_FAILED` when all retries are exhausted.
+  - `OPEN` becomes `COMPLETED` when the intended recipient acknowledges it or when every response step is exhausted.
+  - `COMPLETED`, `CANCELLED`, and `START_FAILED` do not transition again in v1. A manual retry for `START_FAILED` is post-release work.
+- **Agreed action behaviour:**
+  - A repeated acknowledgement by the same recipient returns the saved result. Another recipient cannot overwrite it, and an `EXHAUSTED` escalation cannot be acknowledged later.
+  - Repeated cancellation is idempotent and returns the existing cancelled result.
+  - Scheduled timer callbacks reload the database row and stop when the escalation is no longer `SCHEDULED`. Terminal runs are read-only and remain visible for history.
+  - All authenticated members of the selected team may create, start, schedule, reschedule, cancel, and view escalations in v1. Email acknowledgement requires the valid recipient token; automatic transitions are backend-only; another team's escalation is never exposed.
+- **Concurrency rule:** The first valid database transition that commits wins. Conditional updates or row locks enforce the decision; a stale request returns a conflict and an internal stale callback becomes a no-op. In-memory state never decides lifecycle ownership.
+- **API behaviour:** Invalid input returns `400`, missing authentication returns `401`, missing or another-team escalation returns `404`, and an invalid transition returns `409`. Duplicate starts return `409`; repeated cancellation and same-recipient acknowledgement are idempotent successes.
+- **Minimum v1 audit data:** Persist the scheduling user needed for failure notification, the latest scheduling actor after reschedule, start time, cancellation actor and time, start-failure time and safe reason, retry count, and the existing acknowledgement actor and time. A complete event timeline remains Requirement 5.
+- **Implementation checklist:**
+  - [x] Remove the generic `updateEscalationStatus` method so callers cannot assign arbitrary status and resolution strings.
+  - [ ] Centralize the allowed status and resolution values and prevent arbitrary values from being persisted.
+  - [ ] Add the minimum lifecycle actor, timestamp, and safe failure fields, including the scheduling user required for notification.
+  - [ ] Make repeated cancellation idempotent and return the saved cancelled result.
+  - [ ] Map validation, authentication, team isolation, and transition conflicts to the agreed HTTP responses.
+  - [ ] Add the durable `START_FAILED` notification and UI described in Requirement 1.
+  - [ ] Add focused transition, authorization, stale-callback, idempotency, and concurrency tests, including start/schedule, start/cancel, start/reschedule, acknowledgement/send, and failure/cancellation races.
+- **Done when:** No generic status mutation path remains; every transition follows the agreed state graph and team boundary; concurrent actions have one winner; terminal states cannot be reopened; required audit data is saved; invalid actions return the agreed API response; and focused unit plus PostgreSQL integration tests prove the lifecycle.
+- **Evidence:** [escalation service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationService.java), [start use case](../src/main/java/com/alertops/flow_execution_engine/application/StartFlowExecutionUseCase.java), [conditional transition queries](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), and [message consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java).
 
 ### Remaining requirements
 
-- [ ] 2. Incident lifecycle — not yet reviewed
 - [ ] 3. Resolution timeout after acknowledgement — not yet reviewed
 - [ ] 4. Escalate now — not yet reviewed
 - [ ] 5. Incident activity timeline — not yet reviewed
@@ -87,5 +126,6 @@ The scheduling integration tests cover publication after commit, no publication 
 ## Release check
 
 - [ ] All four critical fixes above are complete.
+- [ ] A scheduled escalation that exhausts its start retries notifies the responsible user and team administrators. The pending notification survives an application crash and is recovered after restart.
 - [ ] Both product features work together in a deployed end-to-end run: webhook event → one task and run → email → recipient acknowledgement → no later step sent.
 - [ ] The same journey works after a restart and a duplicate webhook or queue delivery. The UI shows saved server state. `SENT` continues to mean SMTP acceptance unless actual delivery tracking is added.
