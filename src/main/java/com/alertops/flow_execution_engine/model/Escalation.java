@@ -36,6 +36,18 @@ public class Escalation {
 
     private Instant acknowledgedAt;
 
+    private Instant scheduledStartAt;
+
+    private String scheduleTimezone;
+
+    @Column(name = "scheduled_start_retry_count", nullable = false)
+    private int scheduledStartRetryCount;
+
+    @Column(name = "scheduled_start_next_retry_at")
+    private Instant scheduledStartNextRetryAt;
+
+    private Instant cancelledAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
@@ -134,6 +146,45 @@ public class Escalation {
         this.acknowledgedAt = acknowledgedAt;
     }
 
+    public Instant getScheduledStartAt() {
+        return scheduledStartAt;
+    }
+
+    public void setScheduledStartAt(Instant scheduledStartAt) {
+        this.scheduledStartAt = scheduledStartAt;
+    }
+
+    public String getScheduleTimezone() {
+        return scheduleTimezone;
+    }
+
+    public void setScheduleTimezone(String scheduleTimezone) {
+        this.scheduleTimezone = scheduleTimezone;
+    }
+
+    public int getScheduledStartRetryCount() {
+        return scheduledStartRetryCount;
+    }
+
+    public void setScheduledStartRetryCount(int scheduledStartRetryCount) {
+        this.scheduledStartRetryCount = scheduledStartRetryCount;
+    }
+
+    public Instant getScheduledStartNextRetryAt() {
+        return scheduledStartNextRetryAt;
+    }
+
+    public void setScheduledStartNextRetryAt(Instant scheduledStartNextRetryAt) {
+        this.scheduledStartNextRetryAt = scheduledStartNextRetryAt;
+    }
+
+    public Instant getCancelledAt() {
+        return cancelledAt;
+    }
+
+    public void setCancelledAt(Instant cancelledAt) {
+        this.cancelledAt = cancelledAt;
+    }
+
     
 }
-

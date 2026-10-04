@@ -1,6 +1,7 @@
 package com.alertops.flow_execution_engine.application;
 
 import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -65,5 +66,41 @@ public class StartFlowExecutionUseCase {
         }
 
         return flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
+    }
+
+    public String executeScheduled(
+            FlowExecutionStateService flowExecutionStateService,
+            UUID escalationId,
+            Instant now) {
+        if (escalationId == null || now == null) {
+            throw EscalationException.startConflict();
+        }
+        Escalation escalation = escalationRepository.findById(escalationId).orElse(null);
+        if (escalation == null || !"SCHEDULED".equals(escalation.getStatus())
+                || escalation.getScheduledStartAt() == null
+                || escalation.getScheduledStartAt().isAfter(now)) {
+            throw EscalationException.startConflict();
+        }
+        return startForTeam(flowExecutionStateService, escalation, escalation.getTeamId(), "SCHEDULED");
+    }
+
+    private String startForTeam(
+            FlowExecutionStateService flowExecutionStateService,
+            Escalation escalation,
+            UUID teamId,
+            String expectedStatus) {
+        if (teamId == null) {
+            throw new RuntimeException("Team is required to start an escalation");
+        }
+        List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(escalation.getFlowId());
+        if (nodes.isEmpty()) {
+            throw new RuntimeException("Must be at least single node to start the escalation");
+        }
+        Task task = taskRepository.findTaskByIdAndTeamId(escalation.getTaskId(), teamId);
+        if (task == null) {
+            throw new RuntimeException("TaskId can't be empty, please create a new escaltion");
+        }
+        return flowExecutionStateService.startFlowExecution(
+                task, nodes, escalation.getId(), teamId, expectedStatus);
     }
 }

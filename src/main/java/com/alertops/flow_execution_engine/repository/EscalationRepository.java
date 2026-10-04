@@ -3,6 +3,7 @@ package com.alertops.flow_execution_engine.repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,13 +28,82 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Query("select e from Escalation e where e.id = :id")
       Optional<Escalation> findByIdForUpdate(@Param("id") UUID id);
 
+      List<Escalation> findAllByStatus(String status);
+
+      @Query("""
+              select e from Escalation e
+              where e.status = 'SCHEDULED' and e.scheduledStartAt is not null
+              order by e.scheduledStartAt asc, e.id asc
+              """)
+      List<Escalation> findAllScheduled();
+
       @Modifying
       @Query("""
               UPDATE Escalation e
-              SET e.status = 'RUNNING'
+              SET e.status = 'OPEN',
+                  e.scheduledStartNextRetryAt = null
+              WHERE e.id = :id
+                AND e.teamId = :teamId
+                AND e.status = 'IDLE'
+              """)
+      int claimIdleForStart(@Param("id") UUID id, @Param("teamId") UUID teamId);
+
+      @Modifying
+      @Query("""
+              UPDATE Escalation e
+              SET e.status = 'OPEN',
+                  e.scheduledStartNextRetryAt = null
+              WHERE e.id = :id
+                AND e.teamId = :teamId
+                AND e.status = 'SCHEDULED'
+                AND e.scheduledStartAt <= :now
+              """)
+      int claimScheduledForStart(
+              @Param("id") UUID id,
+              @Param("teamId") UUID teamId,
+              @Param("now") Instant now);
+
+      @Modifying
+      @Query("""
+              UPDATE Escalation e
+              SET e.status = 'SCHEDULED',
+                  e.scheduledStartAt = :scheduledStartAt,
+                  e.scheduleTimezone = :scheduleTimezone,
+                  e.scheduledStartRetryCount = 0,
+                  e.scheduledStartNextRetryAt = null
               WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'IDLE'
               """)
-      int claimForStart(@Param("id") UUID id, @Param("teamId") UUID teamId);
+      int scheduleIdle(
+              @Param("id") UUID id,
+              @Param("teamId") UUID teamId,
+              @Param("scheduledStartAt") Instant scheduledStartAt,
+              @Param("scheduleTimezone") String scheduleTimezone);
 
-      List<Escalation> findAllByStatus(String status);
+      @Modifying
+      @Query("""
+              UPDATE Escalation e
+              SET e.status = 'CANCELLED',
+                  e.cancelledAt = :now,
+                  e.scheduledStartNextRetryAt = null
+              WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'SCHEDULED'
+              """)
+      int cancelScheduled(
+              @Param("id") UUID id,
+              @Param("teamId") UUID teamId,
+              @Param("now") Instant now);
+
+      @Modifying
+      @Query("""
+              UPDATE Escalation e
+              SET e.scheduledStartAt = :scheduledStartAt,
+                  e.scheduleTimezone = :scheduleTimezone,
+                  e.scheduledStartRetryCount = 0,
+                  e.scheduledStartNextRetryAt = null
+              WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'SCHEDULED'
+              """)
+      int rescheduleScheduled(
+              @Param("id") UUID id,
+              @Param("teamId") UUID teamId,
+              @Param("scheduledStartAt") Instant scheduledStartAt,
+              @Param("scheduleTimezone") String scheduleTimezone);
 }
