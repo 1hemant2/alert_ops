@@ -91,6 +91,7 @@ export function EscalationDetailPage() {
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
     <PageHeader eyebrow={`EXECUTION / ${item.id.slice(0, 8).toUpperCase()}`} title={item.name} description="Durable progress for this team scoped escalation." action={<StatusBadge status={item.status} />} />
     <InlineNotice>Each active step emails its configured recipient with the task context. SENT means the email service accepted the message; it does not confirm delivery.</InlineNotice>
+    {item.status === 'START_FAILED' && <InlineNotice tone="error"><strong>This scheduled escalation could not start.</strong> AlertOps exhausted its start retries. A notification was queued for the scheduler owner and team administrators; undelivered notifications retry and recover after restart.</InlineNotice>}
     {scheduled && item.scheduledStartAt && <Card className="schedule-management-card">
       <div className="card-heading"><div><span className="eyebrow">SCHEDULED START</span><h2>{formatDate(item.scheduledStartAt)}</h2></div><StatusBadge status="SCHEDULED" /></div>
       <p className="form-intro">Configured timezone: {item.scheduleTimezone ?? 'UTC'}. You can change or cancel this one-time start before it begins.</p>
