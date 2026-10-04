@@ -1,6 +1,36 @@
 # AlertOps: critical path to product release
 
-Reassessed: 2026-09-30. This list contains critical bugs to fix first and the two product features selected for this release. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
+Reassessed: 2026-10-02. This list contains critical bugs to fix first, the two product features selected for this release, and the in-progress review of the Alert Escalation v1 requirements. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
+
+## Alert Escalation v1 requirements review
+
+Review these requirements in order. A checked **Requirements agreed** box means the product behaviour and acceptance criteria are settled; it does not mean implementation is complete. Implementation progress is tracked separately.
+
+### 1. Scheduled escalation start
+
+- [x] **Requirements agreed**
+- [x] **Implementation complete locally**
+- [ ] **Implemented and verified in PostgreSQL/deployed flow**
+- **Requested behaviour:** When creating an escalation, choose **Start immediately** or **Schedule for later**. A scheduled escalation stores a date, time, and timezone, remains `SCHEDULED` until its start time, and then enters the same workflow as an immediate escalation. Before it starts, it can be rescheduled or cancelled. Only one-time schedules are in v1.
+- **Current state:** The local implementation is complete. The escalation stores a one-time UTC start instant and IANA timezone, exposes create/reschedule/cancel actions, schedules starts in memory from the durable database row, recovers scheduled rows on startup, and atomically claims a scheduled start before creating response steps. PostgreSQL integration and deployed end-to-end verification remain pending.
+- **Agreed product decisions:**
+  - Put the schedule on the escalation run, not on the reusable task or escalation path.
+  - Accept a local date/time plus an IANA timezone such as `Asia/Kolkata`; persist both the resolved UTC instant and the submitted timezone for accurate display and rescheduling.
+  - Reject a scheduled time that is not in the future. Default the UI timezone to the browser timezone and allow the user to change it.
+  - Allow reschedule and cancel only while the run is still `SCHEDULED`, enforced atomically so a start cannot race with either action.
+  - Treat **Start immediately** as create-and-start, using the same start use case invoked when a scheduled time becomes due.
+  - Add a terminal `CANCELLED` state for a cancelled scheduled run. This must be reconciled with Requirement 2, whose listed lifecycle currently omits cancellation.
+- **Verification needed:** API validation and team isolation; timezone and daylight-saving conversion; start-at-time behaviour; restart recovery; duplicate trigger safety; reschedule/start and cancel/start races; UI state and actions; proof that recurring or cron schedules are not accepted.
+- **Evidence:** [schedule migration](../src/main/resources/db/migration/V6__add_escalation_scheduling.sql), [scheduled-start scheduler](../src/main/java/com/alertops/flow_execution_engine/service/EscalationStartScheduler.java), [escalation service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationService.java), [start claims](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [creation UI](../ui/src/features/escalations/EscalationsPage.tsx), [schedule controls](../ui/src/features/escalations/EscalationDetailPage.tsx), [scheduling tests](../src/test/java/com/alertops/flow_execution_engine/service/EscalationServiceSchedulingTest.java).
+- **Local verification:** `mvn test` and `npm run build` pass. PostgreSQL/Testcontainers integration coverage is currently skipped in this environment, so the final readiness box stays open.
+
+### Remaining requirements
+
+- [ ] 2. Incident lifecycle — not yet reviewed
+- [ ] 3. Resolution timeout after acknowledgement — not yet reviewed
+- [ ] 4. Escalate now — not yet reviewed
+- [ ] 5. Incident activity timeline — not yet reviewed
+- [ ] 6. Send test escalation — not yet reviewed
 
 ## Fix these bugs first, in order
 
@@ -16,7 +46,7 @@ Reassessed: 2026-09-30. This list contains critical bugs to fix first and the tw
 - [x] Reload the saved step for each queue message and atomically claim an eligible delivery. Ignore duplicate deliveries and messages for an older send attempt. Unit tests cover these consumer decisions, and PostgreSQL integration tests prove concurrent deliveries can claim a step only once.
 - [x] When an unexpected processing error occurs, look for the next `PENDING` step before deciding the escalation is exhausted.
 - [x] Persist each step's due time and pending-publication flag on the execution-state row. Publish immediately after the scheduling transaction commits, confirm RabbitMQ acceptance, and retry failed publications while the backend remains running. Startup recovery republishes outstanding steps with only the remaining delay; there is no separate outbox table or recurring idle poll. Existing active steps without a due time are recovered from their saved timestamps.
-- [x] Claim a start by changing the escalation from `IDLE` to `RUNNING` with a conditional database update, so only one simultaneous request can create step states.
+- [x] Claim a start by changing the escalation from `IDLE` to `OPEN` with a conditional database update, so only one simultaneous request can create step states.
 - [x] Add database integration tests proving that duplicate starts create one state set. Concurrent delivery claims are already covered in PostgreSQL.
 - **Done when:** duplicate messages, repeated starts, consumer crashes, and application restarts do not skip or advance a step twice; the remaining SMTP uncertainty after a send succeeds but before the database records it is explicitly handled or documented. Focused integration tests exercise these cases.
 - **Evidence:** [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), [reconciler](../src/main/java/com/alertops/messaging/ReconcilerService.java), [publisher](../src/main/java/com/alertops/messaging/MessagePublisher.java), [start use case](../src/main/java/com/alertops/flow_execution_engine/application/StartFlowExecutionUseCase.java).

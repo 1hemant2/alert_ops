@@ -116,7 +116,7 @@ public class EscalationAcknowledgementService {
         if ("ACKNOWLEDGED".equals(escalation.getResolutionType())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This escalation was acknowledged by another recipient.");
         }
-        if (!"RUNNING".equals(escalation.getStatus())) {
+        if (!"OPEN".equals(escalation.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This escalation is no longer active.");
         }
     }

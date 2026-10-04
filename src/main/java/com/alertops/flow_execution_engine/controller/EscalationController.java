@@ -3,6 +3,7 @@ package com.alertops.flow_execution_engine.controller;
 
 import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.dto.CreateEscalationReqDto;
+import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.service.EscalationService;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
 
@@ -30,7 +31,8 @@ public class EscalationController {
     @PostMapping("/create")
     public ResponseEntity<?> createEsclation(@RequestBody CreateEscalationReqDto req) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(escalationService.createEscalation(req.getEscalationName(), req.getTaskId(), req.getFlowId()));
+                .body(escalationService.createEscalation(
+                        req.getEscalationName(), req.getTaskId(), req.getFlowId()));
     }
 
     @GetMapping("/all")
@@ -54,6 +56,34 @@ public class EscalationController {
     public ResponseEntity<?> startEscalation(@RequestBody Map<String, UUID> req) {
         UUID escalationId = req.get("escalationId");
         return ResponseEntity.ok(startFlowExecutionUseCase.execute(flowExecutionStateService, escalationId));
+    }
+
+    @PostMapping("/{escalationId}/start")
+    public ResponseEntity<?> startEscalation(@PathVariable UUID escalationId) {
+        return ResponseEntity.ok(startFlowExecutionUseCase.execute(
+                flowExecutionStateService, escalationId));
+    }
+
+    @PostMapping("/{escalationId}/schedule")
+    public ResponseEntity<?> schedule(
+            @PathVariable UUID escalationId,
+            @RequestBody ScheduledEscalationRequest request) {
+        var escalation = escalationService.schedule(escalationId, request);
+        return escalation == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(escalation);
+    }
+
+    @PostMapping("/{escalationId}/reschedule")
+    public ResponseEntity<?> reschedule(
+            @PathVariable UUID escalationId,
+            @RequestBody ScheduledEscalationRequest request) {
+        var escalation = escalationService.reschedule(escalationId, request);
+        return escalation == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(escalation);
+    }
+
+    @PostMapping("/{escalationId}/cancel")
+    public ResponseEntity<?> cancel(@PathVariable UUID escalationId) {
+        var escalation = escalationService.cancelScheduled(escalationId);
+        return escalation == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(escalation);
     }
 
 }

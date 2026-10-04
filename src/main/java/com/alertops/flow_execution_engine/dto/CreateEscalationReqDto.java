@@ -26,5 +26,4 @@ public class CreateEscalationReqDto {
         this.taskId = taskId;
     }
 
-    
 }

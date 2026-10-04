@@ -467,7 +467,7 @@ class StepSchedulingPostgresIntegrationTest {
             workers.shutdownNow();
         }
 
-        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo("RUNNING");
+        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo("OPEN");
         assertThat(states.findAllByProcessIdOrderByPositionAsc(escalationId)).hasSize(2);
         assertThat(timers.activeTimerCount()).isEqualTo(1);
     }
@@ -503,7 +503,7 @@ class StepSchedulingPostgresIntegrationTest {
 
     private FlowExecutionState createStep(String executionState, Duration duration, boolean pending, Instant dueAt) {
         Escalation escalation = new Escalation();
-        escalation.setStatus("RUNNING");
+        escalation.setStatus("OPEN");
         escalations.save(escalation);
         FlowExecutionState step = new FlowExecutionState();
         step.setProcessId(escalation.getId());

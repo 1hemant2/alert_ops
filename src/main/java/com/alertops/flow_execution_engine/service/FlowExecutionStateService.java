@@ -28,8 +28,20 @@ public class FlowExecutionStateService {
 
     @Transactional
     public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId, UUID teamId) {
+        return startFlowExecution(task, nodes, escalationId, teamId, "IDLE");
+    }
+
+    @Transactional
+    public String startFlowExecution(
+            Task task,
+            List<Node> nodes,
+            UUID escalationId,
+            UUID teamId,
+            String expectedStatus) {
         try {
-            int claimedRows = escalationRepository.claimForStart(escalationId, teamId);
+            int claimedRows = "SCHEDULED".equals(expectedStatus)
+                    ? escalationRepository.claimScheduledForStart(escalationId, teamId, java.time.Instant.now())
+                    : escalationRepository.claimIdleForStart(escalationId, teamId);
             if (claimedRows != 1) {
                 throw EscalationException.startConflict();
             }

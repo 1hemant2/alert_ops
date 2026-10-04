@@ -53,7 +53,7 @@ public class MessageConsumer {
 
         // Lock the run while checking and sending so acknowledgement cannot race a new step.
         Escalation escalation = escalationRepository.findByIdForUpdate(currentState.getProcessId()).orElse(null);
-        if (escalation == null || !"RUNNING".equals(escalation.getStatus())) {
+        if (escalation == null || !"OPEN".equals(escalation.getStatus())) {
             return;
         }
 

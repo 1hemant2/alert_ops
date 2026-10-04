@@ -43,7 +43,7 @@ class EscalationAcknowledgementServiceTest {
         escalation = new Escalation();
         escalation.setId(ESCALATION_ID);
         escalation.setName("Database outage");
-        escalation.setStatus("RUNNING");
+        escalation.setStatus("OPEN");
 
         token = new EscalationAcknowledgementToken();
         token.setEscalationId(ESCALATION_ID);
@@ -118,7 +118,7 @@ class EscalationAcknowledgementServiceTest {
                 () -> service.acknowledge(RAW_TOKEN));
 
         assertEquals(HttpStatus.GONE, error.getStatusCode());
-        assertEquals("RUNNING", escalation.getStatus());
+        assertEquals("OPEN", escalation.getStatus());
         verify(escalationRepository, never()).save(any(Escalation.class));
     }
 

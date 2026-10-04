@@ -20,10 +20,38 @@ export function createEscalation(input: {
   })
 }
 
-export function startEscalation(escalationId: string): Promise<string> {
-  return request<string>('/api/v1/escalation/start', {
+export function scheduleEscalation(escalationId: string, schedule: {
+  scheduleDate: string
+  scheduleTime: string
+  timezone: string
+}): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/schedule`, {
     method: 'POST',
-    body: jsonBody({ escalationId }),
+    body: jsonBody(schedule),
+  })
+}
+
+export function rescheduleEscalation(escalationId: string, schedule: {
+  scheduleDate: string
+  scheduleTime: string
+  timezone: string
+}): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/reschedule`, {
+    method: 'POST',
+    body: jsonBody(schedule),
+  })
+}
+
+export function cancelScheduledEscalation(escalationId: string): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/cancel`, {
+    method: 'POST',
+    body: jsonBody({}),
+  })
+}
+
+export function startEscalation(escalationId: string): Promise<string> {
+  return request<string>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/start`, {
+    method: 'POST',
   })
 }
 

@@ -8,11 +8,20 @@ import com.alertops.flow.repository.FlowRepository;
 import com.alertops.task.repository.TaskRepository;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
+import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
+import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
+import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -21,15 +30,29 @@ public class EscalationService {
    private final FlowExecutionStateRepository flowExecutionStateRepository;
    private final FlowRepository flowRepository;
    private final TaskRepository taskRepository;
+   private final ApplicationEventPublisher eventPublisher;
+   private final Clock clock;
 
     EscalationService(EscalationRepository escalationRepository,
                       FlowExecutionStateRepository flowExecutionStateRepository,
                       FlowRepository flowRepository,
                       TaskRepository taskRepository) {
+       this(escalationRepository, flowExecutionStateRepository, flowRepository, taskRepository,
+               null, Clock.systemUTC());
+    }
+
+    public EscalationService(EscalationRepository escalationRepository,
+                      FlowExecutionStateRepository flowExecutionStateRepository,
+                      FlowRepository flowRepository,
+                      TaskRepository taskRepository,
+                      ApplicationEventPublisher eventPublisher,
+                      Clock clock) {
        this.escalationRepository = escalationRepository;
        this.flowExecutionStateRepository = flowExecutionStateRepository;
        this.flowRepository = flowRepository;
        this.taskRepository = taskRepository;
+       this.eventPublisher = eventPublisher;
+       this.clock = clock;
     }
 
     public Escalation createEscalation(String name, UUID taskId, UUID flowId) {
@@ -40,7 +63,9 @@ public class EscalationService {
         return createEscalationForTeam(name, taskId, flowId, authContext.getTeamId());
     }
 
-    public Escalation createEscalationForTeam(String name, UUID taskId, UUID flowId, UUID teamId) {
+    @Transactional
+    public Escalation createEscalationForTeam(
+            String name, UUID taskId, UUID flowId, UUID teamId) {
         if (teamId == null
                 || flowRepository.findByIdAndTeamId(flowId, teamId) == null
                 || taskRepository.findById(taskId, teamId) == null) {
@@ -51,10 +76,93 @@ public class EscalationService {
         escalation.setName(name);
         escalation.setTaskId(taskId);
         escalation.setFlowId(flowId);
-        escalation.setStatus("IDLE");
         escalation.setTeamId(teamId);
         escalation.setResolutionType(null);
+        escalation.setStatus("IDLE");
         return escalationRepository.save(escalation);
+    }
+
+    @Transactional
+    public Escalation schedule(UUID escalationId, ScheduledEscalationRequest schedule) {
+        AuthContext authContext = requireTeamContext();
+        Escalation escalation = escalationRepository.findByIdAndTeamId(
+                escalationId, authContext.getTeamId());
+        if (escalation == null) {
+            return null;
+        }
+        if (!"IDLE".equals(escalation.getStatus())) {
+            throw new IllegalStateException("Only an idle escalation can be scheduled");
+        }
+
+        Instant scheduledStartAt = resolveScheduledStart(schedule);
+        String timezone = schedule.getTimezone().trim();
+        int updated = escalationRepository.scheduleIdle(
+                escalationId, authContext.getTeamId(), scheduledStartAt, timezone);
+        if (updated != 1) {
+            throw new IllegalStateException("Only an idle escalation can be scheduled");
+        }
+        escalation.setStatus("SCHEDULED");
+        escalation.setScheduledStartAt(scheduledStartAt);
+        escalation.setScheduleTimezone(timezone);
+        escalation.setScheduledStartRetryCount(0);
+        escalation.setScheduledStartNextRetryAt(null);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new EscalationStartSchedule(escalationId, scheduledStartAt));
+        }
+        return escalation;
+    }
+
+    @Transactional
+    public Escalation reschedule(UUID escalationId, ScheduledEscalationRequest schedule) {
+        AuthContext authContext = requireTeamContext();
+        Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, authContext.getTeamId());
+        if (escalation == null) {
+            return null;
+        }
+        if (!"SCHEDULED".equals(escalation.getStatus())) {
+            throw new IllegalStateException("Only scheduled escalations can be rescheduled");
+        }
+        Instant scheduledStartAt = resolveScheduledStart(schedule);
+        int updated = escalationRepository.rescheduleScheduled(
+                escalationId, authContext.getTeamId(), scheduledStartAt, schedule.getTimezone().trim());
+        if (updated != 1) {
+            throw new IllegalStateException("Only scheduled escalations can be rescheduled");
+        }
+        escalation.setScheduledStartAt(scheduledStartAt);
+        escalation.setScheduleTimezone(schedule.getTimezone().trim());
+        escalation.setScheduledStartRetryCount(0);
+        escalation.setScheduledStartNextRetryAt(null);
+        Escalation saved = escalation;
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new EscalationStartSchedule(
+                    saved.getId(), saved.getScheduledStartAt()));
+        }
+        return saved;
+    }
+
+    @Transactional
+    public Escalation cancelScheduled(UUID escalationId) {
+        AuthContext authContext = requireTeamContext();
+        Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, authContext.getTeamId());
+        if (escalation == null) {
+            return null;
+        }
+        if (!"SCHEDULED".equals(escalation.getStatus())) {
+            throw new IllegalStateException("Only scheduled escalations can be cancelled");
+        }
+        Instant cancelledAt = clock.instant();
+        int updated = escalationRepository.cancelScheduled(escalationId, authContext.getTeamId(), cancelledAt);
+        if (updated != 1) {
+            throw new IllegalStateException("Only scheduled escalations can be cancelled");
+        }
+        escalation.setStatus("CANCELLED");
+        escalation.setCancelledAt(cancelledAt);
+        escalation.setScheduledStartNextRetryAt(null);
+        Escalation saved = escalation;
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new EscalationStartCancelled(saved.getId()));
+        }
+        return saved;
     }
 
     public List<Escalation> getEscalations(int page, int size, String sortBy, String sortDir) {
@@ -130,6 +238,57 @@ public class EscalationService {
         } catch (Exception e) {
             throw e;
         }
+    }
+
+    private AuthContext requireTeamContext() {
+        AuthContext authContext = AuthContextHolder.get();
+        if (authContext == null || authContext.getTeamId() == null) {
+            throw new RuntimeException("Team is required for this escalation action");
+        }
+        return authContext;
+    }
+
+    private Instant resolveScheduledStart(ScheduledEscalationRequest schedule) {
+        // A date and time by themselves are not enough to identify one real moment.
+        // For example, "10:00" could mean 10:00 in India, London, or New York.
+        if (schedule == null || schedule.getScheduleDate() == null
+                || schedule.getScheduleTime() == null || schedule.getTimezone() == null
+                || schedule.getTimezone().isBlank()) {
+            throw new IllegalArgumentException("A scheduled escalation requires date, time, and timezone");
+        }
+
+        // Convert the user's timezone text (for example, "Asia/Kolkata") into
+        // Java's timezone rules, including daylight-saving-time rules where relevant.
+        ZoneId zone;
+        try {
+            zone = ZoneId.of(schedule.getTimezone().trim());
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("Timezone must be a valid IANA timezone", e);
+        }
+
+        // Combine the separate calendar date and wall-clock time entered by the user.
+        LocalDateTime local = LocalDateTime.of(schedule.getScheduleDate(), schedule.getScheduleTime());
+
+        // A normal local time has exactly one UTC offset. During daylight-saving changes:
+        // - 0 offsets means the clock jumped over this local time, so it does not exist.
+        // - 2 offsets means the clock repeated this local time, so it is ambiguous.
+        // Reject both cases instead of silently choosing the wrong instant.
+        var offsets = zone.getRules().getValidOffsets(local);
+        if (offsets.size() != 1) {
+            throw new IllegalArgumentException("The selected local time is ambiguous or does not exist in this timezone");
+        }
+
+        // Apply the timezone's one valid offset to get an absolute UTC moment.
+        // This Instant is what we persist and give to the scheduler; it is independent
+        // of the server's local timezone. Example: 10:00 Asia/Kolkata = 04:30 UTC.
+        Instant start = local.toInstant(offsets.get(0));
+
+        // Scheduling in the past (or exactly now) is rejected. The injected Clock keeps
+        // this comparison testable and ensures all scheduling decisions use one time source.
+        if (!start.isAfter(clock.instant())) {
+            throw new IllegalArgumentException("Scheduled start time must be in the future");
+        }
+        return start;
     }
 
 }

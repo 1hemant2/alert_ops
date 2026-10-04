@@ -13,10 +13,13 @@ export function TeamOverviewPage() {
   const firstFlowId = flows.data?.[0]?.id
   const firstFlowNodes = useQuery({
     queryKey: ['flow-nodes', teamId, firstFlowId],
-    queryFn: () => getFlowNodes(firstFlowId!),
+    queryFn: () => {
+      if (!firstFlowId) throw new Error('Flow id is required')
+      return getFlowNodes(firstFlowId)
+    },
     enabled: Boolean(firstFlowId),
   })
-  const escalations = useQuery({ queryKey: ['escalations', teamId], queryFn: getEscalations, refetchInterval: query => query.state.data?.some(item => item.status === 'RUNNING') ? 4000 : false })
+  const escalations = useQuery({ queryKey: ['escalations', teamId], queryFn: getEscalations, refetchInterval: query => query.state.data?.some(item => item.status === 'OPEN') ? 4000 : false })
   const base = `/app/${teamId}`
 
   return <>
@@ -25,7 +28,7 @@ export function TeamOverviewPage() {
       <Metric label="Tasks" value={tasks.data?.length} loading={tasks.isPending} detail="Response context" mark="T" />
       <Metric label="Escalation paths" value={flows.data?.length} loading={flows.isPending} detail="Ordered response steps" mark="↗" />
       <Metric label="Escalations" value={escalations.data?.length} loading={escalations.isPending} detail="Team executions" mark="E" />
-      <Metric label="Currently running" value={escalations.data?.filter(item => item.status === 'RUNNING').length} loading={escalations.isPending} detail="Read from saved state" mark="↗" accent />
+      <Metric label="Currently running" value={escalations.data?.filter(item => item.status === 'OPEN').length} loading={escalations.isPending} detail="Read from saved state" mark="↗" accent />
     </div>
     <div className="overview-columns">
       <Card className="journey-card">
