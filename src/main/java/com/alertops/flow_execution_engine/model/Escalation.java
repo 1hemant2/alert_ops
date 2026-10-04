@@ -51,6 +51,12 @@ public class Escalation {
 
     private Instant cancelledAt;
 
+    @Column(name = "scheduled_by_user_id")
+    private UUID scheduledByUserId;
+
+    @Column(name = "scheduled_by_user_email", length = 320)
+    private String scheduledByUserEmail;
+
     @PrePersist
     void onCreate() {
         this.createdAt = Instant.now();
@@ -187,6 +193,22 @@ public class Escalation {
 
     public void setCancelledAt(Instant cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    public UUID getScheduledByUserId() {
+        return scheduledByUserId;
+    }
+
+    public void setScheduledByUserId(UUID scheduledByUserId) {
+        this.scheduledByUserId = scheduledByUserId;
+    }
+
+    public String getScheduledByUserEmail() {
+        return scheduledByUserEmail;
+    }
+
+    public void setScheduledByUserEmail(String scheduledByUserEmail) {
+        this.scheduledByUserEmail = scheduledByUserEmail;
     }
 
     

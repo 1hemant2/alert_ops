@@ -71,6 +71,8 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED,
                   e.scheduledStartAt = :scheduledStartAt,
                   e.scheduleTimezone = :scheduleTimezone,
+                  e.scheduledByUserId = :scheduledByUserId,
+                  e.scheduledByUserEmail = :scheduledByUserEmail,
                   e.scheduledStartRetryCount = 0,
                   e.scheduledStartNextRetryAt = null
               WHERE e.id = :id AND e.teamId = :teamId
@@ -80,7 +82,9 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               @Param("id") UUID id,
               @Param("teamId") UUID teamId,
               @Param("scheduledStartAt") Instant scheduledStartAt,
-              @Param("scheduleTimezone") String scheduleTimezone);
+              @Param("scheduleTimezone") String scheduleTimezone,
+              @Param("scheduledByUserId") UUID scheduledByUserId,
+              @Param("scheduledByUserEmail") String scheduledByUserEmail);
 
       @Modifying(clearAutomatically = true)
       @Query("""
@@ -101,6 +105,8 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               UPDATE Escalation e
               SET e.scheduledStartAt = :scheduledStartAt,
                   e.scheduleTimezone = :scheduleTimezone,
+                  e.scheduledByUserId = :scheduledByUserId,
+                  e.scheduledByUserEmail = :scheduledByUserEmail,
                   e.scheduledStartRetryCount = 0,
                   e.scheduledStartNextRetryAt = null
               WHERE e.id = :id AND e.teamId = :teamId
@@ -110,5 +116,7 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               @Param("id") UUID id,
               @Param("teamId") UUID teamId,
               @Param("scheduledStartAt") Instant scheduledStartAt,
-              @Param("scheduleTimezone") String scheduleTimezone);
+              @Param("scheduleTimezone") String scheduleTimezone,
+              @Param("scheduledByUserId") UUID scheduledByUserId,
+              @Param("scheduledByUserEmail") String scheduledByUserEmail);
 }

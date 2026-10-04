@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.audit.model.AuditAction;
@@ -15,6 +16,7 @@ import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.model.AuditEvent;
 import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.messaging.EscalationStartFailureNotificationRequested;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 /** Persists the retry policy for scheduled escalation starts. */
@@ -22,14 +24,21 @@ import com.alertops.flow_execution_engine.repository.EscalationRepository;
 public class EscalationStartRetryService {
     private final EscalationRepository escalationRepository;
     private final AuditService auditService;
+    private final EscalationStartFailureNotificationService failureNotificationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final int maxRetries;
 
     public EscalationStartRetryService(
             EscalationRepository escalationRepository,
             @Value("${alertops.scheduler.start-max-retries:3}") int maxRetries,
-            AuditService auditService) {
+            AuditService auditService,
+            EscalationStartFailureNotificationService failureNotificationService,
+            ApplicationEventPublisher eventPublisher) {
         this.escalationRepository = Objects.requireNonNull(escalationRepository, "escalationRepository");
         this.auditService = Objects.requireNonNull(auditService, "auditService");
+        this.failureNotificationService = Objects.requireNonNull(
+                failureNotificationService, "failureNotificationService");
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
         if (maxRetries < 0) {
             throw new IllegalArgumentException("Scheduled-start max retries cannot be negative");
         }
@@ -57,11 +66,13 @@ public class EscalationStartRetryService {
         if (retriesUsed >= maxRetries) {
             escalation.setStatus(EscalationStatus.START_FAILED);
             escalation.setScheduledStartNextRetryAt(null);
+            escalationRepository.save(escalation);
+            failureNotificationService.createPendingNotifications(escalation, failureReason);
             auditService.record(new AuditEvent(
                     AuditEntityType.ESCALATION, escalationId, AuditAction.START_FAILED,
                     EscalationStatus.SCHEDULED.name(), EscalationStatus.START_FAILED.name(),
                     null, null, Instant.now(), failureReason, null));
-            escalationRepository.save(escalation);
+            eventPublisher.publishEvent(new EscalationStartFailureNotificationRequested(escalationId));
             return Optional.empty();
         }
 

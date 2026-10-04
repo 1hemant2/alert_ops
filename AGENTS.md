@@ -17,6 +17,32 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 - Add files, abstractions, or dependencies only when they are needed and can be justified.
 - Review the final diff for unrelated changes and explain any important limitation.
 
+## Domain values and enums
+
+- Use an enum whenever a value has a finite, known set of valid domain options, such as lifecycle statuses, actions, roles, resolutions, notification states, and entity types. This keeps invalid values out of business logic and makes transitions explicit.
+- Persist domain enums with `@Enumerated(EnumType.STRING)` or an explicit string mapping so database values remain readable and stable if enum declaration order changes. Add or update database constraints and focused tests when the allowed values change.
+- At API boundaries, parse and validate incoming strings into the corresponding enum close to the boundary; do not pass arbitrary strings through service logic. Return a clear validation error for unknown values.
+- Keep a `String` when the value is genuinely open-ended or owned by an external system, such as a user-provided name, email address, reason/message, IANA timezone, or an extensible provider value. Do not invent an enum for values that cannot be known and controlled by this project.
+- Do not use broad constructs such as `Enum<?>` when the application owns the value set. Use the specific enum type; use strings only when the possible values are intentionally unknown.
+
+## Scope and version control
+
+- Work on one agreed task at a time. Do not bundle a later checklist item, opportunistic refactor, or unrelated cleanup into the current change.
+- Do not create commits unless the user explicitly asks. Preserve the user's staged and unstaged changes, and when a commit is requested include only the scope they specified.
+- Never reset, discard, or rewrite user changes without explicit approval. Inspect the working tree and staging area before modifying overlapping files.
+
+## Time and scheduling
+
+- Persist real-world moments as `Instant`/UTC and inject `Clock` into business services instead of calling `Instant.now()` directly; this keeps comparisons deterministic and tests controllable.
+- Accept a local date/time plus an IANA timezone at the boundary, resolve it to one UTC `Instant`, and retain the submitted timezone when the product needs to display or reschedule the value.
+- Treat in-memory timers as wake-up handles only. Timer callbacks must reload current state from PostgreSQL and tolerate cancellation, replacement, restart recovery, and duplicate callbacks.
+- Add concise comments around calendar/timezone conversion, retry timing, and concurrency code when the reason is not obvious from the syntax. Do not comment routine getters, setters, or self-explanatory code.
+
+## Verification and handoff
+
+- Add or update a focused test for each meaningful behavior or failure path, especially races, retries, restart recovery, idempotency, and null repository results.
+- Run the narrowest relevant tests plus the normal project build before handoff. Clearly distinguish passed local checks from integration or deployed checks that were skipped because required services or environment variables were unavailable.
+
 ## Transactions
 
 - Do not add `@Transactional` automatically. First identify the atomicity requirement and the actual database operations in the method.

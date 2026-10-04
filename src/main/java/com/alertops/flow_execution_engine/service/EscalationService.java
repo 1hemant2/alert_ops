@@ -106,13 +106,17 @@ public class EscalationService {
                 escalationId,
                 authContext.getTeamId(),
                 scheduledStartAt,
-                timezone);
+                timezone,
+                actor.userId(),
+                actor.email());
         if (updated != 1) {
             throw EscalationException.transitionConflict("Only an idle escalation can be scheduled");
         }
         escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(scheduledStartAt);
         escalation.setScheduleTimezone(timezone);
+        escalation.setScheduledByUserId(actor.userId());
+        escalation.setScheduledByUserEmail(actor.email());
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
         auditService.record(new AuditEvent(
@@ -141,12 +145,16 @@ public class EscalationService {
                 escalationId,
                 authContext.getTeamId(),
                 scheduledStartAt,
-                schedule.getTimezone().trim());
+                schedule.getTimezone().trim(),
+                actor.userId(),
+                actor.email());
         if (updated != 1) {
             throw EscalationException.transitionConflict("Only scheduled escalations can be rescheduled");
         }
         escalation.setScheduledStartAt(scheduledStartAt);
         escalation.setScheduleTimezone(schedule.getTimezone().trim());
+        escalation.setScheduledByUserId(actor.userId());
+        escalation.setScheduledByUserEmail(actor.email());
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
         auditService.record(new AuditEvent(
