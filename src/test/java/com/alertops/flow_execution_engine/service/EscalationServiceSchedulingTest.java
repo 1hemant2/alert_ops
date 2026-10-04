@@ -237,6 +237,33 @@ class EscalationServiceSchedulingTest {
     }
 
     @Test
+    void rescheduleRaceRejectsWhenScheduledStartWins() {
+        UUID teamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+
+        Escalation scheduled = new Escalation();
+        scheduled.setId(escalationId);
+        scheduled.setTeamId(teamId);
+        scheduled.setStatus(EscalationStatus.SCHEDULED);
+        when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(scheduled);
+        when(escalations.rescheduleScheduled(any(), any(), any(), any(), any(), any())).thenReturn(0);
+
+        ScheduledEscalationRequest reschedule = new ScheduledEscalationRequest();
+        reschedule.setScheduleDate(LocalDate.of(2026, 1, 2));
+        reschedule.setScheduleTime(LocalTime.of(10, 0));
+        reschedule.setTimezone("Asia/Kolkata");
+
+        EscalationException conflict = assertThrows(
+                EscalationException.class, () -> service.reschedule(escalationId, reschedule));
+
+        assertEquals(409, conflict.getStatus().value());
+        verify(auditService, never()).record(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
     void scheduledStartMustBeFutureAndUseAnUnambiguousLocalTime() {
         UUID teamId = UUID.randomUUID();
         AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
