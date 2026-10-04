@@ -175,6 +175,33 @@ class EscalationServiceSchedulingTest {
     }
 
     @Test
+    void cancellationRaceRejectsWhenScheduledStartWins() {
+        UUID teamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+
+        Escalation scheduled = new Escalation();
+        scheduled.setId(escalationId);
+        scheduled.setTeamId(teamId);
+        scheduled.setStatus(EscalationStatus.SCHEDULED);
+        Escalation open = new Escalation();
+        open.setId(escalationId);
+        open.setTeamId(teamId);
+        open.setStatus(EscalationStatus.OPEN);
+        when(escalations.findByIdAndTeamId(escalationId, teamId))
+                .thenReturn(scheduled, open);
+        when(escalations.cancelScheduled(any(), any(), any())).thenReturn(0);
+
+        EscalationException conflict = assertThrows(
+                EscalationException.class, () -> service.cancelScheduled(escalationId));
+
+        assertEquals(409, conflict.getStatus().value());
+        verify(auditService, never()).record(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
     void reschedulingWritesTheLatestSchedulingActorToAudit() {
         UUID teamId = UUID.randomUUID();
         UUID escalationId = UUID.randomUUID();

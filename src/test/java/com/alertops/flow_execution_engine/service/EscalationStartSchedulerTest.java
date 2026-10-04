@@ -87,6 +87,26 @@ class EscalationStartSchedulerTest {
     }
 
     @Test
+    void staleTimerAfterCancellationDoesNotStartEscalation() {
+        UUID id = UUID.randomUUID();
+        Escalation cancelled = new Escalation();
+        cancelled.setId(id);
+        cancelled.setStatus(EscalationStatus.CANCELLED);
+        cancelled.setScheduledStartAt(now);
+        when(escalations.findById(id)).thenReturn(Optional.of(cancelled));
+        AtomicReference<Runnable> callback = new AtomicReference<>();
+        when(taskScheduler.schedule(any(Runnable.class), eq(now))).thenAnswer(invocation -> {
+            callback.set(invocation.getArgument(0));
+            return mock(ScheduledFuture.class);
+        });
+
+        scheduler.schedule(id, now);
+        callback.get().run();
+
+        verifyNoInteractions(start);
+    }
+
+    @Test
     void failedStartUsesPersistedRetryTimeForTheNextTimer() {
         UUID id = UUID.randomUUID();
         Instant retryAt = now.plusSeconds(5);
