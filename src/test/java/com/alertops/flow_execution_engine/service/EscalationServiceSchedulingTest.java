@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -119,6 +120,55 @@ class EscalationServiceSchedulingTest {
         verify(auditService).record(audit.capture());
         assertEquals(AuditAction.CANCELLED, audit.getValue().action());
         assertEquals(actorId, audit.getValue().userId());
+    }
+
+    @Test
+    void repeatedCancellationReturnsTheExistingCancelledEscalationWithoutRepeatingSideEffects() {
+        UUID teamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+
+        Escalation cancelled = new Escalation();
+        cancelled.setId(escalationId);
+        cancelled.setTeamId(teamId);
+        cancelled.setStatus(EscalationStatus.CANCELLED);
+        cancelled.setCancelledAt(now);
+        when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(cancelled);
+
+        Escalation result = service.cancelScheduled(escalationId);
+
+        assertEquals(cancelled, result);
+        verify(escalations, never()).cancelScheduled(any(), any(), any());
+        verify(auditService, never()).record(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void cancellationRaceReturnsTheCancelledWinnerWhenTheConditionalUpdateLoses() {
+        UUID teamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+
+        Escalation scheduled = new Escalation();
+        scheduled.setId(escalationId);
+        scheduled.setTeamId(teamId);
+        scheduled.setStatus(EscalationStatus.SCHEDULED);
+        Escalation cancelled = new Escalation();
+        cancelled.setId(escalationId);
+        cancelled.setTeamId(teamId);
+        cancelled.setStatus(EscalationStatus.CANCELLED);
+        cancelled.setCancelledAt(now);
+        when(escalations.findByIdAndTeamId(escalationId, teamId))
+                .thenReturn(scheduled, cancelled);
+        when(escalations.cancelScheduled(any(), any(), any())).thenReturn(0);
+
+        Escalation result = service.cancelScheduled(escalationId);
+
+        assertEquals(cancelled, result);
+        verify(auditService, never()).record(any());
+        verify(events, never()).publishEvent(any());
     }
 
     @Test

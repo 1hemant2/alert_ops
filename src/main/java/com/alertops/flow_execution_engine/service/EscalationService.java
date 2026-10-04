@@ -164,6 +164,9 @@ public class EscalationService {
         if (escalation == null) {
             return null;
         }
+        if (escalation.getStatus() == EscalationStatus.CANCELLED) {
+            return escalation;
+        }
         if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
             throw new IllegalStateException("Only scheduled escalations can be cancelled");
         }
@@ -171,6 +174,11 @@ public class EscalationService {
         int updated = escalationRepository.cancelScheduled(
                 escalationId, authContext.getTeamId(), cancelledAt);
         if (updated != 1) {
+            Escalation current = escalationRepository.findByIdAndTeamId(
+                    escalationId, authContext.getTeamId());
+            if (current != null && current.getStatus() == EscalationStatus.CANCELLED) {
+                return current;
+            }
             throw new IllegalStateException("Only scheduled escalations can be cancelled");
         }
         escalation.setStatus(EscalationStatus.CANCELLED);

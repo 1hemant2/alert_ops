@@ -82,7 +82,7 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               @Param("scheduledStartAt") Instant scheduledStartAt,
               @Param("scheduleTimezone") String scheduleTimezone);
 
-      @Modifying
+      @Modifying(clearAutomatically = true)
       @Query("""
               UPDATE Escalation e
               SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.CANCELLED,
