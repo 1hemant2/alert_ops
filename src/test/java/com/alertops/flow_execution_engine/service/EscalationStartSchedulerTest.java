@@ -23,6 +23,7 @@ import org.springframework.scheduling.TaskScheduler;
 
 import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 class EscalationStartSchedulerTest {
@@ -73,7 +74,7 @@ class EscalationStartSchedulerTest {
         UUID id = UUID.randomUUID();
         Escalation escalation = new Escalation();
         escalation.setId(id);
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(now);
         when(escalations.findById(id)).thenReturn(Optional.of(escalation));
         when(taskScheduler.schedule(any(Runnable.class), eq(now))).thenAnswer(invocation -> {
@@ -86,17 +87,38 @@ class EscalationStartSchedulerTest {
     }
 
     @Test
+    void staleTimerAfterCancellationDoesNotStartEscalation() {
+        UUID id = UUID.randomUUID();
+        Escalation cancelled = new Escalation();
+        cancelled.setId(id);
+        cancelled.setStatus(EscalationStatus.CANCELLED);
+        cancelled.setScheduledStartAt(now);
+        when(escalations.findById(id)).thenReturn(Optional.of(cancelled));
+        AtomicReference<Runnable> callback = new AtomicReference<>();
+        when(taskScheduler.schedule(any(Runnable.class), eq(now))).thenAnswer(invocation -> {
+            callback.set(invocation.getArgument(0));
+            return mock(ScheduledFuture.class);
+        });
+
+        scheduler.schedule(id, now);
+        callback.get().run();
+
+        verifyNoInteractions(start);
+    }
+
+    @Test
     void failedStartUsesPersistedRetryTimeForTheNextTimer() {
         UUID id = UUID.randomUUID();
         Instant retryAt = now.plusSeconds(5);
         Escalation escalation = new Escalation();
         escalation.setId(id);
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(now);
         when(escalations.findById(id)).thenReturn(Optional.of(escalation));
         doThrow(new IllegalStateException("temporary failure"))
                 .when(start).executeScheduled(stateService, id, now);
-        when(retryService.recordFailureAndPlanRetry(id, retryAt)).thenReturn(Optional.of(retryAt));
+        when(retryService.recordFailureAndPlanRetry(eq(id), eq(retryAt), any(String.class)))
+                .thenReturn(Optional.of(retryAt));
         AtomicReference<Runnable> callback = new AtomicReference<>();
         when(taskScheduler.schedule(any(Runnable.class), any(Instant.class))).thenAnswer(invocation -> {
             callback.set(invocation.getArgument(0));
@@ -107,7 +129,7 @@ class EscalationStartSchedulerTest {
         callback.get().run();
 
         verify(taskScheduler).schedule(any(Runnable.class), eq(retryAt));
-        verify(retryService).recordFailureAndPlanRetry(id, retryAt);
+        verify(retryService).recordFailureAndPlanRetry(eq(id), eq(retryAt), any(String.class));
     }
 
     @Test
@@ -118,7 +140,8 @@ class EscalationStartSchedulerTest {
 
         scheduler.schedule(id, now);
 
-        verify(retryService).recordFailureAndPlanRetry(id, now.plusSeconds(5));
+        verify(retryService).recordFailureAndPlanRetry(
+                eq(id), eq(now.plusSeconds(5)), any(String.class));
     }
 
     @Test

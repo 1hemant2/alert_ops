@@ -156,6 +156,8 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .status-pending i { background: #d3b45b; }
 .status-failed { color: #a04d47; background: #faf0ef; border-color: #f3dfdc; }
 .status-failed i { background: #ce7168; }
+.status-start_failed { color: #a04d47; background: #faf0ef; border-color: #f3dfdc; }
+.status-start_failed i { background: #ce7168; }
 .two-column-layout { display: grid; grid-template-columns: minmax(0,1.18fr) minmax(290px,.82fr); gap: 16px; align-items: start; }
 .main-list-card, .side-form-card { padding: 21px 22px; }
 .main-list-card { min-height: 300px; }
@@ -240,6 +242,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .notice { border-radius: 7px; padding: 10px 12px; margin: -12px 0 18px; font-size: 13px; line-height: 1.5; }
 .notice-neutral { color: #69776d; background: #f0f3ec; border: 1px solid #e5eadd; }
 .notice-warning { color: #81734f; background: #faf7ec; border: 1px solid #f0ead9; }
+.notice-error { color: #8a3f39; background: #fdf0ee; border: 1px solid #f1d5d1; }
 .flow-detail-layout { grid-template-columns: minmax(0,1.15fr) minmax(290px,.85fr); }
 .node-timeline-card { padding: 21px 22px; }
 .node-timeline { margin-top: 25px; }
@@ -594,6 +597,8 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 .status-pending i { background: #f79009; }
 .status-failed { color: #b42318; background: #fef3f2; border-color: #fecdca; }
 .status-failed i { background: #f04438; }
+.status-start_failed { color: #b42318; background: #fef3f2; border-color: #fecdca; }
+.status-start_failed i { background: #f04438; }
 
 .two-column-layout { gap: 22px; }
 .main-list-card { min-height: 360px; }

@@ -2,6 +2,7 @@ package com.alertops.messaging;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
@@ -100,6 +101,85 @@ public class Notification {
         } catch (Exception e) {
             logger.warn("Email notification failed for process {} ({})",
                     flowExecutionState.getProcessId(), e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    /** Sends the durable alert created when a scheduled escalation cannot start. */
+    public boolean sendStartFailureEmail(
+            UUID escalationId,
+            String escalationName,
+            String recipientEmail,
+            String reason) {
+        if (isBlank(recipientEmail)) {
+            logger.warn("Start-failure notification skipped because the recipient address is missing");
+            return false;
+        }
+
+        try {
+            JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+            if (mailSender == null || isBlank(fromAddress)) {
+                logger.warn("Start-failure notification skipped because SMTP is not configured");
+                return false;
+            }
+
+            String safeName = sanitizeSubject(Objects.toString(escalationName, "Escalation"));
+            if (safeName.isBlank()) {
+                safeName = "Escalation";
+            }
+            if (safeName.length() > 100) {
+                safeName = safeName.substring(0, 97) + "...";
+            }
+            String safeReason = Objects.toString(reason, "SCHEDULED_START_FAILED").trim();
+            if (safeReason.isBlank()) {
+                safeReason = "SCHEDULED_START_FAILED";
+            }
+
+            String plainText = """
+                    AlertOps could not start a scheduled escalation after all retry attempts.
+
+                    Escalation: %s
+                    Escalation ID: %s
+                    Reason: %s
+
+                    Review the escalation in AlertOps and follow your team's response procedure.
+                    """.formatted(safeName, Objects.toString(escalationId, "unknown"), safeReason);
+            String html = """
+                    <!doctype html>
+                    <html lang="en">
+                    <body style="margin:0;padding:28px 12px;background:#f2f5f9;color:#314156;font-family:Arial,Helvetica,sans-serif;">
+                      <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
+                        <tr><td align="center">
+                          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#fff;border:1px solid #e3eaf1;border-radius:14px;overflow:hidden;">
+                            <tr><td style="height:5px;background:#c0392b;font-size:0;">&nbsp;</td></tr>
+                            <tr><td style="padding:22px 30px;background:#14283f;color:#fff;font-size:18px;font-weight:700;">Scheduled escalation failed to start</td></tr>
+                            <tr><td style="padding:30px;font-size:15px;line-height:1.65;">
+                              <p style="margin:0 0 16px;">AlertOps exhausted all start attempts for this scheduled escalation.</p>
+                              <p style="margin:0 0 8px;"><strong>Escalation:</strong> %s</p>
+                              <p style="margin:0 0 8px;"><strong>Escalation ID:</strong> %s</p>
+                              <p style="margin:0;"><strong>Reason:</strong> %s</p>
+                            </td></tr>
+                          </table>
+                        </td></tr>
+                      </table>
+                    </body>
+                    </html>
+                    """.formatted(
+                    HtmlUtils.htmlEscape(safeName),
+                    HtmlUtils.htmlEscape(Objects.toString(escalationId, "unknown")),
+                    HtmlUtils.htmlEscape(safeReason));
+
+            var message = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(fromAddress);
+            helper.setTo(recipientEmail.trim());
+            helper.setSubject("AlertOps · START_FAILED · " + safeName);
+            helper.setText(plainText, html);
+            mailSender.send(message);
+            return true;
+        } catch (Exception e) {
+            logger.warn("Start-failure notification failed for escalation {} ({})",
+                    escalationId, e.getClass().getSimpleName());
             return false;
         }
     }

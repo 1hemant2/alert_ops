@@ -20,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 import com.alertops.flow_execution_engine.dto.EscalationAcknowledgementResponse;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
@@ -85,8 +87,8 @@ public class EscalationAcknowledgementService {
         validateTokenAndRun(token, escalation, alreadyAcknowledged);
 
         if (!alreadyAcknowledged) {
-            escalation.setStatus("COMPLETED");
-            escalation.setResolutionType("ACKNOWLEDGED");
+            escalation.setStatus(EscalationStatus.COMPLETED);
+            escalation.setResolutionType(EscalationResolutionType.ACKNOWLEDGED);
             escalation.setIssueSolvedBy(token.getRecipientEmail());
             escalation.setAcknowledgedAt(Instant.now());
             escalationRepository.save(escalation);
@@ -113,16 +115,16 @@ public class EscalationAcknowledgementService {
         if (!token.getExpiresAt().isAfter(Instant.now())) {
             throw new ResponseStatusException(HttpStatus.GONE, "This acknowledgement link has expired.");
         }
-        if ("ACKNOWLEDGED".equals(escalation.getResolutionType())) {
+        if (escalation.getResolutionType() == EscalationResolutionType.ACKNOWLEDGED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This escalation was acknowledged by another recipient.");
         }
-        if (!"OPEN".equals(escalation.getStatus())) {
+        if (escalation.getStatus() != EscalationStatus.OPEN) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This escalation is no longer active.");
         }
     }
 
     private boolean isAcknowledgedBy(Escalation escalation, String recipientEmail) {
-        return "ACKNOWLEDGED".equals(escalation.getResolutionType())
+        return escalation.getResolutionType() == EscalationResolutionType.ACKNOWLEDGED
                 && normalizeEmail(recipientEmail).equals(normalizeEmail(escalation.getIssueSolvedBy()));
     }
 
@@ -133,7 +135,7 @@ public class EscalationAcknowledgementService {
         return new EscalationAcknowledgementResponse(
                 escalation.getName(),
                 token.getRecipientEmail(),
-                escalation.getStatus(),
+                escalation.getStatus() == null ? null : escalation.getStatus().name(),
                 token.getExpiresAt(),
                 escalation.getAcknowledgedAt(),
                 escalation.getIssueSolvedBy(),

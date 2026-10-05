@@ -79,7 +79,7 @@ export function LinkButton({ to, children }: { to: string; children: ReactNode }
   return <Link className="button button-secondary" to={to}>{children}</Link>
 }
 
-export function InlineNotice({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'warning' | 'success' }) {
+export function InlineNotice({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'warning' | 'success' | 'error' }) {
   return <div className={`notice notice-${tone}`}>{children}</div>
 }
 

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -161,6 +162,7 @@ public class StepSchedulingService {
     }
 
     private boolean isActive(com.alertops.flow_execution_engine.model.Escalation escalation) {
-        return escalation != null && "OPEN".equals(escalation.getStatus());
+        return escalation != null
+                && escalation.getStatus() == EscalationStatus.OPEN;
     }
 }
