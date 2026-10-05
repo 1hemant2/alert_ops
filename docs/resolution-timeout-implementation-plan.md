@@ -237,9 +237,10 @@ These are open product decisions, not completed requirements. Manual-action and 
 
 ### 2. Support Start now for scheduled runs
 
-- [ ] Extend the existing manual start API/use case and conditional claim; reuse step creation and add after-commit start-timer cancellation, actor audit, and the scheduled-run UI action.
+- [x] Extend the existing manual start API/use case and conditional claim; reuse step creation and add after-commit start-timer cancellation, actor audit, and the scheduled-run UI action.
 - Acceptance: early start produces one execution-state set, retains the first-step delay, and rolls back without losing the original schedule on failure. Automatic due-time gating remains enforced. Test manual/automatic starts, cancellation/reschedule races, duplicate starts, stale timer callbacks, and team isolation.
 - This focused task can proceed independently of the remaining resolution decisions when selected by the user.
+- **Local implementation evidence:** The existing `POST /{escalationId}/start` accepts same-team `SCHEDULED` runs, uses a conditional early-start claim, records the authenticated actor, and cancels the scheduler handle after the transactional start returns. The UI exposes **Start now** for scheduled runs. Focused start/controller/scheduling tests, backend packaging, and the UI build pass. PostgreSQL/deployed verification remains pending.
 
 ### 3. Unify execution-step statuses
 
@@ -352,6 +353,13 @@ transition/audit event and no additional send.
 
 ## Current evidence
 
-This document specifies planned behavior. Current manual start accepts only IDLE; automatic scheduled start is due-gated. Current code still completes runs on acknowledgement and uses two step-state strings. Audit actions currently cover scheduling, rescheduling, start, cancellation, and start failure; the detail-page execution timeline shows current step rows rather than event history. No early scheduled-start, Escalate now, resolution-timeout, or full activity-timeline implementation/test success is claimed here.
+This document specifies planned behavior. Manual start now accepts same-team `IDLE`
+and `SCHEDULED` runs, while automatic scheduled start remains due-gated. Current
+code still completes runs on acknowledgement and uses two step-state strings.
+Audit actions cover scheduling, rescheduling, start, cancellation, and start
+failure; the detail-page execution timeline shows current step rows rather than
+event history. No Escalate now, resolution-timeout, or full activity-timeline
+implementation/test success is claimed here. Start now has local implementation
+and focused-test evidence only; PostgreSQL/deployed verification is pending.
 
 Relevant entry points: [flow model](../src/main/java/com/alertops/flow/model/Flow.java), [node model](../src/main/java/com/alertops/flow/model/Node.java), [start service](../src/main/java/com/alertops/flow_execution_engine/service/FlowExecutionStateService.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), and [step scheduling service](../src/main/java/com/alertops/messaging/StepSchedulingService.java).

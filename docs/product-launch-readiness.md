@@ -9,7 +9,7 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 ### 1. Scheduled escalation start
 
 - [x] **Requirements agreed**
-- [x] **Implementation complete locally — durable `START_FAILED` notification**
+- [x] **Implementation complete locally — durable `START_FAILED` notification and Start now**
 - [ ] **Implemented and verified in PostgreSQL/deployed flow**
 - **Requested behaviour:** When creating an escalation, choose **Start immediately** or **Schedule for later**. A scheduled escalation stores a date, time, and timezone, remains `SCHEDULED` until its start time, and then enters the same workflow as an immediate escalation. Before it starts, it can be rescheduled or cancelled. Only one-time schedules are in v1. If all start attempts fail, the responsible users must be notified; that notification must survive an application crash or restart.
 - **Current state:** The core local scheduling implementation is complete. The escalation stores a one-time UTC start instant and IANA timezone, exposes create/reschedule/cancel actions, schedules starts in memory from the durable database row, recovers scheduled rows on startup, and atomically claims a scheduled start before creating response steps. Exhausted retries produce `START_FAILED` and create one durable notification obligation per responsible recipient; startup recovery can deliver obligations that remained pending across a crash. PostgreSQL integration and deployed end-to-end verification remain pending.
@@ -19,14 +19,14 @@ Review these requirements in order. A checked **Requirements agreed** box means 
   - Reject a scheduled time that is not in the future. Default the UI timezone to the browser timezone and allow the user to change it.
   - Allow reschedule and cancel only while the run is still `SCHEDULED`, enforced atomically so a start cannot race with either action.
   - Treat **Start immediately** as create-and-start, using the same start use case invoked when a scheduled time becomes due.
-  - Allow **Start now** to start a scheduled run early through the existing manual start API. Commit `SCHEDULED → OPEN` and step creation before cancelling the in-memory start timer. The first step retains its configured delay. This extension is agreed and planned, not implemented yet; see the [shared lifecycle plan](resolution-timeout-implementation-plan.md#how-start-now-will-work).
+  - Allow **Start now** to start a scheduled run early through the existing manual start API. Commit `SCHEDULED → OPEN` and step creation before cancelling the in-memory start timer. The first step retains its configured delay. This extension is implemented locally; PostgreSQL/deployed verification remains pending. See the [shared lifecycle plan](resolution-timeout-implementation-plan.md#how-start-now-will-work).
   - Add a terminal `CANCELLED` state for a cancelled scheduled run, consistent with the incident lifecycle in Requirement 2.
   - When the retry limit is exhausted, change the escalation to `START_FAILED` and atomically persist a pending failure-notification obligation in PostgreSQL. Do not rely on the scheduler callback or an in-memory queue to remember that notification.
   - Notify the user who scheduled the escalation and the team owner or administrators. If the application stops after recording `START_FAILED` but before notification delivery, startup recovery must find the pending notification and send it when the application is available again.
   - Record successful delivery so normal recovery does not resend it. Prefer at-least-once delivery over losing the notification; the implementation must tolerate the narrow possibility of a duplicate if the application stops after the provider accepts the notification but before delivery is recorded.
 - **Verification needed:** API validation and team isolation; timezone and daylight-saving conversion; start-at-time behaviour; restart recovery; duplicate trigger safety; reschedule/start and cancel/start races; UI state and actions; proof that recurring or cron schedules are not accepted; exhausted retries persist `START_FAILED` and pending notification together; notification-delivery failure remains recoverable; application restart sends pending notifications; repeated recovery does not create avoidable duplicates; the correct user and team administrators are notified.
 - **Evidence:** [schedule migration](../src/main/resources/db/migration/V6__add_escalation_scheduling.sql), [failure-notification migration](../src/main/resources/db/migration/V10__add_scheduled_start_failure_notifications.sql), [scheduled-start scheduler](../src/main/java/com/alertops/flow_execution_engine/service/EscalationStartScheduler.java), [failure-notification service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationStartFailureNotificationService.java), [start claims](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [creation UI](../ui/src/features/escalations/EscalationsPage.tsx), [schedule controls and failure state](../ui/src/features/escalations/EscalationDetailPage.tsx), [notification tests](../src/test/java/com/alertops/flow_execution_engine/service/EscalationStartFailureNotificationServiceTest.java).
-- **Local verification:** Focused scheduling/retry/notification tests and `npm run build` pass. PostgreSQL/Testcontainers integration coverage is currently skipped in this environment, so the final readiness box stays open.
+- **Local verification:** Focused scheduling/retry/notification tests, early-start/controller tests, backend packaging, and `npm run build` pass. PostgreSQL/Testcontainers integration coverage is currently skipped in this environment, so the final readiness box stays open.
 
 ### 2. Incident lifecycle
 
@@ -42,8 +42,8 @@ Review these requirements in order. A checked **Requirements agreed** box means 
   - `CANCELLED`: terminal; a scheduled escalation was cancelled before starting.
   - `START_FAILED`: terminal for v1; all scheduled-start attempts were exhausted.
 - **Agreed baseline transitions:**
-  - `IDLE` may become `OPEN` through **Start now** or `SCHEDULED` through **Schedule later**.
-  - `SCHEDULED` may remain `SCHEDULED` when rescheduled or when another start retry is allowed. It may become `OPEN` when its due start succeeds or the planned manual **Start now** action wins, `CANCELLED` when cancellation wins first, or `START_FAILED` when all retries are exhausted.
+  - `IDLE` may become `OPEN` through **Start escalation** or `SCHEDULED` through **Schedule later**.
+  - `SCHEDULED` may become `OPEN` when its due start succeeds or an authenticated same-team **Start now** claim wins early. It may remain `SCHEDULED` when rescheduled or when another start retry is allowed, become `CANCELLED` when cancellation wins first, or become `START_FAILED` when all retries are exhausted.
   - Without resolution timeout, `OPEN` becomes `COMPLETED` when the intended recipient acknowledges it or when every response step is exhausted. Requirement 3 defines the enabled-flow extension; last-step handling still requires agreement.
   - `COMPLETED`, `CANCELLED`, and `START_FAILED` do not transition again in v1. A manual retry for `START_FAILED` is post-release work.
 - **Agreed baseline action behaviour:**

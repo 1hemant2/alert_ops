@@ -1,36 +1,32 @@
 # Current task plan
 
-## Task: Audit webhook launch-checklist progress
+## Task: Document explicit mode APIs for agents
 
 Started: 2026-10-06
 Status: Complete
 
 ### Goal and scope
 
-Compare Feature 2 in the [launch checklist](product-launch-readiness.md)
-with existing task metadata, webhook backend/UI, and verification evidence.
-Correct stale implementation tracking without claiming release verification.
-Scope: read-only code/build audit plus documentation updates; no product fixes.
+Update [AGENTS.md](../AGENTS.md) so future implementations use explicit named
+mode values instead of overloaded methods or boolean flags for materially
+different business behavior. This documents the refactoring practice just used;
+no product code behavior changes are in scope.
 
 ### Acceptance criteria
 
-- Check only implementation items supported by inspected code and local checks.
-- Split partially complete items so unfinished behavior stays visible.
-- Distinguish existing code/build success from missing behavior/deployed evidence.
-- Preserve unrelated changes and leave product code/lifecycle states unchanged.
+- The rule covers overloaded behavior methods, boolean mode flags, enums/request objects, and focused mode tests.
+- The guidance is concise and consistent with the existing enum and transaction rules.
+- Existing staged/unstaged product changes remain untouched.
 
 ### Steps
 
-- [x] Inspect working tree/checklist and locate existing webhook/task implementation.
-- [x] Trace backend, metadata/email, UI, migration, and relevant tests against each item.
-- [x] Run focused existing tests and normal backend/UI builds; record gaps/skips.
-- [x] Update readiness/changelog and review links, whitespace, plan length, and diff.
+- [x] Inspect existing API and enum guidance.
+- [x] Add the explicit mode API rule to `AGENTS.md`.
+- [x] Record the documentation change in the changelog and review the diff.
 
 ### Verification and limitations
 
-- Passed: NotificationTest (one mocked-SMTP test), backend packaging, and UI build.
-- Passed: 66 local links/anchors, whitespace, diff review, and the 60-line target.
-- Webhook-focused tests are absent; no PostgreSQL webhook or deployed checks ran.
-- Remaining metadata/UI/input-limit gaps are explicit in Feature 2; no product fixes made.
-- No live webhook or email was triggered. Outcome in [the changelog](../CHANGELOG.md).
-- All documentation changes remain uncommitted; earlier working-tree changes were preserved.
+- Passed: document links/anchors, whitespace, plan length, and diff review.
+- Product code and existing staged changes remain unchanged.
+- No behavior tests or builds were needed for this documentation-only rule update.
+- Outcome recorded in [the changelog](../CHANGELOG.md); the implementation and documentation changes are now committed separately.

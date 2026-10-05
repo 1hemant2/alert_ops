@@ -4,6 +4,24 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Require explicit mode APIs in agent guidance
+
+- Update [AGENTS.md](AGENTS.md#changes) to prohibit overloaded methods and boolean mode flags for materially different business behavior; require explicit enums/request objects or clearly named operations with focused mode tests.
+- This documents the `startFlowExecution` refactoring practice for future work. No product behavior or existing staged changes were changed.
+- Verification: documentation links/anchors, whitespace, and current-plan length checks pass; no behavior tests or builds were needed.
+
+## 2026-10-06 — Simplify flow execution start modes
+
+- Replace the overloaded/boolean `startFlowExecution` API with one explicit `FlowExecutionStartMode` enum covering idle, due scheduled, and early scheduled starts.
+- Update all callers and focused tests without changing claims, transaction boundaries, actor auditing, first-step delays, or timer behavior.
+- Verification: focused Maven tests, backend packaging, UI build, and diff/whitespace checks pass. The implementation is recorded in the preceding implementation commit.
+
+## 2026-10-06 — Implement Start now for scheduled escalations
+
+- Allow same-team users to start a scheduled escalation early through the existing start API, using a conditional `SCHEDULED → OPEN` claim, normal first-step delay, actor audit, and post-commit timer cancellation.
+- Add scheduled-run UI wording and focused use-case, service, controller, and scheduling tests. Automatic due-time starts remain due-gated; PostgreSQL/deployed verification remains pending.
+- Verification: focused Maven tests, backend packaging, UI build, and diff/whitespace checks pass. Resolution, Escalate now, webhook gaps, and activity timeline remain separate tasks.
+
 ## 2026-10-06 — Correct webhook launch progress from implementation evidence
 
 - Audit existing webhook/task backend, UI, migrations, and email code; replace stale unchecked tracking in [Feature 2](docs/product-launch-readiness.md#feature-2-create-and-start-an-escalation-through-a-webhook) with completed implementation pieces and explicit remaining metadata, event-history, validation, and verification gaps.

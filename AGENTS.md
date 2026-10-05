@@ -15,6 +15,7 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 - Use clear, descriptive names for variables, methods, and classes.
 - Choose the simplest solution that meets the request. Keep the change focused and reuse existing code where practical.
 - Add files, abstractions, or dependencies only when they are needed and can be justified.
+- When one operation supports materially different business modes, do not encode the mode with overloaded method signatures or boolean flags. Use one clear method with a specific enum/request object, or separate methods with distinct names when the operations truly differ. Keep the mode values finite and explicit, and add focused coverage for each mode.
 - Review the final diff for unrelated changes and explain any important limitation.
 
 ## Domain values and enums
