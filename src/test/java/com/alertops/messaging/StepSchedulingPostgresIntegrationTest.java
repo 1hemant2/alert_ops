@@ -36,6 +36,7 @@ import com.alertops.audit.repository.AuditEventRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
+import com.alertops.flow_execution_engine.service.FlowExecutionStartMode;
 import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
 import com.alertops.audit.service.AuditService;
 import com.alertops.task.model.Task;
@@ -522,7 +523,8 @@ class StepSchedulingPostgresIntegrationTest {
             ready.countDown();
             start.await();
             try {
-                flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
+                flowExecutionStateService.startFlowExecution(
+                        task, nodes, escalationId, teamId, FlowExecutionStartMode.IDLE);
                 return null;
             } catch (Throwable failure) {
                 return failure;

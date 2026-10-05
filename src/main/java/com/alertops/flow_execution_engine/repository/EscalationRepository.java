@@ -68,6 +68,19 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Modifying
       @Query("""
               UPDATE Escalation e
+              SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN,
+                  e.scheduledStartNextRetryAt = null
+              WHERE e.id = :id
+                AND e.teamId = :teamId
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
+              """)
+      int claimScheduledForManualStart(
+              @Param("id") UUID id,
+              @Param("teamId") UUID teamId);
+
+      @Modifying
+      @Query("""
+              UPDATE Escalation e
               SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED,
                   e.scheduledStartAt = :scheduledStartAt,
                   e.scheduleTimezone = :scheduleTimezone,

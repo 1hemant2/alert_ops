@@ -19,6 +19,8 @@ import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepSchedulingService;
+import com.alertops.security.AuthContext;
+import com.alertops.security.AuthContextHolder;
 import com.alertops.task.model.Task;
 
 @Service
@@ -40,28 +42,29 @@ public class FlowExecutionStateService {
     }
 
     @Transactional
-    public String startFlowExecution(Task task, List<Node> nodes, UUID escalationId, UUID teamId) {
-        return startFlowExecution(task, nodes, escalationId, teamId, EscalationStatus.IDLE);
-    }
-
-    @Transactional
     public String startFlowExecution(
             Task task,
             List<Node> nodes,
             UUID escalationId,
             UUID teamId,
-            EscalationStatus expectedStatus) {
+            FlowExecutionStartMode startMode) {
         try {
-            int claimedRows = expectedStatus == EscalationStatus.SCHEDULED
-                    ? escalationRepository.claimScheduledForStart(escalationId, teamId, java.time.Instant.now())
-                    : escalationRepository.claimIdleForStart(escalationId, teamId);
+            if (startMode == null) {
+                throw EscalationException.invalidRequest("A flow execution start mode is required.");
+            }
+            int claimedRows = claimStart(escalationId, teamId, startMode);
             if (claimedRows != 1) {
                 throw EscalationException.startConflict();
             }
-            EscalationStatus fromStatus = expectedStatus == null ? EscalationStatus.IDLE : expectedStatus;
+            EscalationStatus fromStatus = startMode == FlowExecutionStartMode.IDLE
+                    ? EscalationStatus.IDLE
+                    : EscalationStatus.SCHEDULED;
+            AuthContext authContext = AuthContextHolder.get();
+            UUID actorId = authContext == null ? null : authContext.getUserId();
+            String actorEmail = authContext == null ? null : authContext.getEmail();
             auditService.record(new AuditEvent(
                     AuditEntityType.ESCALATION, escalationId, AuditAction.STARTED, fromStatus.name(),
-                    EscalationStatus.OPEN.name(), null, null, Instant.now(), null, null));
+                    EscalationStatus.OPEN.name(), actorId, actorEmail, Instant.now(), null, null));
 
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();
@@ -84,5 +87,14 @@ public class FlowExecutionStateService {
         } catch (RuntimeException e) {
             throw e;
         }
+    }
+
+    private int claimStart(UUID escalationId, UUID teamId, FlowExecutionStartMode startMode) {
+        return switch (startMode) {
+            case IDLE -> escalationRepository.claimIdleForStart(escalationId, teamId);
+            case SCHEDULED_DUE -> escalationRepository.claimScheduledForStart(
+                    escalationId, teamId, java.time.Instant.now());
+            case SCHEDULED_EARLY -> escalationRepository.claimScheduledForManualStart(escalationId, teamId);
+        };
     }
 }

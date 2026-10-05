@@ -12,6 +12,7 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
+import com.alertops.flow_execution_engine.service.FlowExecutionStartMode;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 import com.alertops.task.model.Task;
@@ -55,8 +56,14 @@ public class StartFlowExecutionUseCase {
           throw EscalationException.notFound();
         }
  
-        if (escalation.getStatus() != EscalationStatus.IDLE) {
-          throw EscalationException.startConflict();
+        EscalationStatus expectedStatus = escalation.getStatus();
+        if (expectedStatus != EscalationStatus.IDLE
+                && expectedStatus != EscalationStatus.SCHEDULED) {
+            throw EscalationException.startConflict();
+        }
+        if (expectedStatus == EscalationStatus.SCHEDULED
+                && escalation.getScheduledStartAt() == null) {
+            throw EscalationException.startConflict();
         }
         
         UUID flowId = escalation.getFlowId();
@@ -72,7 +79,11 @@ public class StartFlowExecutionUseCase {
             throw EscalationException.invalidRequest("The escalation task is not available in this team.");
         }
 
-        return flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
+        FlowExecutionStartMode startMode = expectedStatus == EscalationStatus.IDLE
+                ? FlowExecutionStartMode.IDLE
+                : FlowExecutionStartMode.SCHEDULED_EARLY;
+        return flowExecutionStateService.startFlowExecution(
+                task, nodes, escalationId, teamId, startMode);
     }
 
     public String executeScheduled(
@@ -89,14 +100,14 @@ public class StartFlowExecutionUseCase {
             throw EscalationException.startConflict();
         }
         return startForTeam(
-                flowExecutionStateService, escalation, escalation.getTeamId(), EscalationStatus.SCHEDULED);
+                flowExecutionStateService, escalation, escalation.getTeamId(), FlowExecutionStartMode.SCHEDULED_DUE);
     }
 
     private String startForTeam(
             FlowExecutionStateService flowExecutionStateService,
             Escalation escalation,
             UUID teamId,
-            EscalationStatus expectedStatus) {
+            FlowExecutionStartMode startMode) {
         if (teamId == null) {
             throw EscalationException.forbidden("Select a team before starting an escalation.");
         }
@@ -109,6 +120,6 @@ public class StartFlowExecutionUseCase {
             throw EscalationException.invalidRequest("The escalation task is not available in this team.");
         }
         return flowExecutionStateService.startFlowExecution(
-                task, nodes, escalation.getId(), teamId, expectedStatus);
+                task, nodes, escalation.getId(), teamId, startMode);
     }
 }

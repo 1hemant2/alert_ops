@@ -5,6 +5,7 @@ import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.dto.CreateEscalationReqDto;
 import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.service.EscalationService;
+import com.alertops.flow_execution_engine.service.EscalationStartScheduler;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 
@@ -21,12 +22,15 @@ public class EscalationController {
     private final EscalationService escalationService;
     private final FlowExecutionStateService flowExecutionStateService;
     private final StartFlowExecutionUseCase startFlowExecutionUseCase;
+    private final EscalationStartScheduler escalationStartScheduler;
 
     EscalationController (EscalationService escalationService, FlowExecutionStateService flowExecutionStateService, 
-            StartFlowExecutionUseCase startFlowExecutionUseCase) {
+            StartFlowExecutionUseCase startFlowExecutionUseCase,
+            EscalationStartScheduler escalationStartScheduler) {
         this.escalationService = escalationService;
         this.flowExecutionStateService = flowExecutionStateService;
         this.startFlowExecutionUseCase = startFlowExecutionUseCase;
+        this.escalationStartScheduler = escalationStartScheduler;
     }
 
     @PostMapping("/create")
@@ -62,13 +66,18 @@ public class EscalationController {
             throw EscalationException.invalidRequest("An escalationId is required.");
         }
         UUID escalationId = req.get("escalationId");
-        return ResponseEntity.ok(startFlowExecutionUseCase.execute(flowExecutionStateService, escalationId));
+        String result = startFlowExecutionUseCase.execute(flowExecutionStateService, escalationId);
+        // The transaction has committed before the use case returns; now cancel only the old wake-up handle.
+        escalationStartScheduler.cancel(escalationId);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/{escalationId}/start")
     public ResponseEntity<?> startEscalation(@PathVariable UUID escalationId) {
-        return ResponseEntity.ok(startFlowExecutionUseCase.execute(
-                flowExecutionStateService, escalationId));
+        String result = startFlowExecutionUseCase.execute(flowExecutionStateService, escalationId);
+        // The transaction has committed before the use case returns; now cancel only the old wake-up handle.
+        escalationStartScheduler.cancel(escalationId);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/{escalationId}/schedule")
