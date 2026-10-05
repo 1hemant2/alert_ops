@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Require separate commits by change category
+
+- Update [AGENTS.md](AGENTS.md#scope-and-version-control) to keep backend, frontend, test, and documentation changes in separate commits, requiring confirmation before committing to split mixed staging and using a fixed backend-to-documentation order.
+- Preserve unrelated unstaged changes while separating commits; no product behavior changed.
+- Verification: documentation links/anchors, whitespace, plan length, and diff review pass. Changes remain uncommitted.
+
 ## 2026-10-06 — Require explicit mode APIs in agent guidance
 
 - Update [AGENTS.md](AGENTS.md#changes) to prohibit overloaded methods and boolean mode flags for materially different business behavior; require explicit enums/request objects or clearly named operations with focused mode tests.

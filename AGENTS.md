@@ -30,6 +30,7 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 
 - Work on one agreed task at a time. Do not bundle a later checklist item, opportunistic refactor, or unrelated cleanup into the current change.
 - Do not create commits unless the user explicitly asks. Preserve the user's staged and unstaged changes, and when a commit is requested include only the scope they specified.
+- Keep backend, frontend, test, and documentation changes in separate commits; never commit all categories together. If the staging area mixes categories, ask for confirmation before committing so the staged files can be split, then commit them in this order: backend, frontend, tests, documentation. Preserve unrelated unstaged changes while separating the commits.
 - Never reset, discard, or rewrite user changes without explicit approval. Inspect the working tree and staging area before modifying overlapping files.
 
 ## Task plans and documentation
