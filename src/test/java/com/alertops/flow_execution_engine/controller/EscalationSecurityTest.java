@@ -3,6 +3,7 @@ package com.alertops.flow_execution_engine.controller;
 import com.alertops.auth.repository.UserRepository;
 import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.service.EscalationService;
+import com.alertops.flow_execution_engine.service.EscalationStartScheduler;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
 import com.alertops.security.JwtUtil;
 import com.alertops.security.SecurityConfig;
@@ -35,6 +36,9 @@ class EscalationSecurityTest {
 
     @MockitoBean
     private StartFlowExecutionUseCase startFlowExecutionUseCase;
+
+    @MockitoBean
+    private EscalationStartScheduler escalationStartScheduler;
 
     @MockitoBean
     private JwtUtil jwtUtil;
