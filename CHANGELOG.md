@@ -4,6 +4,18 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Document Spring test-context dependency checks
+
+- Add [AGENTS.md](AGENTS.md#verification-and-handoff) guidance to update `@WebMvcTest`/slice-test mocks and direct constructor tests whenever Spring constructor dependencies change.
+- Require focused context verification and diagnosis of the first underlying `UnsatisfiedDependencyException`; no product behavior changed.
+- Verification: whitespace, plan length, and diff review pass. Changes remain uncommitted.
+
+## 2026-10-06 — Restore security test context wiring
+
+- Add the missing `EscalationStartScheduler` Mockito bean to the MVC security test after the controller gained that constructor dependency.
+- Anonymous escalation, schedule, reschedule, and cancel requests continue to verify `401` responses; production wiring is unchanged.
+- Verification: focused `EscalationSecurityTest` and backend packaging pass. Changes remain uncommitted.
+
 ## 2026-10-06 — Require separate commits by change category
 
 - Update [AGENTS.md](AGENTS.md#scope-and-version-control) to keep backend, frontend, test, and documentation changes in separate commits, requiring confirmation before committing to split mixed staging and using a fixed backend-to-documentation order.

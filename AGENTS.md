@@ -60,6 +60,7 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 ## Verification and handoff
 
 - Add or update a focused test for each meaningful behavior or failure path, especially races, retries, restart recovery, idempotency, and null repository results.
+- When a Spring component's constructor dependencies change, update every affected test context before handoff. Provide new dependencies with `@MockitoBean` or explicit test configuration in `@WebMvcTest` and other slice tests, update direct constructor tests, and run the focused slice test. If a context failure threshold appears, inspect the first underlying `UnsatisfiedDependencyException` rather than treating the threshold as the root cause.
 - Run the narrowest relevant tests plus the normal project build before handoff. Clearly distinguish passed local checks from integration or deployed checks that were skipped because required services or environment variables were unavailable.
 
 ## Transactions
