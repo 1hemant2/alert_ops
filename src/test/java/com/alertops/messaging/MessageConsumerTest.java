@@ -1,6 +1,7 @@
 package com.alertops.messaging;
 
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -140,7 +141,7 @@ class MessageConsumerTest {
     private Escalation runningEscalation() {
         Escalation escalation = new Escalation();
         escalation.setId(ESCALATION_ID);
-        escalation.setStatus("OPEN");
+        escalation.setStatus(EscalationStatus.OPEN);
         return escalation;
     }
 }

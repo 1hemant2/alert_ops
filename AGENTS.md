@@ -15,7 +15,53 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 - Use clear, descriptive names for variables, methods, and classes.
 - Choose the simplest solution that meets the request. Keep the change focused and reuse existing code where practical.
 - Add files, abstractions, or dependencies only when they are needed and can be justified.
+- When one operation supports materially different business modes, do not encode the mode with overloaded method signatures or boolean flags. Use one clear method with a specific enum/request object, or separate methods with distinct names when the operations truly differ. Keep the mode values finite and explicit, and add focused coverage for each mode.
 - Review the final diff for unrelated changes and explain any important limitation.
+
+## Domain values and enums
+
+- Use an enum whenever a value has a finite, known set of valid domain options, such as lifecycle statuses, actions, roles, resolutions, notification states, and entity types. This keeps invalid values out of business logic and makes transitions explicit.
+- Persist domain enums with `@Enumerated(EnumType.STRING)` or an explicit string mapping so database values remain readable and stable if enum declaration order changes. Add or update database constraints and focused tests when the allowed values change.
+- At API boundaries, parse and validate incoming strings into the corresponding enum close to the boundary; do not pass arbitrary strings through service logic. Return a clear validation error for unknown values.
+- Keep a `String` when the value is genuinely open-ended or owned by an external system, such as a user-provided name, email address, reason/message, IANA timezone, or an extensible provider value. Do not invent an enum for values that cannot be known and controlled by this project.
+- Do not use broad constructs such as `Enum<?>` when the application owns the value set. Use the specific enum type; use strings only when the possible values are intentionally unknown.
+
+## Scope and version control
+
+- Work on one agreed task at a time. Do not bundle a later checklist item, opportunistic refactor, or unrelated cleanup into the current change.
+- Do not create commits unless the user explicitly asks. Preserve the user's staged and unstaged changes, and when a commit is requested include only the scope they specified.
+- Keep backend, frontend, test, and documentation changes in separate commits; never commit all categories together. If the staging area mixes categories, ask for confirmation before committing so the staged files can be split, then commit them in this order: backend, frontend, tests, documentation. Preserve unrelated unstaged changes while separating the commits.
+- Never reset, discard, or rewrite user changes without explicit approval. Inspect the working tree and staging area before modifying overlapping files.
+
+## Task plans and documentation
+
+- Before implementing any task, including fixes and documentation changes, write a concise plan in [the current task plan](docs/current-plan.md). Include the task name, start date, status, goal and scope, acceptance criteria, implementation steps, and intended verification. Small tasks need only a few bullets. Planning does not require a separate approval unless the user requests it or scope needs clarification.
+- Maintain one current task plan. Update its checkboxes, decisions, blockers, and verification results as work progresses. Resume an unfinished plan rather than overwriting it; replace a completed plan's contents when the next agreed task begins. If the user explicitly switches tasks, preserve a short resume note and link from the new plan to the existing feature plan or backlog item before replacing it.
+- Keep the current plan roughly one screen long (aim for at most 60 lines). Summarize findings and link to relevant code or documentation instead of copying requirements, test logs, conversation history, or earlier plan revisions.
+- Use [the product launch checklist](docs/product-launch-readiness.md) as the source of truth for release priorities and readiness. The current plan describes only the task being worked on; link to the relevant checklist item or existing feature plan instead of duplicating it. Update readiness only when supported by verification evidence.
+- Reuse existing feature plans for work spanning multiple tasks. Create a dedicated plan only when a substantial initiative needs shared requirements, design decisions, or sequencing that cannot fit in the current plan. Give it a clear status and link it from the relevant checklist item; do not create a separate plan, implementation report, and completion summary for every task.
+- At completion, record the outcome in the changelog and mark the current plan complete with verification results and any remaining limitations. Move lasting API, configuration, architecture, or operational guidance into the relevant maintained document so it remains available when the current plan is replaced. Git history preserves earlier tracked plan revisions; do not create commits solely to archive plans.
+- When a dedicated feature plan is complete, retain useful guidance in maintained docs and move the historical plan to `docs/archive/plans/` if it is no longer an active reference. Fix incoming and relative links when moving it. Archive only documents relevant to the agreed task; do not reorganize unrelated existing docs.
+
+## Changelog
+
+- Maintain [CHANGELOG.md](CHANGELOG.md) from now on. Add one concise entry for each completed task that changes repository files, including documentation and configuration. Do not invent historical entries or record planned work as completed.
+- Use a dated task heading (`YYYY-MM-DD — descriptive task title`), newest first. In one to three bullets, explain what changed and why, summarize verification and material limitations, and link to relevant maintained documentation where useful. Edit the same entry for follow-up corrections within the same task; avoid entries for individual edits or test reruns.
+- Keep implementation detail, raw logs, and task checklists out of the changelog. The changelog records completed outcomes; the current plan records progress; maintained product and operations docs describe current behavior.
+- Keep the current calendar year's entries in the root changelog. When the year changes, move older entries unchanged into `docs/archive/changelog/YYYY.md` and retain year links in the root file. If a year's entries become difficult to scan (roughly 200 lines), archive its older completed months in `docs/archive/changelog/YYYY-MM.md` with clear links. Update relative links when archiving and preserve all history.
+
+## Time and scheduling
+
+- Persist real-world moments as `Instant`/UTC and inject `Clock` into business services instead of calling `Instant.now()` directly; this keeps comparisons deterministic and tests controllable.
+- Accept a local date/time plus an IANA timezone at the boundary, resolve it to one UTC `Instant`, and retain the submitted timezone when the product needs to display or reschedule the value.
+- Treat in-memory timers as wake-up handles only. Timer callbacks must reload current state from PostgreSQL and tolerate cancellation, replacement, restart recovery, and duplicate callbacks.
+- Add concise comments around calendar/timezone conversion, retry timing, and concurrency code when the reason is not obvious from the syntax. Do not comment routine getters, setters, or self-explanatory code.
+
+## Verification and handoff
+
+- Add or update a focused test for each meaningful behavior or failure path, especially races, retries, restart recovery, idempotency, and null repository results.
+- When a Spring component's constructor dependencies change, update every affected test context before handoff. Provide new dependencies with `@MockitoBean` or explicit test configuration in `@WebMvcTest` and other slice tests, update direct constructor tests, and run the focused slice test. If a context failure threshold appears, inspect the first underlying `UnsatisfiedDependencyException` rather than treating the threshold as the root cause.
+- Run the narrowest relevant tests plus the normal project build before handoff. Clearly distinguish passed local checks from integration or deployed checks that were skipped because required services or environment variables were unavailable.
 
 ## Transactions
 

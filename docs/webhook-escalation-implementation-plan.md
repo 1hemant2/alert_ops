@@ -1,5 +1,11 @@
 # Webhook task creation plan
 
+Status: Partially implemented — core backend and configuration UI exist; metadata
+presentation, full event access, input-limit alignment, and focused verification remain pending.
+Source audit: 2026-10-06. Track inspected progress and remaining release checks in
+[Feature 2 of the launch checklist](product-launch-readiness.md#feature-2-create-and-start-an-escalation-through-a-webhook).
+This plan describes the target behavior, not proof that every item is implemented.
+
 A team chooses a default response path for a webhook. When an external system sends a valid event, AlertOps creates one task, starts one run, and saves the complete JSON event for later viewing. A request can optionally choose a different path from the same team.
 
 ## Task fields

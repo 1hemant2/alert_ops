@@ -22,11 +22,14 @@ public class Escalation {
 
     private UUID flowId;
     
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private EscalationStatus status;
 
     private UUID teamId;
 
-    private String resolutionType;
+    @Enumerated(EnumType.STRING)
+    private EscalationResolutionType resolutionType;
    
     private Instant createdAt;
 
@@ -47,6 +50,12 @@ public class Escalation {
     private Instant scheduledStartNextRetryAt;
 
     private Instant cancelledAt;
+
+    @Column(name = "scheduled_by_user_id")
+    private UUID scheduledByUserId;
+
+    @Column(name = "scheduled_by_user_email", length = 320)
+    private String scheduledByUserEmail;
 
     @PrePersist
     void onCreate() {
@@ -90,11 +99,11 @@ public class Escalation {
         this.flowId = flowId;
     }
 
-    public String getStatus() {
+    public EscalationStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(EscalationStatus status) {
         this.status = status;
     }
 
@@ -106,11 +115,11 @@ public class Escalation {
         this.teamId = teamId;
     }
 
-    public String getResolutionType() {
+    public EscalationResolutionType getResolutionType() {
         return resolutionType;
     }
 
-    public void setResolutionType(String resolutionType) {
+    public void setResolutionType(EscalationResolutionType resolutionType) {
         this.resolutionType = resolutionType;
     }
 
@@ -184,6 +193,22 @@ public class Escalation {
 
     public void setCancelledAt(Instant cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    public UUID getScheduledByUserId() {
+        return scheduledByUserId;
+    }
+
+    public void setScheduledByUserId(UUID scheduledByUserId) {
+        this.scheduledByUserId = scheduledByUserId;
+    }
+
+    public String getScheduledByUserEmail() {
+        return scheduledByUserEmail;
+    }
+
+    public void setScheduledByUserEmail(String scheduledByUserEmail) {
+        this.scheduledByUserEmail = scheduledByUserEmail;
     }
 
     

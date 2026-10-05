@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import jakarta.persistence.LockModeType;
 
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 
 @Repository
 public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
@@ -28,11 +29,12 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Query("select e from Escalation e where e.id = :id")
       Optional<Escalation> findByIdForUpdate(@Param("id") UUID id);
 
-      List<Escalation> findAllByStatus(String status);
+      List<Escalation> findAllByStatus(EscalationStatus status);
 
       @Query("""
               select e from Escalation e
-              where e.status = 'SCHEDULED' and e.scheduledStartAt is not null
+              where e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
+                and e.scheduledStartAt is not null
               order by e.scheduledStartAt asc, e.id asc
               """)
       List<Escalation> findAllScheduled();
@@ -40,22 +42,22 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Modifying
       @Query("""
               UPDATE Escalation e
-              SET e.status = 'OPEN',
+              SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN,
                   e.scheduledStartNextRetryAt = null
               WHERE e.id = :id
                 AND e.teamId = :teamId
-                AND e.status = 'IDLE'
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.IDLE
               """)
       int claimIdleForStart(@Param("id") UUID id, @Param("teamId") UUID teamId);
 
       @Modifying
       @Query("""
               UPDATE Escalation e
-              SET e.status = 'OPEN',
+              SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN,
                   e.scheduledStartNextRetryAt = null
               WHERE e.id = :id
                 AND e.teamId = :teamId
-                AND e.status = 'SCHEDULED'
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
                 AND e.scheduledStartAt <= :now
               """)
       int claimScheduledForStart(
@@ -66,26 +68,45 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
       @Modifying
       @Query("""
               UPDATE Escalation e
-              SET e.status = 'SCHEDULED',
+              SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN,
+                  e.scheduledStartNextRetryAt = null
+              WHERE e.id = :id
+                AND e.teamId = :teamId
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
+              """)
+      int claimScheduledForManualStart(
+              @Param("id") UUID id,
+              @Param("teamId") UUID teamId);
+
+      @Modifying
+      @Query("""
+              UPDATE Escalation e
+              SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED,
                   e.scheduledStartAt = :scheduledStartAt,
                   e.scheduleTimezone = :scheduleTimezone,
+                  e.scheduledByUserId = :scheduledByUserId,
+                  e.scheduledByUserEmail = :scheduledByUserEmail,
                   e.scheduledStartRetryCount = 0,
                   e.scheduledStartNextRetryAt = null
-              WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'IDLE'
+              WHERE e.id = :id AND e.teamId = :teamId
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.IDLE
               """)
       int scheduleIdle(
               @Param("id") UUID id,
               @Param("teamId") UUID teamId,
               @Param("scheduledStartAt") Instant scheduledStartAt,
-              @Param("scheduleTimezone") String scheduleTimezone);
+              @Param("scheduleTimezone") String scheduleTimezone,
+              @Param("scheduledByUserId") UUID scheduledByUserId,
+              @Param("scheduledByUserEmail") String scheduledByUserEmail);
 
-      @Modifying
+      @Modifying(clearAutomatically = true)
       @Query("""
               UPDATE Escalation e
-              SET e.status = 'CANCELLED',
+              SET e.status = com.alertops.flow_execution_engine.model.EscalationStatus.CANCELLED,
                   e.cancelledAt = :now,
                   e.scheduledStartNextRetryAt = null
-              WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'SCHEDULED'
+              WHERE e.id = :id AND e.teamId = :teamId
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
               """)
       int cancelScheduled(
               @Param("id") UUID id,
@@ -97,13 +118,18 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               UPDATE Escalation e
               SET e.scheduledStartAt = :scheduledStartAt,
                   e.scheduleTimezone = :scheduleTimezone,
+                  e.scheduledByUserId = :scheduledByUserId,
+                  e.scheduledByUserEmail = :scheduledByUserEmail,
                   e.scheduledStartRetryCount = 0,
                   e.scheduledStartNextRetryAt = null
-              WHERE e.id = :id AND e.teamId = :teamId AND e.status = 'SCHEDULED'
+              WHERE e.id = :id AND e.teamId = :teamId
+                AND e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
               """)
       int rescheduleScheduled(
               @Param("id") UUID id,
               @Param("teamId") UUID teamId,
               @Param("scheduledStartAt") Instant scheduledStartAt,
-              @Param("scheduleTimezone") String scheduleTimezone);
+              @Param("scheduleTimezone") String scheduleTimezone,
+              @Param("scheduledByUserId") UUID scheduledByUserId,
+              @Param("scheduledByUserEmail") String scheduledByUserEmail);
 }

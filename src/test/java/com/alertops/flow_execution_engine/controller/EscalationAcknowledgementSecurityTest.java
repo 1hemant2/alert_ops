@@ -59,7 +59,7 @@ class EscalationAcknowledgementSecurityTest {
     void openingTheConfirmationEndpointWithGetCannotAcknowledge() throws Exception {
         mockMvc.perform(get("/api/v1/escalation/acknowledgement/confirm")
                         .param("token", "email-token"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         verify(acknowledgementService, never()).acknowledge("email-token");
     }

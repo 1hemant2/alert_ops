@@ -11,6 +11,12 @@ import com.alertops.security.AuthContextHolder;
 import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEntityType;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
+import com.alertops.flow_execution_engine.exception.EscalationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -32,33 +38,31 @@ public class EscalationService {
    private final TaskRepository taskRepository;
    private final ApplicationEventPublisher eventPublisher;
    private final Clock clock;
-
-    EscalationService(EscalationRepository escalationRepository,
-                      FlowExecutionStateRepository flowExecutionStateRepository,
-                      FlowRepository flowRepository,
-                      TaskRepository taskRepository) {
-       this(escalationRepository, flowExecutionStateRepository, flowRepository, taskRepository,
-               null, Clock.systemUTC());
-    }
+   private final AuditService auditService;
 
     public EscalationService(EscalationRepository escalationRepository,
                       FlowExecutionStateRepository flowExecutionStateRepository,
                       FlowRepository flowRepository,
                       TaskRepository taskRepository,
                       ApplicationEventPublisher eventPublisher,
-                      Clock clock) {
+                      Clock clock,
+                      AuditService auditService) {
        this.escalationRepository = escalationRepository;
        this.flowExecutionStateRepository = flowExecutionStateRepository;
        this.flowRepository = flowRepository;
        this.taskRepository = taskRepository;
        this.eventPublisher = eventPublisher;
        this.clock = clock;
+       this.auditService = Objects.requireNonNull(auditService, "auditService");
     }
 
     public Escalation createEscalation(String name, UUID taskId, UUID flowId) {
         AuthContext authContext = AuthContextHolder.get();
-        if (authContext == null || authContext.getTeamId() == null) {
-            throw new RuntimeException("Team is required to create an escalation");
+        if (authContext == null) {
+            throw EscalationException.unauthorized();
+        }
+        if (authContext.getTeamId() == null) {
+            throw EscalationException.forbidden("Select a team before creating an escalation.");
         }
         return createEscalationForTeam(name, taskId, flowId, authContext.getTeamId());
     }
@@ -69,7 +73,7 @@ public class EscalationService {
         if (teamId == null
                 || flowRepository.findByIdAndTeamId(flowId, teamId) == null
                 || taskRepository.findById(taskId, teamId) == null) {
-            throw new RuntimeException("Task and flow must belong to the selected team");
+            throw EscalationException.invalidRequest("Task and flow must belong to the selected team");
         }
 
         Escalation escalation = new Escalation();
@@ -78,34 +82,46 @@ public class EscalationService {
         escalation.setFlowId(flowId);
         escalation.setTeamId(teamId);
         escalation.setResolutionType(null);
-        escalation.setStatus("IDLE");
+        escalation.setStatus(EscalationStatus.IDLE);
         return escalationRepository.save(escalation);
     }
 
     @Transactional
     public Escalation schedule(UUID escalationId, ScheduledEscalationRequest schedule) {
         AuthContext authContext = requireTeamContext();
+        AuditActor actor = requireSchedulingActor(authContext);
         Escalation escalation = escalationRepository.findByIdAndTeamId(
                 escalationId, authContext.getTeamId());
         if (escalation == null) {
             return null;
         }
-        if (!"IDLE".equals(escalation.getStatus())) {
-            throw new IllegalStateException("Only an idle escalation can be scheduled");
+        if (escalation.getStatus() != EscalationStatus.IDLE) {
+            throw EscalationException.transitionConflict("Only an idle escalation can be scheduled");
         }
+        EscalationStatus fromStatus = escalation.getStatus();
 
         Instant scheduledStartAt = resolveScheduledStart(schedule);
         String timezone = schedule.getTimezone().trim();
         int updated = escalationRepository.scheduleIdle(
-                escalationId, authContext.getTeamId(), scheduledStartAt, timezone);
+                escalationId,
+                authContext.getTeamId(),
+                scheduledStartAt,
+                timezone,
+                actor.userId(),
+                actor.email());
         if (updated != 1) {
-            throw new IllegalStateException("Only an idle escalation can be scheduled");
+            throw EscalationException.transitionConflict("Only an idle escalation can be scheduled");
         }
-        escalation.setStatus("SCHEDULED");
+        escalation.setStatus(EscalationStatus.SCHEDULED);
         escalation.setScheduledStartAt(scheduledStartAt);
         escalation.setScheduleTimezone(timezone);
+        escalation.setScheduledByUserId(actor.userId());
+        escalation.setScheduledByUserEmail(actor.email());
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.SCHEDULED, fromStatus.name(),
+                EscalationStatus.SCHEDULED.name(), actor.userId(), actor.email(), clock.instant(), null, null));
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new EscalationStartSchedule(escalationId, scheduledStartAt));
         }
@@ -115,23 +131,35 @@ public class EscalationService {
     @Transactional
     public Escalation reschedule(UUID escalationId, ScheduledEscalationRequest schedule) {
         AuthContext authContext = requireTeamContext();
+        AuditActor actor = requireSchedulingActor(authContext);
         Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, authContext.getTeamId());
         if (escalation == null) {
             return null;
         }
-        if (!"SCHEDULED".equals(escalation.getStatus())) {
-            throw new IllegalStateException("Only scheduled escalations can be rescheduled");
+        if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
+            throw EscalationException.transitionConflict("Only scheduled escalations can be rescheduled");
         }
+        EscalationStatus fromStatus = escalation.getStatus();
         Instant scheduledStartAt = resolveScheduledStart(schedule);
         int updated = escalationRepository.rescheduleScheduled(
-                escalationId, authContext.getTeamId(), scheduledStartAt, schedule.getTimezone().trim());
+                escalationId,
+                authContext.getTeamId(),
+                scheduledStartAt,
+                schedule.getTimezone().trim(),
+                actor.userId(),
+                actor.email());
         if (updated != 1) {
-            throw new IllegalStateException("Only scheduled escalations can be rescheduled");
+            throw EscalationException.transitionConflict("Only scheduled escalations can be rescheduled");
         }
         escalation.setScheduledStartAt(scheduledStartAt);
         escalation.setScheduleTimezone(schedule.getTimezone().trim());
+        escalation.setScheduledByUserId(actor.userId());
+        escalation.setScheduledByUserEmail(actor.email());
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.RESCHEDULED, fromStatus.name(),
+                EscalationStatus.SCHEDULED.name(), actor.userId(), actor.email(), clock.instant(), null, null));
         Escalation saved = escalation;
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new EscalationStartSchedule(
@@ -143,21 +171,35 @@ public class EscalationService {
     @Transactional
     public Escalation cancelScheduled(UUID escalationId) {
         AuthContext authContext = requireTeamContext();
+        UUID cancelledByUserId = requireActorId(authContext);
         Escalation escalation = escalationRepository.findByIdAndTeamId(escalationId, authContext.getTeamId());
         if (escalation == null) {
             return null;
         }
-        if (!"SCHEDULED".equals(escalation.getStatus())) {
-            throw new IllegalStateException("Only scheduled escalations can be cancelled");
+        if (escalation.getStatus() == EscalationStatus.CANCELLED) {
+            return escalation;
+        }
+        if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
+            throw EscalationException.transitionConflict("Only scheduled escalations can be cancelled");
         }
         Instant cancelledAt = clock.instant();
-        int updated = escalationRepository.cancelScheduled(escalationId, authContext.getTeamId(), cancelledAt);
+        int updated = escalationRepository.cancelScheduled(
+                escalationId, authContext.getTeamId(), cancelledAt);
         if (updated != 1) {
-            throw new IllegalStateException("Only scheduled escalations can be cancelled");
+            Escalation current = escalationRepository.findByIdAndTeamId(
+                    escalationId, authContext.getTeamId());
+            if (current != null && current.getStatus() == EscalationStatus.CANCELLED) {
+                return current;
+            }
+            throw EscalationException.transitionConflict("Only scheduled escalations can be cancelled");
         }
-        escalation.setStatus("CANCELLED");
+        escalation.setStatus(EscalationStatus.CANCELLED);
         escalation.setCancelledAt(cancelledAt);
         escalation.setScheduledStartNextRetryAt(null);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.CANCELLED,
+                EscalationStatus.SCHEDULED.name(), EscalationStatus.CANCELLED.name(),
+                cancelledByUserId, null, cancelledAt, null, null));
         Escalation saved = escalation;
         if (eventPublisher != null) {
             eventPublisher.publishEvent(new EscalationStartCancelled(saved.getId()));
@@ -176,15 +218,20 @@ public class EscalationService {
                 page = 0;
             }
 
-            if(!allowedSortBy.contains(sortBy)) {
-                sortBy = "createdAt";
+            String safeSortBy = sortBy == null ? "createdAt" : sortBy;
+            if (!allowedSortBy.contains(safeSortBy)) {
+                safeSortBy = "createdAt";
             }
 
-            if(!allowedSortDir.contains(sortDir)) {
-                sortDir = "asc";
+            String safeSortDir = sortDir == null ? "asc" : sortDir;
+            if (!allowedSortDir.contains(safeSortDir)) {
+                safeSortDir = "asc";
             }
 
-            Sort sort = Sort.by(Sort.Direction.valueOf(sortDir.toUpperCase()), sortBy);
+            Sort.Direction direction = "desc".equals(safeSortDir)
+                    ? Sort.Direction.DESC
+                    : Sort.Direction.ASC;
+            Sort sort = Sort.by(direction, safeSortBy);
             Pageable pageable = PageRequest.of(page, size, sort);
             Page<Escalation> escalationPage = escalationRepository.findByTeamId(teamId, pageable);
             List<Escalation> escalations = escalationPage.getContent();
@@ -224,28 +271,35 @@ public class EscalationService {
                 .toList();
     }
 
-    public Escalation updateEscalationStatus(UUID escalationId, String status, String resolutionType, String issueSolvedBy) {
-        try {
-            Escalation escalation = getEscalationById(escalationId);
-            if(escalation == null) {
-                return null;
-            }
-            escalation.setStatus(status);
-            escalation.setResolutionType(resolutionType);
-            escalation.setIssueSolvedBy(issueSolvedBy);
-            escalationRepository.save(escalation);
-            return escalation;
-        } catch (Exception e) {
-            throw e;
-        }
-    }
-
     private AuthContext requireTeamContext() {
         AuthContext authContext = AuthContextHolder.get();
-        if (authContext == null || authContext.getTeamId() == null) {
-            throw new RuntimeException("Team is required for this escalation action");
+        if (authContext == null) {
+            throw EscalationException.unauthorized();
+        }
+        if (authContext.getTeamId() == null) {
+            throw EscalationException.forbidden("Select a team before using this escalation action.");
         }
         return authContext;
+    }
+
+    private AuditActor requireSchedulingActor(AuthContext authContext) {
+        if (authContext == null) {
+            throw EscalationException.unauthorized();
+        }
+        UUID userId = requireActorId(authContext);
+        String email = authContext.getEmail();
+        if (email == null || email.isBlank()) {
+            throw EscalationException.unauthorized();
+        }
+        return new AuditActor(userId, email.trim());
+    }
+
+    private UUID requireActorId(AuthContext authContext) {
+        UUID userId = authContext == null ? null : authContext.getUserId();
+        if (userId == null) {
+            throw EscalationException.unauthorized();
+        }
+        return userId;
     }
 
     private Instant resolveScheduledStart(ScheduledEscalationRequest schedule) {
@@ -254,7 +308,8 @@ public class EscalationService {
         if (schedule == null || schedule.getScheduleDate() == null
                 || schedule.getScheduleTime() == null || schedule.getTimezone() == null
                 || schedule.getTimezone().isBlank()) {
-            throw new IllegalArgumentException("A scheduled escalation requires date, time, and timezone");
+            throw EscalationException.invalidRequest(
+                    "A scheduled escalation requires date, time, and timezone");
         }
 
         // Convert the user's timezone text (for example, "Asia/Kolkata") into
@@ -263,7 +318,7 @@ public class EscalationService {
         try {
             zone = ZoneId.of(schedule.getTimezone().trim());
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("Timezone must be a valid IANA timezone", e);
+            throw EscalationException.invalidRequest("Timezone must be a valid IANA timezone");
         }
 
         // Combine the separate calendar date and wall-clock time entered by the user.
@@ -275,7 +330,8 @@ public class EscalationService {
         // Reject both cases instead of silently choosing the wrong instant.
         var offsets = zone.getRules().getValidOffsets(local);
         if (offsets.size() != 1) {
-            throw new IllegalArgumentException("The selected local time is ambiguous or does not exist in this timezone");
+            throw EscalationException.invalidRequest(
+                    "The selected local time is ambiguous or does not exist in this timezone");
         }
 
         // Apply the timezone's one valid offset to get an absolute UTC moment.
@@ -286,9 +342,12 @@ public class EscalationService {
         // Scheduling in the past (or exactly now) is rejected. The injected Clock keeps
         // this comparison testable and ensures all scheduling decisions use one time source.
         if (!start.isAfter(clock.instant())) {
-            throw new IllegalArgumentException("Scheduled start time must be in the future");
+            throw EscalationException.invalidRequest("Scheduled start time must be in the future");
         }
         return start;
+    }
+
+    private record AuditActor(UUID userId, String email) {
     }
 
 }

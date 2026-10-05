@@ -26,12 +26,15 @@ import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 /** Durable one-time timers for escalation starts. PostgreSQL remains the source of truth. */
 @Component
 public class EscalationStartScheduler {
     private static final Logger logger = LoggerFactory.getLogger(EscalationStartScheduler.class);
+    private static final String START_ATTEMPT_FAILURE_REASON = "START_ATTEMPT_FAILED";
+    private static final String TIMER_REGISTRATION_FAILURE_REASON = "TIMER_REGISTRATION_FAILED";
 
     private final EscalationRepository escalationRepository;
     private final TaskScheduler taskScheduler;
@@ -141,10 +144,11 @@ public class EscalationStartScheduler {
             return;
         }
         Instant now = clock.instant();
-        Escalation scheduledEscalation = loadScheduledEscalation(escalationId, entry, now);
-        if (scheduledEscalation == null) {
+        Optional<Escalation> scheduledResult = loadScheduledEscalation(escalationId, entry, now);
+        if (scheduledResult.isEmpty()) {
             return;
         }
+        Escalation scheduledEscalation = scheduledResult.get();
 
         Instant wakeAt = nextWakeUpAt(scheduledEscalation, now);
         if (wakeAt != null) {
@@ -159,26 +163,27 @@ public class EscalationStartScheduler {
                 && timers.get(escalationId) == entry && !shuttingDown;
     }
 
-    private Escalation loadScheduledEscalation(UUID escalationId, TimerEntry entry, Instant now) {
-        Escalation scheduledEscalation;
+    private Optional<Escalation> loadScheduledEscalation(UUID escalationId, TimerEntry entry, Instant now) {
+        if (escalationId == null || entry == null || now == null) {
+            return Optional.empty();
+        }
         try {
-            scheduledEscalation = escalationRepository.findById(escalationId).orElse(null);
+            return escalationRepository.findById(escalationId)
+                    .filter(this::isScheduled)
+                    .or(() -> {
+                        timers.remove(escalationId, entry);
+                        return Optional.empty();
+                    });
         } catch (RuntimeException e) {
             logger.warn("Could not load scheduled escalation {}; retrying", escalationId, e);
             retry(escalationId, entry, now.plus(retryDelay));
-            return null;
+            return Optional.empty();
         }
-        if (!isScheduled(scheduledEscalation)) {
-            timers.remove(escalationId, entry);
-            return null;
-        }
-
-        return scheduledEscalation;
     }
 
     private boolean isScheduled(Escalation escalation) {
         return escalation != null
-                && "SCHEDULED".equals(escalation.getStatus())
+                && escalation.getStatus() == EscalationStatus.SCHEDULED
                 && escalation.getScheduledStartAt() != null;
     }
 
@@ -195,6 +200,9 @@ public class EscalationStartScheduler {
     }
 
     private void attemptScheduledStart(UUID escalationId, TimerEntry entry, Instant now) {
+        if (escalationId == null || entry == null || now == null) {
+            return;
+        }
         try {
             startFlowExecutionUseCase.executeScheduled(flowExecutionStateService, escalationId, now);
             timers.remove(escalationId, entry);
@@ -204,24 +212,25 @@ public class EscalationStartScheduler {
     }
 
     private void handleStartFailure(UUID escalationId, TimerEntry entry, Instant now, RuntimeException failure) {
-        Escalation current;
+        if (escalationId == null || entry == null || now == null) {
+            return;
+        }
         try {
-            current = escalationRepository.findById(escalationId).orElse(null);
+            if (escalationRepository.findById(escalationId).filter(this::isScheduled).isEmpty()) {
+                timers.remove(escalationId, entry);
+                return;
+            }
         } catch (RuntimeException reloadFailure) {
             logger.warn("Could not reload scheduled escalation {}; retry policy cannot be persisted yet",
                     escalationId, reloadFailure);
             retry(escalationId, entry, now.plus(retryDelay));
             return;
         }
-        if (!isScheduled(current)) {
-            timers.remove(escalationId, entry);
-            return;
-        }
 
         Optional<Instant> nextRetry;
         try {
             nextRetry = retryService.recordFailureAndPlanRetry(
-                    escalationId, now.plus(retryDelay));
+                    escalationId, now.plus(retryDelay), START_ATTEMPT_FAILURE_REASON);
         } catch (RuntimeException retryPersistenceFailure) {
             logger.warn("Could not persist retry state for scheduled escalation {}; retrying temporarily",
                     escalationId, retryPersistenceFailure);
@@ -258,11 +267,12 @@ public class EscalationStartScheduler {
     }
 
     private void recordTimerRegistrationFailure(UUID escalationId, Instant retryAt) {
-        if (shuttingDown) {
+        if (escalationId == null || retryAt == null || shuttingDown) {
             return;
         }
         try {
-            Optional<Instant> nextRetry = retryService.recordFailureAndPlanRetry(escalationId, retryAt);
+            Optional<Instant> nextRetry = retryService.recordFailureAndPlanRetry(
+                    escalationId, retryAt, TIMER_REGISTRATION_FAILURE_REASON);
             if (nextRetry.isEmpty()) {
                 logger.error("Scheduled escalation {} reached its retry limit while registering its timer",
                         escalationId);

@@ -35,4 +35,14 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, UUID> {
             ORDER BY u.name
             """, nativeQuery = true)
     List<TeamMemberProjection> findMembersByTeamId(UUID teamId);
+
+    @Query(value = """
+            SELECT u.id AS "userId", u.email AS email
+            FROM team_member tm
+            JOIN users u ON u.id = tm.user_id
+            WHERE tm.team_id = :teamId
+              AND tm.role IN ('TEAM_OWNER', 'ADMIN')
+            ORDER BY u.email
+            """, nativeQuery = true)
+    List<FailureNotificationRecipientProjection> findFailureNotificationRecipients(UUID teamId);
 }

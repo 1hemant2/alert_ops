@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -53,7 +55,7 @@ public class MessageConsumer {
 
         // Lock the run while checking and sending so acknowledgement cannot race a new step.
         Escalation escalation = escalationRepository.findByIdForUpdate(currentState.getProcessId()).orElse(null);
-        if (escalation == null || !"OPEN".equals(escalation.getStatus())) {
+        if (escalation == null || escalation.getStatus() != EscalationStatus.OPEN) {
             return;
         }
 
@@ -94,8 +96,8 @@ public class MessageConsumer {
             flowExecutionState.setNotificationState("SENT");
             flowExecutionStateRepository.save(flowExecutionState);
             if (nextNode == null) {
-                escalation.setStatus("COMPLETED");
-                escalation.setResolutionType("EXHAUSTED");
+                escalation.setStatus(EscalationStatus.COMPLETED);
+                escalation.setResolutionType(EscalationResolutionType.EXHAUSTED);
                 escalationRepository.save(escalation);
             } else {
                 stepSchedulingService.schedule(nextNode);
@@ -108,8 +110,8 @@ public class MessageConsumer {
             flowExecutionState.setNotificationState("FAILED");
             flowExecutionStateRepository.save(flowExecutionState);
             if (nextNode == null) {
-                escalation.setStatus("COMPLETED");
-                escalation.setResolutionType("EXHAUSTED");
+                escalation.setStatus(EscalationStatus.COMPLETED);
+                escalation.setResolutionType(EscalationResolutionType.EXHAUSTED);
                 escalationRepository.save(escalation);
             } else {
                 stepSchedulingService.schedule(nextNode);

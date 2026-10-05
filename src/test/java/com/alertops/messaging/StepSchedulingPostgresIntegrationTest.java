@@ -26,12 +26,19 @@ import javax.sql.DataSource;
 import com.alertops.flow.model.Node;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.audit.model.AuditEventEntity;
+import com.alertops.audit.model.AuditEntityType;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
+import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
+import com.alertops.audit.repository.AuditEventRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.service.FlowExecutionStateService;
+import com.alertops.flow_execution_engine.service.FlowExecutionStartMode;
 import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
+import com.alertops.audit.service.AuditService;
 import com.alertops.task.model.Task;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -61,6 +68,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -92,6 +100,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Autowired private MessageConsumer consumer;
     @Autowired private FlowExecutionStateRepository states;
     @Autowired private EscalationRepository escalations;
+    @Autowired private AuditEventRepository auditEvents;
     @Autowired private EscalationAcknowledgementTokenRepository acknowledgementTokens;
     @Autowired private FlowExecutionStateService flowExecutionStateService;
     @Autowired private EscalationAcknowledgementService acknowledgementService;
@@ -128,6 +137,7 @@ class StepSchedulingPostgresIntegrationTest {
         reset(rabbit, notification);
         states.deleteAll();
         acknowledgementTokens.deleteAll();
+        auditEvents.deleteAll();
         escalations.deleteAll();
         confirmPublishes();
     }
@@ -136,6 +146,7 @@ class StepSchedulingPostgresIntegrationTest {
     void clearRowsBeforeTheNextSpringContextStarts() {
         states.deleteAll();
         acknowledgementTokens.deleteAll();
+        auditEvents.deleteAll();
         escalations.deleteAll();
     }
 
@@ -414,8 +425,8 @@ class StepSchedulingPostgresIntegrationTest {
         }
 
         Escalation acknowledged = escalations.findById(activeStep.getProcessId()).orElseThrow();
-        assertThat(acknowledged.getStatus()).isEqualTo("COMPLETED");
-        assertThat(acknowledged.getResolutionType()).isEqualTo("ACKNOWLEDGED");
+        assertThat(acknowledged.getStatus()).isEqualTo(EscalationStatus.COMPLETED);
+        assertThat(acknowledged.getResolutionType()).isEqualTo(EscalationResolutionType.ACKNOWLEDGED);
         assertThat(acknowledged.getIssueSolvedBy()).isEqualTo("recipient@example.test");
 
         Instant lateDueAt = Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
@@ -434,7 +445,7 @@ class StepSchedulingPostgresIntegrationTest {
     void concurrentStartsCreateOnlyOneSetOfExecutionStates() throws Exception {
         UUID teamId = UUID.randomUUID();
         Escalation escalation = new Escalation();
-        escalation.setStatus("IDLE");
+        escalation.setStatus(EscalationStatus.IDLE);
         escalation.setTeamId(teamId);
         UUID escalationId = escalations.saveAndFlush(escalation).getId();
 
@@ -467,9 +478,36 @@ class StepSchedulingPostgresIntegrationTest {
             workers.shutdownNow();
         }
 
-        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo("OPEN");
+        Escalation started = escalations.findById(escalationId).orElseThrow();
+        assertThat(started.getStatus()).isEqualTo(EscalationStatus.OPEN);
+        assertThat(auditEvents.findAllByEntityTypeAndEntityIdOrderByOccurredAtAscIdAsc(
+                AuditEntityType.ESCALATION.name(), escalationId))
+                .extracting(AuditEventEntity::getAction)
+                .contains("STARTED");
         assertThat(states.findAllByProcessIdOrderByPositionAsc(escalationId)).hasSize(2);
         assertThat(timers.activeTimerCount()).isEqualTo(1);
+    }
+
+    @Test
+    void databaseRejectsUnknownEscalationLifecycleValues() {
+        Escalation escalation = new Escalation();
+        escalation.setStatus(EscalationStatus.IDLE);
+        UUID escalationId = escalations.saveAndFlush(escalation).getId();
+
+        assertThatThrownBy(() -> updateEscalationColumn(escalationId, "status", "NOT_A_STATUS"))
+                .isInstanceOf(SQLException.class);
+        assertThatThrownBy(() -> updateEscalationColumn(escalationId, "resolution_type", "NOT_A_RESOLUTION"))
+                .isInstanceOf(SQLException.class);
+    }
+
+    private void updateEscalationColumn(UUID escalationId, String column, String value) throws SQLException {
+        String sql = "UPDATE " + SCHEMA + ".escalation SET " + column + " = ? WHERE id = ?";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, value);
+            statement.setObject(2, escalationId);
+            statement.executeUpdate();
+        }
     }
 
     private Future<Throwable> submitStartAttempt(
@@ -485,7 +523,8 @@ class StepSchedulingPostgresIntegrationTest {
             ready.countDown();
             start.await();
             try {
-                flowExecutionStateService.startFlowExecution(task, nodes, escalationId, teamId);
+                flowExecutionStateService.startFlowExecution(
+                        task, nodes, escalationId, teamId, FlowExecutionStartMode.IDLE);
                 return null;
             } catch (Throwable failure) {
                 return failure;
@@ -503,7 +542,7 @@ class StepSchedulingPostgresIntegrationTest {
 
     private FlowExecutionState createStep(String executionState, Duration duration, boolean pending, Instant dueAt) {
         Escalation escalation = new Escalation();
-        escalation.setStatus("OPEN");
+        escalation.setStatus(EscalationStatus.OPEN);
         escalations.save(escalation);
         FlowExecutionState step = new FlowExecutionState();
         step.setProcessId(escalation.getId());
@@ -568,11 +607,11 @@ class StepSchedulingPostgresIntegrationTest {
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class, RedisAutoConfiguration.class,
             RedisRepositoriesAutoConfiguration.class})
-    @EntityScan(basePackageClasses = FlowExecutionState.class)
-    @EnableJpaRepositories(basePackageClasses = FlowExecutionStateRepository.class)
+    @EntityScan(basePackageClasses = {FlowExecutionState.class, AuditEventEntity.class})
+    @EnableJpaRepositories(basePackageClasses = {FlowExecutionStateRepository.class, AuditEventRepository.class})
     @Import({StepSchedulingService.class, StepTimerRegistry.class, ReconcilerService.class,
             MessagePublisher.class, MessageConsumer.class, FlowExecutionStateService.class,
-            EscalationAcknowledgementService.class})
+            EscalationAcknowledgementService.class, AuditService.class})
     static class Config {
         @Bean RabbitTemplate rabbitTemplate() { return mock(RabbitTemplate.class); }
 
