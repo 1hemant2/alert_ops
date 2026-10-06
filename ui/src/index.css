@@ -968,6 +968,13 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 .flow-detail-page .back-link-row { margin-bottom: 17px; }
 .flow-detail-page .page-header { margin-bottom: 21px; }
 .flow-detail-page > .notice { margin-bottom: 18px; }
+.flow-detail-page .path-timing-card { margin-bottom: 18px; padding: 22px 23px; }
+.path-timing-card .card-heading { margin-bottom: 16px; }
+.path-timing-card .card-heading p { margin: 4px 0 0; color: #7b8495; font-size: 13px; }
+.checkbox-field { display: inline-flex; align-items: center; gap: 9px; color: #344054; font-size: 13px; font-weight: 650; cursor: pointer; }
+.checkbox-field input { width: 17px; height: 17px; margin: 0; accent-color: #345cf5; }
+.path-timing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 13px; margin-top: 18px; }
+.path-timing-actions { display: flex; justify-content: flex-end; margin-top: 17px; }
 .flow-detail-page .path-workspace-layout { display: block; }
 .flow-detail-page .path-builder-card { min-width: 0; padding: 23px; }
 .flow-detail-page .path-route-heading { align-items: center; margin-bottom: 16px; }

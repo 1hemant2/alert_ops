@@ -99,6 +99,7 @@ export interface Flow {
   version: number
   createdAt?: string
   updatedAt?: string
+  resolutionTimeoutEnabled: boolean
 }
 
 export interface FlowNode {
@@ -108,6 +109,8 @@ export interface FlowNode {
   nodeName?: string
   duration: string | number
   durationInMinutes?: number
+  resolutionTimeout?: string | number | null
+  resolutionTimeoutInMinutes?: number | null
   email: string
   position: string | number
 }
