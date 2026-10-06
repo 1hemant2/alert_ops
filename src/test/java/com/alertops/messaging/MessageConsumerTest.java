@@ -69,7 +69,7 @@ class MessageConsumerTest {
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
-        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
         when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token")).thenReturn(true);
 
@@ -94,7 +94,7 @@ class MessageConsumerTest {
         when(stateRepository.findFirstByProcessIdAndStatusOrderByPositionAsc(
                 ESCALATION_ID, FlowExecutionStepStatus.PENDING))
                 .thenReturn(nextState, nextState);
-        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
         when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
                 .thenThrow(new RuntimeException("unexpected processing error"));

@@ -25,6 +25,7 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -42,6 +43,7 @@ class EscalationAcknowledgementServiceTest {
 
     private Escalation escalation;
     private EscalationAcknowledgementToken token;
+    private FlowExecutionState executionStep;
 
     @BeforeEach
     void setUp() {
@@ -52,14 +54,20 @@ class EscalationAcknowledgementServiceTest {
 
         token = new EscalationAcknowledgementToken();
         token.setEscalationId(ESCALATION_ID);
+        executionStep = new FlowExecutionState();
+        executionStep.setId(UUID.fromString("71000000-0000-0000-0000-000000000002"));
+        executionStep.setProcessId(ESCALATION_ID);
+        executionStep.setUserEmail("oncall@example.com");
+        token.setExecutionStepId(executionStep.getId());
         token.setRecipientEmail("oncall@example.com");
         token.setTokenHash("hash-is-looked-up-by-repository");
         token.setExpiresAt(Instant.now().plus(Duration.ofHours(1)));
+        when(stateRepository.findById(executionStep.getId())).thenReturn(Optional.of(executionStep));
     }
 
     @Test
     void createsRecipientScopedExpiringLinkAndStoresOnlyItsHash() {
-        String link = service.createAcknowledgementUrl(escalation, "oncall@example.com");
+        String link = service.createAcknowledgementUrl(escalation, executionStep);
 
         assertTrue(link.startsWith("https://alerts.example.com/acknowledge?token="));
         String rawToken = link.substring(link.indexOf("token=") + "token=".length());
@@ -68,6 +76,7 @@ class EscalationAcknowledgementServiceTest {
                 org.mockito.ArgumentCaptor.forClass(EscalationAcknowledgementToken.class);
         verify(tokenRepository).save(savedToken.capture());
         assertEquals(ESCALATION_ID, savedToken.getValue().getEscalationId());
+        assertEquals(executionStep.getId(), savedToken.getValue().getExecutionStepId());
         assertEquals("oncall@example.com", savedToken.getValue().getRecipientEmail());
         assertNotEquals(rawToken, savedToken.getValue().getTokenHash());
         assertEquals(64, savedToken.getValue().getTokenHash().length());
@@ -95,6 +104,23 @@ class EscalationAcknowledgementServiceTest {
         verify(escalationRepository).findByIdForUpdate(ESCALATION_ID);
         verify(stateRepository).markUnsentStepsSkipped(ESCALATION_ID);
         verify(escalationRepository).save(escalation);
+    }
+
+    @Test
+    void sameRecipientStepsReceiveDistinctStepBoundTokens() {
+        FlowExecutionState secondStep = new FlowExecutionState();
+        secondStep.setId(UUID.fromString("71000000-0000-0000-0000-000000000003"));
+        secondStep.setProcessId(ESCALATION_ID);
+        secondStep.setUserEmail("oncall@example.com");
+
+        service.createAcknowledgementUrl(escalation, executionStep);
+        service.createAcknowledgementUrl(escalation, secondStep);
+
+        org.mockito.ArgumentCaptor<EscalationAcknowledgementToken> savedTokens =
+                org.mockito.ArgumentCaptor.forClass(EscalationAcknowledgementToken.class);
+        verify(tokenRepository, org.mockito.Mockito.times(2)).save(savedTokens.capture());
+        assertNotEquals(savedTokens.getAllValues().get(0).getExecutionStepId(),
+                savedTokens.getAllValues().get(1).getExecutionStepId());
     }
 
     @Test
@@ -165,6 +191,23 @@ class EscalationAcknowledgementServiceTest {
                 () -> service.acknowledge(RAW_TOKEN));
 
         assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
+        verify(escalationRepository, never()).save(any(Escalation.class));
+    }
+
+    @Test
+    void tokenBoundToAnotherRunCannotBeUsedEvenForTheSameRecipient() {
+        FlowExecutionState wrongStep = new FlowExecutionState();
+        wrongStep.setId(executionStep.getId());
+        wrongStep.setProcessId(UUID.randomUUID());
+        wrongStep.setUserEmail("oncall@example.com");
+        when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(escalation));
+        when(stateRepository.findById(executionStep.getId())).thenReturn(Optional.of(wrongStep));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.acknowledge(RAW_TOKEN));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
         verify(escalationRepository, never()).save(any(Escalation.class));
     }
 }

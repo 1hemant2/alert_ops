@@ -392,7 +392,7 @@ class StepSchedulingPostgresIntegrationTest {
             return states.save(step);
         });
         String link = transaction().execute(status -> acknowledgementService.createAcknowledgementUrl(
-                escalations.findById(activeStep.getProcessId()).orElseThrow(), "recipient@example.test"));
+                escalations.findById(activeStep.getProcessId()).orElseThrow(), activeStep));
         String rawToken = link.substring(link.indexOf("token=") + "token=".length());
 
         CountDownLatch acknowledgementStarted = new CountDownLatch(1);
@@ -534,7 +534,7 @@ class StepSchedulingPostgresIntegrationTest {
             start.await();
             try {
                 flowExecutionStateService.startFlowExecution(
-                        task, nodes, escalationId, teamId, FlowExecutionStartMode.IDLE);
+                        task, new com.alertops.flow.model.Flow(), nodes, escalationId, teamId, FlowExecutionStartMode.IDLE);
                 return null;
             } catch (Throwable failure) {
                 return failure;
