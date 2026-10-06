@@ -1,7 +1,7 @@
 # Escalation lifecycle: resolution timeout, manual actions, and activity timeline
 
 Created: 2026-10-05
-Status: Planning — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, and existing team permissions agreed; final storage details require review; implementation pending.
+Status: Planning — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; implementation pending.
 Release priorities: [scheduled starts](product-launch-readiness.md#1-scheduled-escalation-start),
 [resolution timeout](product-launch-readiness.md#3-resolution-timeout-after-acknowledgement), and
 [Escalate now](product-launch-readiness.md#4-escalate-now), and
@@ -222,17 +222,21 @@ Keep the disabled-flow path unchanged apart from explicit step-state representat
 
 Repeated acknowledgement of the same step must return its saved accepted result without extending its deadline or reclaiming current ownership. Duplicate timer callbacks must not advance two steps. Continue serializing acknowledgement with sends already in progress; SMTP acceptance still has the existing crash/duplicate uncertainty. New acknowledgement/resolution requests must enforce their saved deadlines under the run lock, even when timer execution is delayed.
 
-## Decisions to settle before dependent implementation
+## Final lifecycle storage decision
 
-- **Resolution lifecycle fields:** Finalize whether `RESOLVED` needs a completion reason in addition to its status, and how current owner fields are cleared while audit history preserves earlier acknowledgements/timeouts.
+- `RESOLVED` is a terminal lifecycle status and needs no additional completion reason; the status itself records the successful outcome.
+- `COMPLETED` remains the terminal status for non-resolution completion and requires one explicit completion reason: `ACKNOWLEDGED` when resolution timeout is disabled, or `EXHAUSTED` when the acknowledgement/resolution wait ends without another step or acknowledgement. `CANCELLED`, `START_FAILED`, and non-terminal statuses have no completion reason.
+- The implementation may rename the legacy `resolutionType` field to a clearly named completion-reason field, while preserving readable string enum values and migrating existing rows explicitly. Do not add a second reason field for `RESOLVED`.
+- Active acknowledgement ownership consists of the acknowledged execution-step ID, actor, acknowledgement time, and resolution deadline. Populate these only while the run is `ACKNOWLEDGED`; clear them atomically when resolution wins, a resolution timeout advances the run, or Escalate now ends the wait. Persist the resolving actor/time only for `RESOLVED`.
+- Audit events retain the acknowledgement, timeout, escalation, and resolution actor/step/deadline facts after active ownership is cleared. UI/API history reads audit facts rather than reconstructing them from nullable current-owner fields.
 
-These are open product decisions, not completed requirements. Manual-action and activity-timeline behavior are agreed. Review the remaining resolution cases one at a time before their dependent implementation.
+This prerequisite is complete. Manual-action and activity-timeline behavior remain agreed; dependent implementation proceeds one task at a time.
 
 ## Implementation tasks, one at a time
 
 ### 1. Settle remaining product edge cases
 
-- [ ] Agree on the decisions above and update this plan and the launch checklist.
+- [x] Agree on the final lifecycle storage semantics above and update this plan and the launch checklist.
 - Acceptance: final lifecycle storage meanings have explicit rules without adding states. The shared acknowledgement/delivery wait, optional resolution duration, final-step behavior, deadline-gated actions, email source eligibility, existing team permissions, and timeline presentation are already agreed above; do not reopen them.
 
 ### 2. Support Start now for scheduled runs

@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Settle resolution lifecycle storage semantics
+
+- Decide that `RESOLVED` is self-describing, while `COMPLETED` requires `ACKNOWLEDGED` or `EXHAUSTED`; clear active acknowledgement ownership when the run leaves that state and retain history in audit events.
+- Mark the resolution-timeout requirements prerequisite complete in the [launch checklist](docs/product-launch-readiness.md#3-resolution-timeout-after-acknowledgement); implementation remains pending, with execution-step status unification selected as the next task.
+- Verification: focused documentation diff review, link/anchor, whitespace, and plan-length checks passed. Product tests/builds were not applicable; independent subagent verification was skipped because no usable subagent mechanism was exposed.
+
 ## 2026-10-06 — Require independent subagent completion verification
 
 - Update [AGENTS.md](AGENTS.md#verification-and-handoff) to require a read-only verification subagent for each repository task, with acceptance-criteria evidence, an explicit verdict, and documented limitations before handoff.
