@@ -142,8 +142,7 @@ export interface ExecutionState {
   nodeId: string
   position: string | number
   userEmail: string
-  executionState: string
-  notificationState: string
+  status: string
   sendAttemptCount: number
   createdAt: string
   updatedAt?: string

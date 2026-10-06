@@ -288,8 +288,11 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .execution-timeline { margin-top: 20px; }
 .execution-row { display: flex; position: relative; min-height: 84px; gap: 13px; }
 .execution-index { z-index: 1; flex: 0 0 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; background: #f1f4ed; border: 1px solid #e4e9dd; color: #8b9788; font-size: 12px; font-weight: 850; }
-.execution-active { color: #677d38; background: #f1f6e6; border-color: #e6edd5; }
-.execution-terminal { color: #548169; background: #eef6ef; border-color: #dfede2; }
+.execution-scheduled, .execution-sending { color: #677d38; background: #f1f6e6; border-color: #e6edd5; }
+.execution-paused { color: #977c40; background: #faf5e8; border-color: #f0e8d3; }
+.execution-sent { color: #548169; background: #eef6ef; border-color: #dfede2; }
+.execution-failed { color: #a04d47; background: #faf0ef; border-color: #f3dfdc; }
+.execution-skipped { color: #68766d; background: #f2f4f0; border-color: #eaede7; }
 .execution-connector { position: absolute; left: 14px; top: 29px; bottom: 0; width: 1px; background: #e4eadd; }
 .execution-row:last-child { min-height: 54px; }
 .execution-row:last-child .execution-connector { display: none; }
@@ -589,14 +592,20 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 .status-open i { background: #2e90fa; }
 .status-scheduled { color: #6941c6; background: #f9f5ff; border-color: #d6bbfb; }
 .status-scheduled i { background: #9e77ed; }
+.status-sending { color: #175cd3; background: #eff8ff; border-color: #b2ddff; }
+.status-sending i { background: #2e90fa; }
+.status-paused { color: #93370d; background: #fffaeb; border-color: #fedf89; }
+.status-paused i { background: #f79009; }
 .status-cancelled { color: #667085; background: #f2f4f7; border-color: #d0d5dd; }
 .status-cancelled i { background: #98a2b3; }
-.status-completed, .status-terminal { color: #067647; background: #ecfdf3; border-color: #abefc6; }
-.status-completed i, .status-terminal i { background: #12b76a; }
+.status-completed, .status-terminal, .status-sent { color: #067647; background: #ecfdf3; border-color: #abefc6; }
+.status-completed i, .status-terminal i, .status-sent i { background: #12b76a; }
 .status-pending { color: #93370d; background: #fffaeb; border-color: #fedf89; }
 .status-pending i { background: #f79009; }
 .status-failed { color: #b42318; background: #fef3f2; border-color: #fecdca; }
 .status-failed i { background: #f04438; }
+.status-skipped { color: #667085; background: #f2f4f7; border-color: #d0d5dd; }
+.status-skipped i { background: #98a2b3; }
 .status-start_failed { color: #b42318; background: #fef3f2; border-color: #fecdca; }
 .status-start_failed i { background: #f04438; }
 
