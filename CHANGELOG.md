@@ -4,6 +4,19 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Clarify agreed-decision implementation guardrails
+
+- Require implementation plans to identify binding agreed decisions and canonical sources of truth before adding fields, columns, timers, or API properties.
+- Require conflicting earlier implementation and tests to be removed or revised when the user clarifies a decision, with focused re-verification before handoff.
+- Verification: documentation whitespace, plan-length, anchor, and diff checks pass.
+
+## 2026-10-06 — Persist runtime resolution snapshots
+
+- Add V13 durable per-step resolution snapshots, run-level acknowledgement ownership/resolution deadlines, and exact execution-step binding for acknowledgement tokens; reuse `dueAt` as the canonical shared acknowledgement/delivery deadline.
+- Propagate the flow/node snapshot through immediate and scheduled starts, with focused coverage for enabled/disabled timing, failed writes, same-recipient steps, and mismatched tokens.
+- Follow-up correction removes the redundant per-step acknowledgement-deadline column so the shared wait has one durable time source.
+- Verification: focused tests, full `mvn test`, backend packaging, UI build, documentation checks, and diff review pass. PostgreSQL/RabbitMQ/Redis integration remains environment-gated and skipped; independent read-only verifier verdict: **Achieved**. PostgreSQL rollback/migration execution remained unavailable.
+
 ## 2026-10-06 — Add flow/node resolution timing configuration
 
 - Add the flow-level resolution-timeout toggle, nullable positive per-node timeout storage, version-checked atomic timing updates, and matching create/edit validation.

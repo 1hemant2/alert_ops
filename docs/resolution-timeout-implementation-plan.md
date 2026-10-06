@@ -168,7 +168,7 @@ be the original acknowledging recipient or introduce extra roles or states.
 | `Flow` | Resolution-timeout toggle for the reusable configuration |
 | `Node` | Existing duration representing the shared acknowledgement/delivery wait, plus resolution duration when enabled; no separate send-delay duration |
 | `Escalation` | Snapshotted toggle, lifecycle status, acknowledged execution-step ID, acknowledgement time/actor, UTC resolution deadline, and resolution time/actor |
-| `FlowExecutionState` | Snapshotted node timing, notification step status, due time, UTC acknowledgement deadline, and existing send-attempt/publication metadata |
+| `FlowExecutionState` | Snapshotted node timing, notification step status, due time (the canonical shared acknowledgement/delivery deadline), and existing send-attempt/publication metadata |
 | Acknowledgement token | Exact execution-step reference, recipient scope, and token hash; response eligibility comes from current ownership and saved deadlines, not link expiry |
 
 Create execution-step rows at escalation start. Copy the flow toggle and node timeouts in the same transaction that claims the run and creates its steps. Validate and read a consistent flow configuration: a concurrent flow/node edit cannot produce a mixed snapshot. Once started, reusable-flow edits must not change that run's toggle, node timeouts, or delays. Scheduled runs take this snapshot when they actually start; advance snapshotting at schedule creation is outside the currently agreed scope.
@@ -210,7 +210,7 @@ Keep the disabled-flow path unchanged apart from explicit step-state representat
 
 ## Timer and concurrency contract
 
-1. Ordinary progression uses one shared acknowledgement/delivery wait. After SMTP acceptance, persist the sent step and its acknowledgement deadline atomically, aligning the next eligible delivery with that same wait rather than adding another delay. Do not exhaust solely because this was the final send; persist its normal acknowledgement wait too. Keep the initial first-step delay unchanged.
+1. Ordinary progression uses one shared acknowledgement/delivery wait. After SMTP acceptance, persist the sent step and the canonical shared wait boundary atomically, aligning the next eligible delivery's `dueAt` with that same wait rather than adding another delay. Do not exhaust solely because this was the final send; persist its normal acknowledgement wait too. Keep the initial first-step delay unchanged.
 2. Acknowledgement locks the run and validates the exact sent step/token. With timeout enabled, atomically save `ACKNOWLEDGED`, the owning step, the deadline, and the paused next step.
 3. After commit, cancel its delivery wake-up where available and register the resolution timer. A delivery callback/message already in flight must reload state and ignore paused or obsolete attempts.
 4. Resolution, timeout, and manual escalation use the same run-lock/conditional-transition boundary. Only one valid transition wins for the same acknowledgement/step. Publish timer changes or delivery work after commit, never on rollback.
@@ -260,8 +260,9 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 5. Persist a consistent runtime snapshot
 
-- [ ] Copy settings during immediate/scheduled start and bind acknowledgement tokens to exact execution steps. Add escalation acknowledgement/resolution ownership and durable per-step acknowledgement deadlines using the agreed timing mapping.
+- [x] Copy settings during immediate/scheduled start and bind acknowledgement tokens to exact execution steps. Add escalation acknowledgement/resolution ownership while reusing each step's durable `dueAt` as the canonical shared acknowledgement/delivery deadline.
 - Acceptance: flow edits cannot change a started run; failed start rolls back snapshot creation; same-recipient nodes remain distinguishable.
+- **Local implementation evidence:** Migration V13 adds per-step resolution snapshots, run-level acknowledgement ownership/resolution deadline fields, and exact execution-step token references; `dueAt` remains the canonical durable shared acknowledgement/delivery deadline. Immediate, early scheduled, and due scheduled starts load the flow and copy the toggle/timeout into each execution step inside the existing start transaction. Token creation and validation require the exact step, run, and recipient. Focused tests cover enabled/disabled snapshots, failed snapshot writes, same-recipient steps, and cross-run token rejection.
 
 ### 6. Implement acknowledgement pause
 
