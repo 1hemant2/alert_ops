@@ -27,6 +27,7 @@ import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
+import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 
 class EscalationAcknowledgementServiceTest {
     private static final UUID ESCALATION_ID = UUID.fromString("71000000-0000-0000-0000-000000000001");
@@ -34,8 +35,10 @@ class EscalationAcknowledgementServiceTest {
 
     private final EscalationAcknowledgementTokenRepository tokenRepository = org.mockito.Mockito.mock(EscalationAcknowledgementTokenRepository.class);
     private final EscalationRepository escalationRepository = org.mockito.Mockito.mock(EscalationRepository.class);
+    private final FlowExecutionStateRepository stateRepository = org.mockito.Mockito.mock(FlowExecutionStateRepository.class);
     private final EscalationAcknowledgementService service = new EscalationAcknowledgementService(
-            tokenRepository, escalationRepository, Duration.ofHours(72), "https://alerts.example.com/");
+            tokenRepository, escalationRepository, stateRepository,
+            Duration.ofHours(72), "https://alerts.example.com/");
 
     private Escalation escalation;
     private EscalationAcknowledgementToken token;
@@ -90,6 +93,7 @@ class EscalationAcknowledgementServiceTest {
         assertNotNull(escalation.getAcknowledgedAt());
         assertTrue(result.alreadyAcknowledged());
         verify(escalationRepository).findByIdForUpdate(ESCALATION_ID);
+        verify(stateRepository).markUnsentStepsSkipped(ESCALATION_ID);
         verify(escalationRepository).save(escalation);
     }
 

@@ -3,6 +3,7 @@ package com.alertops.flow_execution_engine.service;
 import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.security.AuthContext;
@@ -62,8 +63,7 @@ class EscalationServiceTest {
         state.setNodeId(nodeId);
         state.setPosition(BigInteger.valueOf(1000));
         state.setUserEmail("oncall@example.com");
-        state.setExecutionState("ACTIVE");
-        state.setNotificationState("NOT_SENT");
+        state.setStatus(FlowExecutionStepStatus.SCHEDULED);
         state.setSendAttemptCount(1);
         when(executionStateRepository.findAllByProcessIdOrderByPositionAsc(escalationId)).thenReturn(List.of(state));
 
@@ -73,8 +73,7 @@ class EscalationServiceTest {
         assertEquals(nodeId, result.get(0).nodeId());
         assertEquals(BigInteger.valueOf(1000), result.get(0).position());
         assertEquals("oncall@example.com", result.get(0).userEmail());
-        assertEquals("ACTIVE", result.get(0).executionState());
-        assertEquals("NOT_SENT", result.get(0).notificationState());
+        assertEquals(FlowExecutionStepStatus.SCHEDULED, result.get(0).status());
         assertEquals(1, result.get(0).sendAttemptCount());
     }
 

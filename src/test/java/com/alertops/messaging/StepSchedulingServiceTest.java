@@ -1,7 +1,10 @@
 package com.alertops.messaging;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.never;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 
@@ -31,13 +35,27 @@ class StepSchedulingServiceTest {
     }
 
     @Test
+    void scheduleUsesOnePersistedScheduledStatus() {
+        FlowExecutionState state = new FlowExecutionState();
+        state.setStatus(FlowExecutionStepStatus.PENDING);
+        state.setDuration(java.time.Duration.ZERO);
+        when(states.save(any(FlowExecutionState.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.schedule(state);
+
+        assertEquals(FlowExecutionStepStatus.SCHEDULED, state.getStatus());
+        assertTrue(state.isPublicationPending());
+        verify(events).publishEvent(any(EscalationStepSchedule.class));
+    }
+
+    @Test
     void publicationCheckIgnoresStateWithoutProcessId() {
         UUID stepId = UUID.randomUUID();
         Instant dueAt = Instant.parse("2026-01-01T00:00:00Z");
         FlowExecutionState current = new FlowExecutionState();
         current.setId(stepId);
-        current.setExecutionState("ACTIVE");
-        current.setNotificationState("NOT_SENT");
+        current.setStatus(FlowExecutionStepStatus.SCHEDULED);
         current.setPublicationPending(true);
         current.setSendAttemptCount(0);
         current.setDueAt(dueAt);
@@ -66,8 +84,7 @@ class StepSchedulingServiceTest {
 
         FlowExecutionState current = new FlowExecutionState();
         current.setId(stepId);
-        current.setExecutionState("ACTIVE");
-        current.setNotificationState("NOT_SENT");
+        current.setStatus(FlowExecutionStepStatus.SCHEDULED);
         when(states.findById(stepId)).thenReturn(Optional.of(current));
 
         service.rescheduleStepAtDueTime(requested);

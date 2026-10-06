@@ -3,6 +3,7 @@ package com.alertops.messaging;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
@@ -38,7 +39,7 @@ class MessageConsumerTest {
     @Test
     void ignoresMessageFromOlderSendAttempt() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 1);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 1);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
 
         consumer.onMessage(queuedState);
@@ -50,7 +51,7 @@ class MessageConsumerTest {
     @Test
     void ignoresDeliveryWhenAnotherConsumerHasAlreadyClaimedTheStep() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(0);
@@ -64,7 +65,7 @@ class MessageConsumerTest {
     @Test
     void sendsOnlyOnceWhenTheSameMessageArrivesAfterTheStepFinished() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
@@ -77,21 +78,21 @@ class MessageConsumerTest {
 
         verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token");
         verify(stateRepository, times(1)).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
-        assertEquals("TERMINAL", currentState.getExecutionState());
-        assertEquals("SENT", currentState.getNotificationState());
+        assertEquals(FlowExecutionStepStatus.SENT, currentState.getStatus());
         assertEquals(1, currentState.getSendAttemptCount());
     }
 
     @Test
     void letsUnexpectedProcessingErrorsEscapeSoRabbitCanRetry() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
-        FlowExecutionState nextState = currentState("PENDING", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        FlowExecutionState nextState = currentState(FlowExecutionStepStatus.PENDING, 0);
         nextState.setId(UUID.fromString("51000000-0000-0000-0000-000000000003"));
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
-        when(stateRepository.findFirstByProcessIdAndExecutionStateOrderByPositionAsc(ESCALATION_ID, "PENDING"))
+        when(stateRepository.findFirstByProcessIdAndStatusOrderByPositionAsc(
+                ESCALATION_ID, FlowExecutionStepStatus.PENDING))
                 .thenReturn(nextState, nextState);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
@@ -100,8 +101,7 @@ class MessageConsumerTest {
 
         assertThrows(RuntimeException.class, () -> consumer.onMessage(queuedState));
 
-        assertEquals("PROCESSING", currentState.getExecutionState());
-        assertEquals("NOT_SENT", currentState.getNotificationState());
+        assertEquals(FlowExecutionStepStatus.SENDING, currentState.getStatus());
         verify(stepSchedulingService, never()).schedule(nextState);
         verify(escalationRepository, never()).save(any(Escalation.class));
     }
@@ -110,7 +110,7 @@ class MessageConsumerTest {
     void earlyReadyMessageRearmsSavedDueTimeWithoutClaimingOrSending() {
         Instant dueAt = Instant.now().plusSeconds(60);
         EscalationStepReadyMessage earlyMessage = new EscalationStepReadyMessage(STEP_ID, 0, dueAt);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
         currentState.setDueAt(dueAt);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
@@ -126,12 +126,11 @@ class MessageConsumerTest {
         return new EscalationStepReadyMessage(STEP_ID, sendAttemptCount, Instant.EPOCH);
     }
 
-    private FlowExecutionState currentState(String executionState, String notificationState, int sendAttemptCount) {
+    private FlowExecutionState currentState(FlowExecutionStepStatus status, int sendAttemptCount) {
         FlowExecutionState state = new FlowExecutionState();
         state.setId(STEP_ID);
         state.setProcessId(ESCALATION_ID);
-        state.setExecutionState(executionState);
-        state.setNotificationState(notificationState);
+        state.setStatus(status);
         state.setSendAttemptCount(sendAttemptCount);
         state.setDueAt(Instant.EPOCH);
         state.setUserEmail("oncall@example.com");
