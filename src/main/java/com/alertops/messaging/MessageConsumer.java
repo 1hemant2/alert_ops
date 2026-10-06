@@ -95,9 +95,8 @@ public class MessageConsumer {
             flowExecutionState.setStatus(FlowExecutionStepStatus.SENT);
             flowExecutionStateRepository.save(flowExecutionState);
             if (nextNode == null) {
-                escalation.setStatus(EscalationStatus.COMPLETED);
-                escalation.setResolutionType(EscalationResolutionType.EXHAUSTED);
-                escalationRepository.save(escalation);
+                // A successful final notification remains open for its response window.
+                // Deadline expiry will complete an unacknowledged final run later.
             } else {
                 stepSchedulingService.schedule(nextNode);
             }
