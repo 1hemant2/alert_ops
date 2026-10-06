@@ -1,7 +1,7 @@
 # Escalation lifecycle: resolution timeout, manual actions, and activity timeline
 
 Created: 2026-10-05
-Status: Planning — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; implementation pending.
+Status: In progress — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; task 6 is implemented locally and later tasks remain pending.
 Release priorities: [scheduled starts](product-launch-readiness.md#1-scheduled-escalation-start),
 [resolution timeout](product-launch-readiness.md#3-resolution-timeout-after-acknowledgement), and
 [Escalate now](product-launch-readiness.md#4-escalate-now), and
@@ -266,8 +266,9 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 6. Implement acknowledgement pause
 
-- [ ] Branch on the saved toggle, invalidate the acknowledgement wait, pause the next step if present, save the resolution deadline, and record lifecycle audit data atomically. Emit wake-up changes after commit.
+- [x] Branch on the saved toggle, invalidate the acknowledgement wait, pause the next step if present, save the resolution deadline, and record lifecycle audit data atomically. Emit wake-up changes after commit.
 - Acceptance: disabled acknowledgement still completes; enabled acknowledgement pauses even on the final node; repeated acknowledgement does not extend the deadline; a stale send cannot bypass the pause.
+- **Local implementation evidence (2026-10-06):** `EscalationAcknowledgementService` locks the run, validates the exact `SENT` step and current sent-step token, keeps disabled acknowledgement terminal as `COMPLETED` / `ACKNOWLEDGED`, and changes enabled acknowledgement to `ACKNOWLEDGED` with the saved step timeout, owner, deadline, and `ACKNOWLEDGED` audit event. The next unsent step is changed to `PAUSED` without changing its canonical shared `dueAt`; its in-memory wake-up is cancelled after commit. Final successful sends remain `OPEN` so the final recipient can acknowledge. Focused acknowledgement, consumer, and timer tests pass; the full Maven suite passes with PostgreSQL/RabbitMQ/Redis integration tests environment-gated and skipped. Independent read-only verifier verdict: **Achieved**. Deadline expiry/recovery, explicit resolution, and deployed verification remain later tasks.
 
 ### 7. Implement explicit resolution
 
@@ -360,15 +361,17 @@ transition/audit event and no additional send.
 
 ## Current evidence
 
-This document specifies planned behavior. Manual start now accepts same-team `IDLE`
-and `SCHEDULED` runs, while automatic scheduled start remains due-gated. Current
-code still completes runs on acknowledgement, but execution steps now use the
-single persisted `FlowExecutionStepStatus` enum. Resolution-timeout and activity-
-timeline behavior remain unimplemented.
-Audit actions cover scheduling, rescheduling, start, cancellation, and start
-failure; the detail-page execution timeline shows current step rows rather than
-event history. No Escalate now, resolution-timeout, or full activity-timeline
-implementation/test success is claimed here. Start now has local implementation
-and focused-test evidence only; PostgreSQL/deployed verification is pending.
+This document specifies the agreed lifecycle and tracks implementation. Manual
+start now accepts same-team `IDLE` and `SCHEDULED` runs, while automatic scheduled
+start remains due-gated. Execution steps use the single persisted
+`FlowExecutionStepStatus` enum. Runtime snapshots and acknowledgement pause are
+implemented locally; explicit resolution, deadline expiry/recovery, Escalate now,
+and the activity timeline remain unimplemented.
+Audit actions cover scheduling, rescheduling, start, cancellation, start failure,
+and acknowledgement; the detail-page execution timeline shows current step rows
+rather than event history. No explicit resolution, deadline expiry/recovery,
+Escalate now, or full activity-timeline implementation/test success is claimed
+here. Start now and acknowledgement pause have local implementation and
+focused-test evidence only; PostgreSQL/deployed verification is pending.
 
 Relevant entry points: [flow model](../src/main/java/com/alertops/flow/model/Flow.java), [node model](../src/main/java/com/alertops/flow/model/Node.java), [start service](../src/main/java/com/alertops/flow_execution_engine/service/FlowExecutionStateService.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), and [step scheduling service](../src/main/java/com/alertops/messaging/StepSchedulingService.java).

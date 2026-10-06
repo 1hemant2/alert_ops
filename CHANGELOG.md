@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-07 — Implement acknowledgement pause
+
+- Add the enabled `ACKNOWLEDGED` lifecycle transition, exact current-step validation, saved resolution owner/deadline, next-step pause, and post-commit wake-up cancellation while preserving disabled terminal acknowledgement behavior.
+- Keep successful final sends open for acknowledgement and record the acknowledgement audit event; `dueAt` remains the shared acknowledgement/delivery boundary with no redundant acknowledgement-deadline field.
+- Verification: focused tests, full Maven tests, backend package, UI build, and documentation checks pass. PostgreSQL/RabbitMQ/Redis integration checks remain environment-gated; independent read-only verifier verdict: **Achieved**.
+
 ## 2026-10-06 — Clarify agreed-decision implementation guardrails
 
 - Require implementation plans to identify binding agreed decisions and canonical sources of truth before adding fields, columns, timers, or API properties.

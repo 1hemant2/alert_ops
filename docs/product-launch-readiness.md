@@ -34,17 +34,18 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 - [ ] **Implementation complete locally**
 - [ ] **Implemented and verified in PostgreSQL/deployed flow**
 - **Requested behaviour:** Every escalation follows one explicit lifecycle. Status changes happen only through named operations, invalid transitions are rejected consistently, simultaneous actions cannot both win, and terminal history remains available for investigation.
-- **Agreed baseline statuses:** Requirement 3 below adds the planned optional acknowledgement/resolution lifecycle; those changes are not implemented yet.
+- **Agreed baseline statuses:** Requirement 3 below adds the optional acknowledgement/resolution lifecycle. The enabled `ACKNOWLEDGED` state and acknowledgement pause are implemented locally; resolution and deadline expiry remain pending.
   - `IDLE`: created but not started or scheduled.
   - `SCHEDULED`: waiting for its configured start time or an eligible start retry.
-  - `OPEN`: actively processing response steps.
+  - `OPEN`: actively processing response steps and waiting for acknowledgement.
+  - `ACKNOWLEDGED`: the current recipient owns an active resolution window; the next step is paused until resolution or timeout.
   - `COMPLETED`: terminal; `ACKNOWLEDGED` or `EXHAUSTED` records why it completed.
   - `CANCELLED`: terminal; a scheduled escalation was cancelled before starting.
   - `START_FAILED`: terminal for v1; all scheduled-start attempts were exhausted.
 - **Agreed baseline transitions:**
   - `IDLE` may become `OPEN` through **Start escalation** or `SCHEDULED` through **Schedule later**.
   - `SCHEDULED` may become `OPEN` when its due start succeeds or an authenticated same-team **Start now** claim wins early. It may remain `SCHEDULED` when rescheduled or when another start retry is allowed, become `CANCELLED` when cancellation wins first, or become `START_FAILED` when all retries are exhausted.
-  - Without resolution timeout, `OPEN` becomes `COMPLETED` when the intended recipient acknowledges it or when every response step is exhausted. Requirement 3 defines the enabled-flow extension; last-step handling still requires agreement.
+  - Without resolution timeout, `OPEN` becomes `COMPLETED` when the intended recipient acknowledges it or when every response step is exhausted. With resolution timeout enabled, acknowledgement enters `ACKNOWLEDGED` until resolution or timeout.
   - `COMPLETED`, `CANCELLED`, and `START_FAILED` do not transition again in v1. A manual retry for `START_FAILED` is post-release work.
 - **Agreed baseline action behaviour:**
   - A repeated acknowledgement by the same recipient returns the saved result. Another recipient cannot overwrite it, and an `EXHAUSTED` escalation cannot be acknowledged later.
@@ -85,8 +86,8 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 - **Resolution access settled:** Reuse existing same-team access in the UI and the current acknowledging recipient's scoped email link, enforcing the current resolution deadline and recording the actual actor. Node recipients already belong to the team; no extra role or state is needed.
 - **Final lifecycle storage decision:** `RESOLVED` is self-describing and has no separate completion reason. `COMPLETED` requires `ACKNOWLEDGED` or `EXHAUSTED`; active acknowledgement owner/step/deadline fields are cleared when the run leaves `ACKNOWLEDGED`, while audit events retain the historical facts. Timing is settled: delivery delay and acknowledgement duration are the same wait. Node response durations, late-action rejection, resolution access, and email Escalate now source eligibility are settled; do not reopen those states or permissions.
 - **Plan and implementation tracking:** [Resolution timeout implementation plan](resolution-timeout-implementation-plan.md). Work through its tasks one at a time. Agreed behavior is recorded; remaining design decisions and feature implementation are pending.
-- **Progress:** The execution-step status foundation, flow/node timing configuration, runtime snapshots, and exact acknowledgement token binding are implemented locally: one string-persisted enum replaces the old execution/notification status pair, legacy rows are migrated, disabled acknowledgement marks unsent steps skipped, and flows validate an all-or-nothing resolution-timeout toggle with one positive timeout per node. Acknowledgement pause, resolution/expiry behavior, recovery, and deployed verification remain pending.
-- **Verification needed:** Pause/resume, immediate next-step delivery for all original due-time comparisons, resolution/timeout races, stale/duplicate callbacks, durable recovery, and the agreed last-step behavior. Cover viewable read-only previews after deadlines, exact deadline boundaries, delayed timers/restart, old-step rejection, separate resolution access after timely acknowledgement, and saved-result replay without duplicate writes. Deployed checks are deferred until remaining implementation work is complete.
+- **Progress:** The execution-step status foundation, flow/node timing configuration, runtime snapshots, exact acknowledgement token binding, and acknowledgement pause are implemented locally: one string-persisted enum replaces the old execution/notification status pair, legacy rows are migrated, disabled acknowledgement marks unsent steps skipped, enabled acknowledgement stores `ACKNOWLEDGED` ownership/deadline and pauses the next step, and final successful sends remain open for acknowledgement. Deadline expiry/resume, explicit resolution, recovery, and deployed verification remain pending.
+- **Verification needed:** Pause/resume after deadline expiry, immediate next-step delivery for all original due-time comparisons, resolution/timeout races, stale/duplicate callbacks, durable recovery, and the agreed last-step behavior. Cover viewable read-only previews after deadlines, exact deadline boundaries, delayed timers/restart, old-step rejection, separate resolution access after timely acknowledgement, and saved-result replay without duplicate writes. Deployed checks are deferred until remaining implementation work is complete.
 
 ### 4. Escalate now
 
