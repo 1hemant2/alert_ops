@@ -1,32 +1,33 @@
 # Current task plan
 
-## Task: Settle resolution lifecycle storage edge cases
+## Task: Unify execution-step statuses
 
 Started: 2026-10-06
 Status: Complete
 
 ### Goal and scope
 
-Complete the prerequisite task in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#implementation-tasks-one-at-a-time) before dependent implementation begins. Decide the final lifecycle/completion fields and active acknowledgement ownership rules; update the plan and launch checklist. No product-code changes are in scope.
+Implement the next pending task in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#3-unify-execution-step-statuses): replace the two independent execution-step status strings with one explicit persisted enum across the backend, database, recovery/queue paths, DTOs, tests, and UI mappings. Preserve existing behavior; resolution-timeout behavior itself remains out of scope.
 
 ### Acceptance criteria
 
-- `RESOLVED` versus `COMPLETED` storage semantics are explicit and do not add an unnecessary reason field.
-- Active acknowledgement ownership/deadline fields have clear set/clear rules, with historical facts delegated to audit events.
-- The resolution-timeout plan and Requirement 3 readiness state agree that this prerequisite is complete and implementation remains pending.
+- Each execution step has exactly one supported persisted status and the database rejects unsupported values.
+- Delivery, retry, duplicate-message, restart-recovery, and disabled-acknowledgement behavior remain correct.
+- All affected API/UI mappings and focused tests use the single status without unsupported combinations.
 
 ### Steps
 
-- [x] Inspect the current lifecycle model, migration constraints, and planned resolution behavior.
-- [x] Decide and document final status, completion-reason, and acknowledgement-owner semantics.
-- [x] Update the changelog and verify links, formatting, and unrelated diff changes.
+- [x] Inspect the current step model, persistence schema, repositories, message/recovery paths, DTOs, UI, and tests.
+- [x] Add the enum, migration/constraints, and coordinated backend/UI changes.
+- [x] Add or update focused tests for state transitions, persistence, duplicate delivery, retry, recovery, and disabled acknowledgement.
+- [x] Run focused tests, normal builds, documentation checks, and review the final diff.
 
 ### Verification and limitations
 
-- Passed: documentation targets/anchors, `git diff --check`, 32-line plan-length check (within the 60-line limit), and focused diff review.
-- Product tests/builds are not applicable because this task changes planning documentation only.
-- Independent read-only verifier: skipped because no usable subagent mechanism is exposed in this environment, as required by `AGENTS.md`.
+- Passed: focused backend tests, `mvn test`, `mvn package -DskipTests`, `npm run build`, `git diff --check`, documentation target/anchor checks, 32-line plan-length check, and focused diff review.
+- PostgreSQL integration: skipped by the environment gate; `StepSchedulingPostgresIntegrationTest` reported 13 skipped tests because `POSTGRES_INTEGRATION_TEST` and database variables were unavailable.
+- Independent read-only verifier: Inconclusive. Two verifier attempts were dispatched, but neither returned a report after repeated waits; both were shut down without modifying repository state. No independent verifier evidence is available.
 
 ### Resume note
 
-After this prerequisite, continue with the next pending implementation task, [unify execution-step statuses](resolution-timeout-implementation-plan.md#3-unify-execution-step-statuses), before the remaining resolution-timeout tasks.
+After this task, continue with [flow/node timing configuration](resolution-timeout-implementation-plan.md#4-add-agreed-flow-node-timing-configuration). Resolution timeout behavior itself remains separate.

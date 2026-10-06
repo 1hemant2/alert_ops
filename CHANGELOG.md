@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Unify execution-step statuses
+
+- Replace the independent execution/notification status strings with the persisted `FlowExecutionStepStatus` enum, migrate legacy rows with V11, rebuild publication recovery queries, and reject unsupported database values.
+- Update delivery/retry/duplicate-message paths, disabled acknowledgement skip handling, execution-state API/UI mappings, and focused tests so each step has one authoritative status.
+- Verification: focused tests, full `mvn test`, backend packaging, and `npm run build` pass. PostgreSQL integration remains skipped by its environment gate (13 skipped tests); independent read-only verification was inconclusive because two dispatched verifier attempts did not return reports and were shut down.
+
 ## 2026-10-06 — Settle resolution lifecycle storage semantics
 
 - Decide that `RESOLVED` is self-describing, while `COMPLETED` requires `ACKNOWLEDGED` or `EXHAUSTED`; clear active acknowledgement ownership when the run leaves that state and retain history in audit events.

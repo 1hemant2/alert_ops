@@ -248,8 +248,9 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 3. Unify execution-step statuses
 
-- [ ] Add the enum and database constraints; migrate the model, repository queries, consumer, scheduler, recovery, DTOs, and UI status mappings together.
+- [x] Add the enum and database constraints; migrate the model, repository queries, consumer, scheduler, recovery, DTOs, and UI status mappings together.
 - Acceptance: one status per step; existing send, retry, duplicate-message, and disabled acknowledgement behavior still works. No unsupported status combinations remain.
+- **Local implementation evidence:** `FlowExecutionStepStatus` is persisted as a string enum with `PENDING`, `SCHEDULED`, `PAUSED`, `SENDING`, `SENT`, `FAILED`, and `SKIPPED`. Migration V11 converts legacy rows, replaces the old columns, adds a database check, and rebuilds the recovery index. Queue claiming, scheduling, startup recovery, DTOs, UI badges, duplicate-delivery tests, and disabled acknowledgement now use the single status. Focused tests, the normal backend suite, backend packaging, and the UI build pass; PostgreSQL integration remains environment-gated and skipped.
 
 ### 4. Add agreed flow/node timing configuration
 
@@ -359,7 +360,9 @@ transition/audit event and no additional send.
 
 This document specifies planned behavior. Manual start now accepts same-team `IDLE`
 and `SCHEDULED` runs, while automatic scheduled start remains due-gated. Current
-code still completes runs on acknowledgement and uses two step-state strings.
+code still completes runs on acknowledgement, but execution steps now use the
+single persisted `FlowExecutionStepStatus` enum. Resolution-timeout and activity-
+timeline behavior remain unimplemented.
 Audit actions cover scheduling, rescheduling, start, cancellation, and start
 failure; the detail-page execution timeline shows current step rows rather than
 event history. No Escalate now, resolution-timeout, or full activity-timeline
