@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 
@@ -51,7 +52,7 @@ public class StepSchedulingService {
             throw new IllegalStateException("A response step requires a nonnegative wait duration");
         }
 
-        state.setExecutionState("ACTIVE");
+        state.setStatus(FlowExecutionStepStatus.SCHEDULED);
         state.setDueAt(Instant.now().plus(duration).truncatedTo(ChronoUnit.MICROS));
         state.setPublicationPending(true);
         FlowExecutionState saved = Objects.requireNonNull(stateRepository.save(state), "Saved response step is required");
@@ -103,8 +104,7 @@ public class StepSchedulingService {
         }
         UUID processId = current.getProcessId();
         Instant currentDueAt = current.getDueAt();
-        if (!"ACTIVE".equals(current.getExecutionState())
-                || !"NOT_SENT".equals(current.getNotificationState())
+        if (current.getStatus() != FlowExecutionStepStatus.SCHEDULED
                 || current.getSendAttemptCount() != state.getSendAttemptCount()
                 || currentDueAt == null
                 || !requestedDueAt.equals(currentDueAt)
@@ -137,8 +137,7 @@ public class StepSchedulingService {
             return false;
         }
         UUID processId = current.getProcessId();
-        if (!"ACTIVE".equals(current.getExecutionState())
-                || !"NOT_SENT".equals(current.getNotificationState())
+        if (current.getStatus() != FlowExecutionStepStatus.SCHEDULED
                 || !current.isPublicationPending()
                 || current.getSendAttemptCount() != schedule.sendAttemptCount()
                 || !scheduleDueAt.equals(current.getDueAt())

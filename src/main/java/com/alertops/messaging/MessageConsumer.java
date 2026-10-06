@@ -11,6 +11,7 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
@@ -47,8 +48,7 @@ public class MessageConsumer {
         if (currentState == null
                 || currentState.getSendAttemptCount() != readyMessage.sendAttemptCount()
                 || !readyMessage.dueAt().equals(currentState.getDueAt())
-                || !"ACTIVE".equals(currentState.getExecutionState())
-                || !"NOT_SENT".equals(currentState.getNotificationState())
+                || currentState.getStatus() != FlowExecutionStepStatus.SCHEDULED
                 || currentState.getProcessId() == null) {
             return;
         }
@@ -72,7 +72,7 @@ public class MessageConsumer {
         }
 
         // The bulk update bypasses the persistence context, so keep the managed copy aligned.
-        currentState.setExecutionState("PROCESSING");
+        currentState.setStatus(FlowExecutionStepStatus.SENDING);
         currentState.setPublicationPending(false);
         consume(currentState, escalation);
     }
@@ -83,8 +83,8 @@ public class MessageConsumer {
         int maxRetryAttempts = flowExecutionState.getMaxRetryAttempts();
         int sendAttemptCount = flowExecutionState.getSendAttemptCount();
         FlowExecutionState nextNode = flowExecutionStateRepository
-                .findFirstByProcessIdAndExecutionStateOrderByPositionAsc(
-                        flowExecutionState.getProcessId(), "PENDING");
+                .findFirstByProcessIdAndStatusOrderByPositionAsc(
+                        flowExecutionState.getProcessId(), FlowExecutionStepStatus.PENDING);
 
         String acknowledgementUrl = acknowledgementService.createAcknowledgementUrl(
                 escalation, flowExecutionState.getUserEmail());
@@ -92,8 +92,7 @@ public class MessageConsumer {
         // Persist total attempts, including successful SMTP submissions.
         flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
         if (mailSent) {
-            flowExecutionState.setExecutionState("TERMINAL");
-            flowExecutionState.setNotificationState("SENT");
+            flowExecutionState.setStatus(FlowExecutionStepStatus.SENT);
             flowExecutionStateRepository.save(flowExecutionState);
             if (nextNode == null) {
                 escalation.setStatus(EscalationStatus.COMPLETED);
@@ -106,8 +105,7 @@ public class MessageConsumer {
             flowExecutionStateRepository.save(flowExecutionState);
             stepSchedulingService.schedule(flowExecutionState);
         } else {
-            flowExecutionState.setExecutionState("TERMINAL");
-            flowExecutionState.setNotificationState("FAILED");
+            flowExecutionState.setStatus(FlowExecutionStepStatus.FAILED);
             flowExecutionStateRepository.save(flowExecutionState);
             if (nextNode == null) {
                 escalation.setStatus(EscalationStatus.COMPLETED);

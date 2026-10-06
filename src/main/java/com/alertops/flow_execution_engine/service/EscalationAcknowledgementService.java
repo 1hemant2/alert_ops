@@ -24,6 +24,7 @@ import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
+import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 
 @Service
 public class EscalationAcknowledgementService {
@@ -32,16 +33,19 @@ public class EscalationAcknowledgementService {
 
     private final EscalationAcknowledgementTokenRepository tokenRepository;
     private final EscalationRepository escalationRepository;
+    private final FlowExecutionStateRepository flowExecutionStateRepository;
     private final Duration tokenLifetime;
     private final String uiBaseUrl;
 
     public EscalationAcknowledgementService(
             EscalationAcknowledgementTokenRepository tokenRepository,
             EscalationRepository escalationRepository,
+            FlowExecutionStateRepository flowExecutionStateRepository,
             @Value("${alertops.escalation.acknowledgement-ttl:72h}") Duration tokenLifetime,
             @Value("${alertops.ui.base-url:http://localhost:5173}") String uiBaseUrl) {
         this.tokenRepository = tokenRepository;
         this.escalationRepository = escalationRepository;
+        this.flowExecutionStateRepository = flowExecutionStateRepository;
         this.tokenLifetime = tokenLifetime;
         this.uiBaseUrl = uiBaseUrl == null ? "" : uiBaseUrl.replaceAll("/+$", "");
         if (tokenLifetime.isZero() || tokenLifetime.isNegative()) {
@@ -91,6 +95,7 @@ public class EscalationAcknowledgementService {
             escalation.setResolutionType(EscalationResolutionType.ACKNOWLEDGED);
             escalation.setIssueSolvedBy(token.getRecipientEmail());
             escalation.setAcknowledgedAt(Instant.now());
+            flowExecutionStateRepository.markUnsentStepsSkipped(escalation.getId());
             escalationRepository.save(escalation);
         }
 

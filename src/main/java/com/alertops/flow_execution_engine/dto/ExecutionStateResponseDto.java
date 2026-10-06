@@ -1,6 +1,7 @@
 package com.alertops.flow_execution_engine.dto;
 
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 
 import java.math.BigInteger;
 import java.time.Instant;
@@ -10,8 +11,7 @@ public record ExecutionStateResponseDto(
         UUID nodeId,
         BigInteger position,
         String userEmail,
-        String executionState,
-        String notificationState,
+        FlowExecutionStepStatus status,
         int sendAttemptCount,
         Instant createdAt,
         Instant updatedAt
@@ -21,8 +21,7 @@ public record ExecutionStateResponseDto(
                 state.getNodeId(),
                 state.getPosition(),
                 state.getUserEmail(),
-                state.getExecutionState(),
-                state.getNotificationState(),
+                state.getStatus(),
                 state.getSendAttemptCount(),
                 state.getCreatedAt(),
                 state.getUpdatedAt()

@@ -16,6 +16,7 @@ import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.model.AuditEvent;
 import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepSchedulingService;
@@ -68,8 +69,7 @@ public class FlowExecutionStateService {
 
             for(Node node : nodes) {
                 FlowExecutionState flowExecutionState = new FlowExecutionState();
-                flowExecutionState.setExecutionState("PENDING");
-                flowExecutionState.setNotificationState("NOT_SENT");
+                flowExecutionState.setStatus(FlowExecutionStepStatus.PENDING);
                 flowExecutionState.setTaskDetails(task.getDescription());
                 flowExecutionState.setTaskName(task.getName());
                 flowExecutionState.setTaskSource(task.getSource());

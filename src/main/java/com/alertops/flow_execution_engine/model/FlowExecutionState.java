@@ -8,6 +8,8 @@ import org.hibernate.annotations.UuidGenerator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
@@ -20,8 +22,9 @@ public class FlowExecutionState {
     @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
 
-    private String executionState;
-    private String notificationState;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FlowExecutionStepStatus status;
     private UUID taskId;
     @Column(name = "task_name", length = 120)
     private String taskName;
@@ -72,20 +75,12 @@ public class FlowExecutionState {
         this.id = id;
     }
 
-    public String getExecutionState() {
-        return executionState;
+    public FlowExecutionStepStatus getStatus() {
+        return status;
     }
 
-    public void setExecutionState(String executionState) {
-        this.executionState = executionState;
-    }
-
-    public String getNotificationState() {
-        return notificationState;
-    }
-
-    public void setNotificationState(String notificationState) {
-        this.notificationState = notificationState;
+    public void setStatus(FlowExecutionStepStatus status) {
+        this.status = status;
     }
 
     public UUID getTaskId() {

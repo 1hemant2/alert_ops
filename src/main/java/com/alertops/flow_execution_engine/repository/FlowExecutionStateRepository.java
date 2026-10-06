@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 
 
 @Repository
@@ -20,12 +21,12 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
    
    FlowExecutionState findTopByProcessIdOrderByPositionAsc(UUID processId);
 
-   FlowExecutionState findFirstByProcessIdAndExecutionStateOrderByPositionAsc(UUID processId, String status);
+   FlowExecutionState findFirstByProcessIdAndStatusOrderByPositionAsc(
+           UUID processId, FlowExecutionStepStatus status);
 
    @Query("""
            SELECT state FROM FlowExecutionState state
-           WHERE state.executionState = 'ACTIVE'
-             AND state.notificationState = 'NOT_SENT'
+           WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.publicationPending = true
              AND state.dueAt IS NOT NULL
              AND EXISTS (
@@ -39,8 +40,7 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
 
    @Query("""
            SELECT COUNT(state) FROM FlowExecutionState state
-           WHERE state.executionState = 'ACTIVE'
-             AND state.notificationState = 'NOT_SENT'
+           WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.publicationPending = true
              AND EXISTS (
                  SELECT escalation.id FROM Escalation escalation
@@ -55,7 +55,7 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
            UPDATE FlowExecutionState state
            SET state.publicationPending = false
            WHERE state.id = :stateId
-             AND state.executionState = 'ACTIVE'
+             AND state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.sendAttemptCount = :sendAttemptCount
              AND state.dueAt = :dueAt
              AND state.publicationPending = true
@@ -69,10 +69,10 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
    @Modifying
    @Query("""
            UPDATE FlowExecutionState state
-           SET state.executionState = 'PROCESSING', state.publicationPending = false
+           SET state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SENDING,
+               state.publicationPending = false
            WHERE state.id = :stateId
-             AND state.executionState = 'ACTIVE'
-             AND state.notificationState = 'NOT_SENT'
+             AND state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.sendAttemptCount = :sendAttemptCount
              AND state.dueAt = :dueAt
            """)
@@ -81,5 +81,19 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
            @Param("sendAttemptCount") int sendAttemptCount,
            @Param("dueAt") Instant dueAt
    );
+
+   @Modifying
+   @Query("""
+           UPDATE FlowExecutionState state
+           SET state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SKIPPED,
+               state.publicationPending = false,
+               state.dueAt = null
+           WHERE state.processId = :processId
+             AND state.status IN (
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PENDING,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
+             )
+           """)
+   int markUnsentStepsSkipped(@Param("processId") UUID processId);
 
 }
