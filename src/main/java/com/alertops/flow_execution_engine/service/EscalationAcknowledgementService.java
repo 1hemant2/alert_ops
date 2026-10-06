@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,7 @@ import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTokenRepository;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -54,16 +56,20 @@ public class EscalationAcknowledgementService {
     }
 
     @Transactional
-    public String createAcknowledgementUrl(Escalation escalation, String recipientEmail) {
-        if (escalation == null || escalation.getId() == null || isBlank(recipientEmail)) {
-            throw new IllegalArgumentException("An escalation and recipient are required to create an acknowledgement link");
+    public String createAcknowledgementUrl(Escalation escalation, FlowExecutionState executionStep) {
+        if (escalation == null || escalation.getId() == null || executionStep == null
+                || executionStep.getId() == null
+                || !escalation.getId().equals(executionStep.getProcessId())
+                || isBlank(executionStep.getUserEmail())) {
+            throw new IllegalArgumentException("An escalation and exact execution step are required to create an acknowledgement link");
         }
 
         String rawToken = newRawToken();
         Instant now = Instant.now();
         EscalationAcknowledgementToken token = new EscalationAcknowledgementToken();
         token.setEscalationId(escalation.getId());
-        token.setRecipientEmail(recipientEmail.trim());
+        token.setExecutionStepId(executionStep.getId());
+        token.setRecipientEmail(executionStep.getUserEmail().trim());
         token.setTokenHash(hash(rawToken));
         token.setCreatedAt(now);
         token.setExpiresAt(now.plus(tokenLifetime));
@@ -77,6 +83,7 @@ public class EscalationAcknowledgementService {
         EscalationAcknowledgementToken token = findToken(rawToken);
         Escalation escalation = escalationRepository.findById(token.getEscalationId())
                 .orElseThrow(() -> invalidToken());
+        validateTokenStep(token, escalation);
         boolean alreadyAcknowledged = isAcknowledgedBy(escalation, token.getRecipientEmail());
         validateTokenAndRun(token, escalation, alreadyAcknowledged);
         return response(token, escalation, alreadyAcknowledged);
@@ -87,6 +94,7 @@ public class EscalationAcknowledgementService {
         EscalationAcknowledgementToken token = findToken(rawToken);
         Escalation escalation = escalationRepository.findByIdForUpdate(token.getEscalationId())
                 .orElseThrow(() -> invalidToken());
+        validateTokenStep(token, escalation);
         boolean alreadyAcknowledged = isAcknowledgedBy(escalation, token.getRecipientEmail());
         validateTokenAndRun(token, escalation, alreadyAcknowledged);
 
@@ -131,6 +139,19 @@ public class EscalationAcknowledgementService {
     private boolean isAcknowledgedBy(Escalation escalation, String recipientEmail) {
         return escalation.getResolutionType() == EscalationResolutionType.ACKNOWLEDGED
                 && normalizeEmail(recipientEmail).equals(normalizeEmail(escalation.getIssueSolvedBy()));
+    }
+
+    private void validateTokenStep(EscalationAcknowledgementToken token, Escalation escalation) {
+        if (token.getExecutionStepId() == null) {
+            throw invalidToken();
+        }
+        FlowExecutionState executionStep = flowExecutionStateRepository.findById(token.getExecutionStepId())
+                .orElseThrow(() -> invalidToken());
+        if (!Objects.equals(escalation.getId(), token.getEscalationId())
+                || !Objects.equals(token.getEscalationId(), executionStep.getProcessId())
+                || !normalizeEmail(token.getRecipientEmail()).equals(normalizeEmail(executionStep.getUserEmail()))) {
+            throw invalidToken();
+        }
     }
 
     private EscalationAcknowledgementResponse response(

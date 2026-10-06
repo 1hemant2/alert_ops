@@ -39,6 +39,12 @@ public class Escalation {
 
     private Instant acknowledgedAt;
 
+    @Column(name = "acknowledged_step_id")
+    private UUID acknowledgedStepId;
+
+    @Column(name = "resolution_deadline")
+    private Instant resolutionDeadline;
+
     private Instant scheduledStartAt;
 
     private String scheduleTimezone;
@@ -153,6 +159,22 @@ public class Escalation {
 
     public void setAcknowledgedAt(Instant acknowledgedAt) {
         this.acknowledgedAt = acknowledgedAt;
+    }
+
+    public UUID getAcknowledgedStepId() {
+        return acknowledgedStepId;
+    }
+
+    public void setAcknowledgedStepId(UUID acknowledgedStepId) {
+        this.acknowledgedStepId = acknowledgedStepId;
+    }
+
+    public Instant getResolutionDeadline() {
+        return resolutionDeadline;
+    }
+
+    public void setResolutionDeadline(Instant resolutionDeadline) {
+        this.resolutionDeadline = resolutionDeadline;
     }
 
     public Instant getScheduledStartAt() {

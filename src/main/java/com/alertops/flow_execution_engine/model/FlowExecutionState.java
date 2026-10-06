@@ -38,6 +38,12 @@ public class FlowExecutionState {
     @Column(name = "due_at")
     private Instant dueAt;
 
+    @Column(name = "resolution_timeout_enabled", nullable = false)
+    private boolean resolutionTimeoutEnabled;
+
+    @Column(name = "resolution_timeout")
+    private Duration resolutionTimeout;
+
     @Column(name = "publication_pending", nullable = false)
     private boolean publicationPending;
     private BigInteger position;
@@ -134,6 +140,22 @@ public class FlowExecutionState {
 
     public void setDueAt(Instant dueAt) {
         this.dueAt = dueAt;
+    }
+
+    public boolean isResolutionTimeoutEnabled() {
+        return resolutionTimeoutEnabled;
+    }
+
+    public void setResolutionTimeoutEnabled(boolean resolutionTimeoutEnabled) {
+        this.resolutionTimeoutEnabled = resolutionTimeoutEnabled;
+    }
+
+    public Duration getResolutionTimeout() {
+        return resolutionTimeout;
+    }
+
+    public void setResolutionTimeout(Duration resolutionTimeout) {
+        this.resolutionTimeout = resolutionTimeout;
     }
 
     public boolean isPublicationPending() {

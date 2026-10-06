@@ -87,7 +87,7 @@ public class MessageConsumer {
                         flowExecutionState.getProcessId(), FlowExecutionStepStatus.PENDING);
 
         String acknowledgementUrl = acknowledgementService.createAcknowledgementUrl(
-                escalation, flowExecutionState.getUserEmail());
+                escalation, flowExecutionState);
         boolean mailSent = notification.sendEmail(flowExecutionState, acknowledgementUrl);
         // Persist total attempts, including successful SMTP submissions.
         flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);

@@ -22,6 +22,9 @@ public class EscalationAcknowledgementToken {
     @Column(name = "escalation_id", nullable = false)
     private UUID escalationId;
 
+    @Column(name = "execution_step_id")
+    private UUID executionStepId;
+
     @Column(name = "recipient_email", nullable = false)
     private String recipientEmail;
 
@@ -44,6 +47,14 @@ public class EscalationAcknowledgementToken {
 
     public void setEscalationId(UUID escalationId) {
         this.escalationId = escalationId;
+    }
+
+    public UUID getExecutionStepId() {
+        return executionStepId;
+    }
+
+    public void setExecutionStepId(UUID executionStepId) {
+        this.executionStepId = executionStepId;
     }
 
     public String getRecipientEmail() {
