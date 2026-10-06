@@ -83,6 +83,40 @@ class MessageConsumerTest {
     }
 
     @Test
+    void keepsASuccessfullySentFinalStepOpenForAcknowledgement() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
+                .thenReturn(true);
+
+        consumer.onMessage(queuedState);
+
+        assertEquals(FlowExecutionStepStatus.SENT, currentState.getStatus());
+        verify(escalationRepository, never()).save(any(Escalation.class));
+        verify(stepSchedulingService, never()).schedule(any(FlowExecutionState.class));
+    }
+
+    @Test
+    void ignoresAReadyCallbackAfterAcknowledgementPause() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        Escalation acknowledgedEscalation = runningEscalation();
+        acknowledgedEscalation.setStatus(EscalationStatus.ACKNOWLEDGED);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(acknowledgedEscalation));
+
+        consumer.onMessage(queuedState);
+
+        verify(stateRepository, never()).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
+        verifyNoInteractions(notification, stepSchedulingService);
+    }
+
+    @Test
     void letsUnexpectedProcessingErrorsEscapeSoRabbitCanRetry() {
         EscalationStepReadyMessage queuedState = queuedState(0);
         FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);

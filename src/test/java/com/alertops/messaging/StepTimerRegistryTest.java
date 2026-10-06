@@ -163,6 +163,21 @@ class StepTimerRegistryTest {
     }
 
     @Test
+    void cancellationRemovesAndCancelsAStillScheduledWakeUp() throws Exception {
+        registry = registry(10);
+        UUID stepId = UUID.randomUUID();
+        EscalationStepSchedule scheduled = step(stepId, 0, START.plusSeconds(30));
+
+        assertThat(registry.tryScheduleInMemoryTimer(scheduled)).isTrue();
+        ScheduledCall call = takeCall();
+
+        assertThat(registry.cancel(stepId)).isTrue();
+        assertThat(registry.cancel(stepId)).isFalse();
+        verify(call.future()).cancel(false);
+        assertThat(registry.activeTimerCount()).isZero();
+    }
+
+    @Test
     void overdueTimerPublishesReadyWorkAndFreesItsSlot() throws Exception {
         registry = registry(1);
         EscalationStepSchedule overdue = step(UUID.randomUUID(), 3, START.minusSeconds(1));
