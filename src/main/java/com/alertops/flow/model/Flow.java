@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Version;
+import jakarta.persistence.Column;
 
 @Entity
 public class Flow {
@@ -28,6 +29,9 @@ public class Flow {
     private UUID updatedBy;
 
     private Instant updatedAt;
+
+    @Column(nullable = false)
+    private boolean resolutionTimeoutEnabled;
 
     @Version
     private Long version;
@@ -84,5 +88,13 @@ public class Flow {
 
     public Long getVersion() {
         return version;
-    }    
+    }
+
+    public boolean isResolutionTimeoutEnabled() {
+        return resolutionTimeoutEnabled;
+    }
+
+    public void setResolutionTimeoutEnabled(boolean resolutionTimeoutEnabled) {
+        this.resolutionTimeoutEnabled = resolutionTimeoutEnabled;
+    }
 }

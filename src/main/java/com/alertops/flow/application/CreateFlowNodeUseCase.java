@@ -8,6 +8,7 @@ import jakarta.transaction.Transactional;
 import com.alertops.auth.model.User;
 import com.alertops.auth.repository.UserRepository;
 import com.alertops.flow.dto.CreateNodeDto;
+import com.alertops.flow.exception.FlowException;
 import com.alertops.flow.model.Node;
 import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow.repository.NodeRepository;
@@ -73,12 +74,13 @@ public class CreateFlowNodeUseCase {
             
             // 3. Call domain behavior
             Node node = flowService.createNode(
-                flow.getId(),
+                flow,
                 request.getNodeName(),
                 request.getDurationInMinutes(),
                 authContext.getUserId(),
                 lastNode == null ? BigInteger.valueOf(0) : lastNode.getPosition(),
-                request.getEmail()
+                request.getEmail(),
+                request.getResolutionTimeoutInMinutes()
             );
 
             if(node == null) {
@@ -96,9 +98,12 @@ public class CreateFlowNodeUseCase {
                 node.getFlowId(),
                 node.getName(),
                 (int)node.getDuration().toMinutes(),
+                node.getResolutionTimeout() == null ? null : (int) node.getResolutionTimeout().toMinutes(),
                 user.getEmail(),
                 node.getPosition()
             );
+        } catch (FlowException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Error creating flow node: " + e.getMessage());
         }

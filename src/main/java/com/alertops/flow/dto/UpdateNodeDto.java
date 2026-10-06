@@ -3,6 +3,7 @@ package com.alertops.flow.dto;
 public class UpdateNodeDto {
     private String nodeName;
     private int durationInMinutes;
+    private Integer resolutionTimeoutInMinutes;
     private String email;
     private Long version;
 
@@ -20,6 +21,14 @@ public class UpdateNodeDto {
 
     public void setDurationInMinutes(int durationInMinutes) {
         this.durationInMinutes = durationInMinutes;
+    }
+
+    public Integer getResolutionTimeoutInMinutes() {
+        return resolutionTimeoutInMinutes;
+    }
+
+    public void setResolutionTimeoutInMinutes(Integer resolutionTimeoutInMinutes) {
+        this.resolutionTimeoutInMinutes = resolutionTimeoutInMinutes;
     }
 
     public String getEmail() {
