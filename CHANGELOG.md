@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Require independent subagent completion verification
+
+- Update [AGENTS.md](AGENTS.md#verification-and-handoff) to require a read-only verification subagent for each repository task, with acceptance-criteria evidence, an explicit verdict, and documented limitations before handoff.
+- Require the primary agent to reconcile the verifier's report and record when the environment cannot provide a subagent; no product behavior changed.
+- Verification: local documentation links/anchors, whitespace, plan length, and diff review passed. An independent verifier initially returned `Not achieved` because the task plan and changelog still said verification was pending; that report was reconciled, and a final verifier returned `Achieved`. A later audit was `Inconclusive` only because its child context could not recursively verify the parent-run subagent mechanism; the parent had successfully used that mechanism, and recursive verification is not required. Documentation linters and product tests/builds were not applicable or unavailable.
+
 ## 2026-10-06 — Document Spring test-context dependency checks
 
 - Add [AGENTS.md](AGENTS.md#verification-and-handoff) guidance to update `@WebMvcTest`/slice-test mocks and direct constructor tests whenever Spring constructor dependencies change.
