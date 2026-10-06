@@ -174,7 +174,7 @@ class StepSchedulingPostgresIntegrationTest {
                 any(CorrelationData.class));
 
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ZERO, false, null);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ZERO, false, null);
             scheduling.schedule(step);
             verifyNoInteractions(rabbit);
             return step.getId();
@@ -194,7 +194,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Test
     void rolledBackSchedulingDoesNotRegisterATimerOrPublish() {
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ofMinutes(5), false, null);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ofMinutes(5), false, null);
             scheduling.schedule(step);
             status.setRollbackOnly();
             return step.getId();
@@ -209,7 +209,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Test
     void committedScheduleKeepsItsPendingFlagUntilReadyWorkIsConfirmed() throws Exception {
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ofMinutes(5), false, null);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ofMinutes(5), false, null);
             scheduling.schedule(step);
             assertThat(step.isPublicationPending()).isTrue();
             verifyNoInteractions(rabbit);
@@ -231,7 +231,7 @@ class StepSchedulingPostgresIntegrationTest {
                         any(CorrelationData.class));
 
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ZERO, false, null);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ZERO, false, null);
             scheduling.schedule(step);
             return step.getId();
         });
@@ -287,7 +287,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Test
     void aNewTimerRegistryRebuildsRegisteredWorkWithItsOriginalDueTime() throws Exception {
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ofMinutes(5), false, null);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ofMinutes(5), false, null);
             scheduling.schedule(step);
             return step.getId();
         });
