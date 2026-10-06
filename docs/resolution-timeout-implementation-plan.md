@@ -254,8 +254,9 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 4. Add agreed flow/node timing configuration
 
-- [ ] Implement the flow toggle and the agreed two node response durations, API validation, consistent configuration updates, and flow-editor controls. Reuse the existing duration for the shared acknowledgement/delivery wait; add no separate send-delay control. Use the same response controls/rules for first, middle, and last nodes, retaining the initial first-step delay.
-- Acceptance: disabled flows have null resolution timeouts; enabled flows have positive resolution timeouts on every node; acknowledgement timing matches the agreed mapping; invalid or concurrent edits do not save a partial configuration. No final-only setting is introduced.
+- [x] Implement the flow toggle and the agreed two node response durations, API validation, consistent configuration updates, and flow-editor controls. Reuse the existing duration for the shared acknowledgement/delivery wait; add no separate send-delay control. Use the same response controls/rules for first, middle, and last nodes, retaining the initial first-step delay.
+- Acceptance: disabled flows have null resolution timeouts; enabled flows have positive resolution timeouts on every node; the configuration update is all-or-nothing under the flow version; and no final-only setting is introduced. Runtime acknowledgement, snapshot, and expiry behavior remain in later tasks.
+- **Local implementation evidence:** Migration V12 stores the flow toggle and nullable positive node timeout. `PUT /api/v1/flow/{flowId}/timing` requires the current flow version and validates the complete node set before saving. Node create/edit requests apply the same enabled/disabled rules, and the flow editor exposes the toggle plus per-node timeout controls. Focused flow-service tests cover enable/disable, partial input, stale versions, and node-level validation.
 
 ### 5. Persist a consistent runtime snapshot
 

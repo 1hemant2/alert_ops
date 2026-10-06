@@ -4,6 +4,13 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-06 — Add flow/node resolution timing configuration
+
+- Add the flow-level resolution-timeout toggle, nullable positive per-node timeout storage, version-checked atomic timing updates, and matching create/edit validation.
+- Add flow-editor controls for enabling the timeout and setting each node's resolution window while retaining the existing shared wait duration.
+- Update the PostgreSQL scheduling fixtures to pass the unified execution-step enum, preserving full-suite compilation after the preceding status migration.
+- Verification: focused flow tests, full `mvn test`, backend packaging, UI build, documentation checks, and diff review pass. PostgreSQL/Redis/RabbitMQ integration tests remain environment-gated and skipped; independent read-only verification was unavailable.
+
 ## 2026-10-06 — Unify execution-step statuses
 
 - Replace the independent execution/notification status strings with the persisted `FlowExecutionStepStatus` enum, migrate legacy rows with V11, rebuild publication recovery queries, and reject unsupported database values.

@@ -1,33 +1,31 @@
 # Current task plan
 
-## Task: Unify execution-step statuses
+## Task: Add agreed flow/node timing configuration
 
 Started: 2026-10-06
 Status: Complete
 
 ### Goal and scope
 
-Implement the next pending task in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#3-unify-execution-step-statuses): replace the two independent execution-step status strings with one explicit persisted enum across the backend, database, recovery/queue paths, DTOs, tests, and UI mappings. Preserve existing behavior; resolution-timeout behavior itself remains out of scope.
+Implement task 4 in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#4-add-agreed-flow-node-timing-configuration): add the flow-level resolution-timeout toggle and consistent per-node timing configuration, API validation, and flow-editor controls. Preserve current delivery behavior; runtime snapshot, acknowledgement pause, resolution, and timeout behavior remain out of scope.
 
 ### Acceptance criteria
 
-- Each execution step has exactly one supported persisted status and the database rejects unsupported values.
-- Delivery, retry, duplicate-message, restart-recovery, and disabled-acknowledgement behavior remain correct.
-- All affected API/UI mappings and focused tests use the single status without unsupported combinations.
+- Disabled flows persist no node resolution timeout; enabled flows require a positive timeout on every node.
+- Existing node duration remains the shared acknowledgement/delivery wait, with no separate send-delay setting.
+- API updates are validated atomically/consistently and the editor exposes the agreed controls without partial configuration.
 
 ### Steps
 
-- [x] Inspect the current step model, persistence schema, repositories, message/recovery paths, DTOs, UI, and tests.
-- [x] Add the enum, migration/constraints, and coordinated backend/UI changes.
-- [x] Add or update focused tests for state transitions, persistence, duplicate delivery, retry, recovery, and disabled acknowledgement.
+- [x] Inspect the current flow/node model, persistence schema, APIs, editor, and tests.
+- [x] Add the migration, model fields, validation, consistent update path, and editor controls.
+- [x] Add focused tests for disabled/enabled validation, node updates, invalid input, and concurrent/partial update safety.
 - [x] Run focused tests, normal builds, documentation checks, and review the final diff.
 
 ### Verification and limitations
 
-- Passed: focused backend tests, `mvn test`, `mvn package -DskipTests`, `npm run build`, `git diff --check`, documentation target/anchor checks, 32-line plan-length check, and focused diff review.
-- PostgreSQL integration: skipped by the environment gate; `StepSchedulingPostgresIntegrationTest` reported 13 skipped tests because `POSTGRES_INTEGRATION_TEST` and database variables were unavailable.
-- Independent read-only verifier: Inconclusive. Two verifier attempts were dispatched, but neither returned a report after repeated waits; both were shut down without modifying repository state. No independent verifier evidence is available.
+- Verification: focused `FlowServiceTest`/`CreateFlowNodeUseCaseTest`, full `mvn test`, backend packaging, UI build, documentation target/anchor and whitespace checks, and focused diff review passed. Database-backed integration checks remain environment-gated; the suite reports 13 PostgreSQL, 1 Redis, and 3 RabbitMQ tests skipped. No usable independent read-only subagent mechanism was exposed in this environment, so that verifier was skipped.
 
 ### Resume note
 
-After this task, continue with [flow/node timing configuration](resolution-timeout-implementation-plan.md#4-add-agreed-flow-node-timing-configuration). Resolution timeout behavior itself remains separate.
+After this task, continue with [runtime snapshot persistence](resolution-timeout-implementation-plan.md#5-persist-a-consistent-runtime-snapshot). Do not implement acknowledgement pause or resolution timeout behavior in this task.
