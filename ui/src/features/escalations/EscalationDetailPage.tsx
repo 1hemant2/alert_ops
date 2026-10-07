@@ -114,6 +114,11 @@ function stepStatusExplanation(status: string): string {
   }
 }
 
+// Displays optional saved task metadata without hiding older rows that lack it.
+function taskMetadataValue(value?: string | null): string {
+  return value?.trim() || 'Not provided'
+}
+
 // Displays the current escalation, saved step progress, and activity history.
 export function EscalationDetailPage() {
   const { teamId = '', escalationId = '' } = useParams()
@@ -245,6 +250,13 @@ export function EscalationDetailPage() {
   if (escalation.isError) return <ErrorState message={escalation.error.message} onRetry={() => void escalation.refetch()} />
   const item = escalation.data
   const task = tasks.data?.find(candidate => candidate.id === item.taskId)
+  const savedTask = execution.data?.[0]
+  const taskName = savedTask ? savedTask.taskName : task?.name
+  const taskDescription = savedTask ? savedTask.taskDetails : task?.description
+  const taskSource = savedTask ? savedTask.taskSource : task?.source
+  const taskPriority = savedTask ? savedTask.taskPriority : task?.priority
+  const taskCategory = savedTask ? savedTask.taskCategory : task?.category
+  const taskReferenceUrl = savedTask ? savedTask.taskReferenceUrl : task?.referenceUrl
   const completed = item.status === 'COMPLETED'
   const scheduled = item.status === 'SCHEDULED'
   const canOfferEscalateNow = (item.status === 'OPEN' || item.status === 'ACKNOWLEDGED') && Boolean(manualActionRequest)
@@ -292,7 +304,7 @@ export function EscalationDetailPage() {
       </>}
     </Card>}
     <div className="detail-summary-grid">
-      <Card className="detail-summary-card"><span className="eyebrow">TASK CONTEXT</span><strong>{task?.name ?? item.taskId.slice(0, 8)}</strong><p>{task?.description || 'Task details are not available.'}</p></Card>
+      <Card className="detail-summary-card task-context-summary"><span className="eyebrow">TASK CONTEXT</span><strong>{taskName ?? item.taskId.slice(0, 8)}</strong><p>{taskDescription || 'Task details are not available.'}</p><div className="task-context-meta"><span>Source <strong>{taskMetadataValue(taskSource)}</strong></span><span>Priority <strong>{taskMetadataValue(taskPriority)}</strong></span><span>Category <strong>{taskMetadataValue(taskCategory)}</strong></span><span>Reference <strong>{taskReferenceUrl ? <a href={taskReferenceUrl} target="_blank" rel="noreferrer">Open reference ↗</a> : 'Not provided'}</strong></span></div><small>{savedTask ? 'Saved from the task when this run started.' : 'Current task context before this run starts.'}</small></Card>
       <Card className="detail-summary-card"><span className="eyebrow">ESCALATION PATH</span>{flow.data ? <Link className="detail-link" to={`/app/${teamId}/flows/${flow.data.id}`}>{flow.data.name} <span>↗</span></Link> : <strong>{item.flowId.slice(0, 8)}</strong>}<p>{nodes.data ? `${nodes.data.length} configured response ${nodes.data.length === 1 ? 'step' : 'steps'}` : 'Loading path configuration…'}</p></Card>
       <Card className="detail-summary-card"><span className="eyebrow">CREATED AT</span><strong>{formatDate(item.createdAt)}</strong><p>{completed && item.resolutionType ? `Resolution: ${item.resolutionType}` : 'Time shown in your local timezone.'}</p></Card>
     </div>

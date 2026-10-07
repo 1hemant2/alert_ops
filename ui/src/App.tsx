@@ -11,6 +11,7 @@ import { TeamPickerPage } from './features/teams/TeamPickerPage'
 import { TeamMembersPage } from './features/teams/TeamMembersPage'
 import { JoinTeamPage } from './features/teams/JoinTeamPage'
 import { TasksPage } from './features/tasks/TasksPage'
+import { TaskDetailPage } from './features/tasks/TaskDetailPage'
 import { FlowDetailPage } from './features/flows/FlowDetailPage'
 import { FlowsPage } from './features/flows/FlowsPage'
 import { EscalationDetailPage } from './features/escalations/EscalationDetailPage'
@@ -68,6 +69,7 @@ function AppRoutes() {
           <Route path="members" element={<TeamMembersPage />} />
           <Route path="webhooks" element={<WebhooksPage />} />
           <Route path="tasks" element={<TasksPage />} />
+          <Route path="tasks/:taskId" element={<TaskDetailPage />} />
           <Route path="flows" element={<FlowsPage />} />
           <Route path="flows/:flowId" element={<FlowDetailPage />} />
           <Route path="escalations" element={<EscalationsPage />} />

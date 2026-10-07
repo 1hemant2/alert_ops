@@ -211,6 +211,24 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .task-copy strong { color: #29382f; font-size: 14px; }
 .task-copy p { color: #859087; font-size: 13px; line-height: 1.5; margin: 5px 0; }
 .task-copy small { color: #a4aca5; font-size: 12px; }
+.task-title-link { display: inline-block; color: #29382f; font-size: 14px; font-weight: 700; }
+.task-title-link:hover { color: #647f40; }
+.task-reference-link { display: inline-block; margin-top: 6px; color: #52733d; font-size: 12px; overflow-wrap: anywhere; }
+.task-reference-link:hover { color: #345cf5; text-decoration: underline; }
+.task-row-link { align-self: center; color: #879188; }
+.task-row-link:hover { color: #345cf5; }
+.task-detail-card { min-height: 0; }
+.task-detail-description { color: #475467; font-size: 14px; line-height: 1.65; margin: 20px 0 0; white-space: pre-wrap; }
+.task-detail-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 24px 0; }
+.task-detail-fields div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.task-detail-fields dt, .task-context-meta span { color: #667085; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.task-detail-fields dd { margin: 0; color: #101828; font-size: 13px; overflow-wrap: anywhere; }
+.task-detail-fields dd a { color: #345cf5; }
+.task-context-meta { display: flex; flex-wrap: wrap; gap: 10px 15px; width: 100%; border-top: 1px solid #eaecf0; padding-top: 11px; }
+.task-context-meta span { display: flex; flex-direction: column; gap: 4px; }
+.task-context-meta strong { color: #344054; font-size: 13px; letter-spacing: 0; text-transform: none; }
+.task-context-meta strong a { color: #345cf5; }
+.task-context-summary > small { color: #98a2b3; font-size: 11px; line-height: 1.45; }
 .webhook-event-list { margin-top: 10px; display: grid; gap: 6px; }
 .webhook-event-list details { border: 1px solid #e7ece8; border-radius: 8px; padding: 7px 9px; background: #fbfcfb; }
 .webhook-event-list summary { cursor: pointer; color: #52645a; font-size: 12px; }
@@ -467,6 +485,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
   .step-action span { font-size: 16px; }
   .detail-summary-grid { grid-template-columns: 1fr; gap: 8px; }
   .detail-summary-card { min-height: 84px; }
+  .task-detail-fields { grid-template-columns: 1fr; }
   .prestart-state { align-items: flex-start; flex-direction: column; }
   .prestart-state .button { width: 100%; }
   .execution-title { flex-direction: column; }

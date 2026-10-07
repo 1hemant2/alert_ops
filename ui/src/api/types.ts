@@ -216,6 +216,12 @@ export interface ExecutionState {
   id: string
   nodeId: string
   position: string | number
+  taskName?: string | null
+  taskSource?: string | null
+  taskPriority?: string | null
+  taskCategory?: string | null
+  taskReferenceUrl?: string | null
+  taskDetails?: string | null
   userEmail: string
   status: string
   sendAttemptCount: number
