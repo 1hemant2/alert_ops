@@ -70,12 +70,16 @@ class FlowExecutionStateServiceTest {
     }
 
     @Test
+    // Verifies every execution step preserves task metadata and timing snapshots.
     void startSnapshotsEnabledFlowTimingForEveryExecutionStep() {
         UUID teamId = UUID.randomUUID();
         UUID escalationId = UUID.randomUUID();
         AuthContextHolder.set(new AuthContext(
                 UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
         Task task = new Task();
+        task.setPriority("P1");
+        task.setCategory("Platform");
+        task.setReferenceUrl("https://example.com/requests/123");
         Flow flow = new Flow();
         flow.setResolutionTimeoutEnabled(true);
         Node first = new Node();
@@ -106,6 +110,13 @@ class FlowExecutionStateServiceTest {
         org.junit.jupiter.api.Assertions.assertEquals(
                 List.of("same@example.com", "same@example.com"),
                 snapshots.stream().map(FlowExecutionState::getUserEmail).toList());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                List.of("P1", "P1"), snapshots.stream().map(FlowExecutionState::getTaskPriority).toList());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                List.of("Platform", "Platform"), snapshots.stream().map(FlowExecutionState::getTaskCategory).toList());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                List.of("https://example.com/requests/123", "https://example.com/requests/123"),
+                snapshots.stream().map(FlowExecutionState::getTaskReferenceUrl).toList());
     }
 
     @Test

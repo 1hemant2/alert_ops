@@ -36,6 +36,9 @@ class NotificationTest {
         state.setUserEmail("user@example.com");
         state.setProcessId(escalationId);
         state.setTaskDetails("Queue **backlog** <img src=x onerror=alert(1)>");
+        state.setTaskPriority("P1");
+        state.setTaskCategory("Platform <on-call>");
+        state.setTaskReferenceUrl("https://example.com/requests/123?view=full&tab=alerts");
 
         Notification notification = new Notification(senderProvider, "alerts@example.com");
 
@@ -52,10 +55,16 @@ class NotificationTest {
         String html = parts.getBodyPart(1).getContent().toString();
         assertTrue(markdown.contains("## Task"));
         assertTrue(markdown.contains("**backlog**"));
+        assertTrue(markdown.contains("P1"));
+        assertTrue(markdown.contains("Platform <on-call>"));
+        assertTrue(markdown.contains("https://example.com/requests/123?view=full&tab=alerts"));
         assertTrue(markdown.contains(escalationId.toString()));
         assertTrue(markdown.contains("https://alerts.example.com/acknowledge?token=sample-token"));
         assertTrue(html.contains("<strong style="));
         assertTrue(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
+        assertTrue(html.contains("P1"));
+        assertTrue(html.contains("Platform &lt;on-call&gt;"));
+        assertTrue(html.contains("https://example.com/requests/123?view=full&amp;tab=alerts"));
         assertTrue(html.contains("ESCALATION NOTIFICATION"));
         assertTrue(html.contains("Acknowledge escalation"));
         assertTrue(html.contains("href=\"https://alerts.example.com/acknowledge?token=sample-token\""));
