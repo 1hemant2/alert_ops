@@ -156,7 +156,7 @@ class StepSchedulingPostgresIntegrationTest {
     @Test
     // Verifies that zero-delay delivery begins only after its save commits.
     void zeroDelayStepPublishesOnlyAfterItsDatabaseCommit() throws Exception {
-        when(notification.sendEmail(any(), anyString())).thenReturn(true);
+        when(notification.sendEmail(any(), anyString(), any())).thenReturn(true);
         CountDownLatch delivered = new CountDownLatch(1);
         doAnswer(invocation -> {
             EscalationStepReadyMessage payload = invocation.getArgument(2);
@@ -191,7 +191,7 @@ class StepSchedulingPostgresIntegrationTest {
         FlowExecutionState saved = states.findById(stepId).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(FlowExecutionStepStatus.SENT);
         assertThat(saved.isPublicationPending()).isFalse();
-        verify(notification, times(1)).sendEmail(any(), anyString());
+        verify(notification, times(1)).sendEmail(any(), anyString(), any());
     }
 
     @Test
@@ -387,7 +387,7 @@ class StepSchedulingPostgresIntegrationTest {
     void acknowledgementWaitsForDeliveryAndPausesNextStep() throws Exception {
         CountDownLatch emailStarted = new CountDownLatch(1);
         CountDownLatch finishEmail = new CountDownLatch(1);
-        when(notification.sendEmail(any(), anyString())).thenAnswer(invocation -> {
+        when(notification.sendEmail(any(), anyString(), any())).thenAnswer(invocation -> {
             emailStarted.countDown();
             assertThat(finishEmail.await(10, TimeUnit.SECONDS)).isTrue();
             return true;
@@ -446,7 +446,7 @@ class StepSchedulingPostgresIntegrationTest {
         Instant lateDueAt = Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         consumer.deliverReadyStep(new EscalationStepReadyMessage(nextStep.getId(), 0, lateDueAt));
 
-        verify(notification, times(1)).sendEmail(any(), anyString());
+        verify(notification, times(1)).sendEmail(any(), anyString(), any());
     }
 
     @Test

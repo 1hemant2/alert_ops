@@ -23,6 +23,7 @@ import jakarta.mail.internet.MimeMessage;
 class NotificationTest {
     @SuppressWarnings("unchecked")
     @Test
+    // Verifies alert emails retain safe plain-text and HTML action links.
     void sendsMarkdownFallbackAndStyledSafeHtmlAlternative() throws Exception {
         ObjectProvider<JavaMailSender> senderProvider = mock(ObjectProvider.class);
         JavaMailSender mailSender = mock(JavaMailSender.class);
@@ -38,7 +39,10 @@ class NotificationTest {
 
         Notification notification = new Notification(senderProvider, "alerts@example.com");
 
-        assertTrue(notification.sendEmail(state, "https://alerts.example.com/acknowledge?token=sample-token"));
+        assertTrue(notification.sendEmail(
+                state,
+                "https://alerts.example.com/acknowledge?token=sample-token",
+                "https://alerts.example.com/escalate?token=escalate-token"));
 
         verify(mailSender).send(mimeMessage);
         Multipart parts = assertInstanceOf(Multipart.class, mimeMessage.getContent());
@@ -55,6 +59,7 @@ class NotificationTest {
         assertTrue(html.contains("ESCALATION NOTIFICATION"));
         assertTrue(html.contains("Acknowledge escalation"));
         assertTrue(html.contains("href=\"https://alerts.example.com/acknowledge?token=sample-token\""));
+        assertTrue(html.contains("Escalate now and notify the next person"));
         assertTrue(html.contains("width:100%;"));
         assertTrue(!html.contains("<img src=x"));
     }

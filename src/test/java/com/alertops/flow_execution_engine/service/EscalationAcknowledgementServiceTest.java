@@ -29,6 +29,7 @@ import com.alertops.audit.model.AuditEvent;
 import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
+import com.alertops.flow_execution_engine.model.EscalationActionCapability;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
@@ -103,6 +104,25 @@ class EscalationAcknowledgementServiceTest {
         assertNotEquals(rawToken, savedToken.getValue().getTokenHash());
         assertEquals(64, savedToken.getValue().getTokenHash().length());
         assertTrue(savedToken.getValue().getExpiresAt().isAfter(savedToken.getValue().getCreatedAt()));
+    }
+
+    @Test
+    // Binds an Escalate now link to its exact source and next target step.
+    void createsExplicitEscalateNowCapabilityForTheNextStep() {
+        FlowExecutionState nextStep = new FlowExecutionState();
+        nextStep.setId(UUID.fromString("71000000-0000-0000-0000-000000000005"));
+        nextStep.setProcessId(ESCALATION_ID);
+        nextStep.setUserEmail("next@example.com");
+
+        String link = service.createEscalateNowUrl(escalation, executionStep, nextStep);
+
+        assertTrue(link.startsWith("https://alerts.example.com/escalate?token="));
+        org.mockito.ArgumentCaptor<EscalationAcknowledgementToken> savedToken =
+                org.mockito.ArgumentCaptor.forClass(EscalationAcknowledgementToken.class);
+        verify(tokenRepository).save(savedToken.capture());
+        assertEquals(EscalationActionCapability.ESCALATE_NOW, savedToken.getValue().getCapability());
+        assertEquals(executionStep.getId(), savedToken.getValue().getExecutionStepId());
+        assertEquals(nextStep.getId(), savedToken.getValue().getExpectedTargetStepId());
     }
 
     @Test
@@ -194,6 +214,19 @@ class EscalationAcknowledgementServiceTest {
     @Test
     void unknownTokenCannotAcknowledgeARun() {
         when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.acknowledge(RAW_TOKEN));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        verify(escalationRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    // Prevents a manual-action token from being reused as an acknowledgement.
+    void escalateNowTokenCannotAcknowledgeARun() {
+        token.setCapability(EscalationActionCapability.ESCALATE_NOW);
+        when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> service.acknowledge(RAW_TOKEN));

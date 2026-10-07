@@ -77,12 +77,12 @@ class MessageConsumerTest {
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token")).thenReturn(true);
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null)).thenReturn(true);
 
         consumer.deliverReadyStep(queuedState);
         consumer.deliverReadyStep(queuedState);
 
-        verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token");
+        verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null);
         verify(stateRepository, times(1)).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
         assertEquals(FlowExecutionStepStatus.SENT, currentState.getStatus());
         assertEquals(1, currentState.getSendAttemptCount());
@@ -98,7 +98,7 @@ class MessageConsumerTest {
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
                 .thenReturn(true);
 
         consumer.deliverReadyStep(queuedState);
@@ -128,13 +128,23 @@ class MessageConsumerTest {
         when(stepSchedulingService.scheduleStep(nextState)).thenReturn(nextState);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
+        when(acknowledgementService.createEscalateNowUrl(any(Escalation.class), eq(currentState), eq(nextState)))
+                .thenReturn("https://alerts.example.com/escalate?token=escalate-token");
+        when(notification.sendEmail(
+                currentState,
+                "https://alerts.example.com/acknowledge?token=test-token",
+                "https://alerts.example.com/escalate?token=escalate-token"))
                 .thenReturn(true);
 
         consumer.deliverReadyStep(queuedState);
 
         assertEquals(nextDueAt, currentState.getDueAt());
         verify(stepSchedulingService).scheduleStep(nextState);
+        verify(acknowledgementService).createEscalateNowUrl(any(Escalation.class), eq(currentState), eq(nextState));
+        verify(notification).sendEmail(
+                currentState,
+                "https://alerts.example.com/acknowledge?token=test-token",
+                "https://alerts.example.com/escalate?token=escalate-token");
         verify(timeoutService, never()).scheduleAcknowledgementTimeout(any(), any(), any());
     }
 
@@ -169,7 +179,7 @@ class MessageConsumerTest {
                 .thenReturn(nextState, nextState);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
                 .thenThrow(new RuntimeException("unexpected processing error"));
 
         assertThrows(RuntimeException.class, () -> consumer.deliverReadyStep(queuedState));
