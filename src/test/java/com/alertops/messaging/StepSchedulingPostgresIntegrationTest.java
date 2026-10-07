@@ -52,8 +52,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
@@ -629,8 +629,8 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class, RedisAutoConfiguration.class,
-            RedisRepositoriesAutoConfiguration.class})
+    @EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class, DataRedisAutoConfiguration.class,
+            DataRedisRepositoriesAutoConfiguration.class})
     @EntityScan(basePackageClasses = {FlowExecutionState.class, AuditEventEntity.class})
     @EnableJpaRepositories(basePackageClasses = {FlowExecutionStateRepository.class, AuditEventRepository.class})
     @Import({StepSchedulingService.class, StepTimerRegistry.class, ReconcilerService.class,
