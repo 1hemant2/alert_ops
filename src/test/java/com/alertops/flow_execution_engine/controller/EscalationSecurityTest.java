@@ -50,6 +50,46 @@ class EscalationSecurityTest {
     private UserRepository userRepository;
 
     @Test
+    // Requires authentication before creating an escalation.
+    void anonymousCreateRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/create")
+                        .contentType(APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    // Requires authentication before reading the team escalation list.
+    void anonymousListRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/escalation/all"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    // Requires authentication before starting an escalation by path.
+    void anonymousPathStartRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/{escalationId}/start", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    // Requires authentication before starting an escalation by request body.
+    void anonymousBodyStartRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/start")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"escalationId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    // Requires authentication before reading saved execution steps.
+    void anonymousExecutionStateRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/escalation/{escalationId}/execution-states", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    // Requires authentication before reading one escalation.
     void anonymousEscalationRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/escalation")
                         .param("escalationId", UUID.randomUUID().toString()))
@@ -57,6 +97,7 @@ class EscalationSecurityTest {
     }
 
     @Test
+    // Requires authentication before scheduling a run.
     void anonymousScheduleRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/escalation/{escalationId}/schedule", UUID.randomUUID())
                         .contentType(APPLICATION_JSON)
@@ -65,6 +106,7 @@ class EscalationSecurityTest {
     }
 
     @Test
+    // Requires authentication before rescheduling a run.
     void anonymousRescheduleRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/escalation/{escalationId}/reschedule", UUID.randomUUID())
                         .contentType(APPLICATION_JSON)
@@ -73,8 +115,10 @@ class EscalationSecurityTest {
     }
 
     @Test
+    // Requires authentication before cancelling a scheduled run.
     void anonymousCancelRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/escalation/{escalationId}/cancel", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
     }
+
 }

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +44,51 @@ class StartFlowExecutionUseCaseTest {
     @AfterEach
     void clearContext() {
         AuthContextHolder.clear();
+    }
+
+    @Test
+    // Rejects an anonymous start before reading or changing escalation state.
+    void anonymousStartIsRejectedBeforeReadingTheEscalation() {
+        EscalationException error = assertThrows(
+                EscalationException.class, () -> useCase.execute(executionStateService, UUID.randomUUID()));
+
+        assertEquals(401, error.getStatus().value());
+        verifyNoInteractions(escalations, flows, nodes, tasks, executionStateService);
+    }
+
+    @Test
+    // Hides an escalation when it is not owned by the selected team.
+    void foreignTeamStartIsRejectedAsNotFound() {
+        UUID teamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(null);
+
+        EscalationException error = assertThrows(
+                EscalationException.class, () -> useCase.execute(executionStateService, escalationId));
+
+        assertEquals(404, error.getStatus().value());
+        verifyNoInteractions(flows, nodes, tasks, executionStateService);
+    }
+
+    @Test
+    // Prevents a scheduled run from starting before its saved start instant.
+    void scheduledStartBeforeItsSavedTimeIsRejected() {
+        UUID escalationId = UUID.randomUUID();
+        Escalation escalation = new Escalation();
+        escalation.setId(escalationId);
+        escalation.setStatus(EscalationStatus.SCHEDULED);
+        escalation.setScheduledStartAt(Instant.parse("2026-01-01T00:05:00Z"));
+        when(escalations.findById(escalationId)).thenReturn(java.util.Optional.of(escalation));
+
+        EscalationException error = assertThrows(
+                EscalationException.class,
+                () -> useCase.executeScheduled(
+                        executionStateService, escalationId, Instant.parse("2026-01-01T00:00:00Z")));
+
+        assertEquals(409, error.getStatus().value());
+        verifyNoInteractions(flows, nodes, tasks, executionStateService);
     }
 
     @Test
