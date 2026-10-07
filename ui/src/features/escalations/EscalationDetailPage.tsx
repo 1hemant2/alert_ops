@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelScheduledEscalation, getEscalation, getExecutionStates, rescheduleEscalation, startEscalation } from '../../api/escalations'
+import { cancelScheduledEscalation, escalateNow, getEscalation, getExecutionStates, previewEscalateNow, rescheduleEscalation, startEscalation } from '../../api/escalations'
 import { getFlow, getFlowNodes, nodeDelayMinutes, nodeName } from '../../api/flows'
 import { getTasks } from '../../api/tasks'
 import { Button, Card, ErrorState, InlineNotice, LoadingRows, PageHeader, StatusBadge } from '../../components/Elements'
@@ -79,6 +79,31 @@ export function EscalationDetailPage() {
       ])
     },
   })
+  const actionSourceStepId = escalation.data?.status === 'ACKNOWLEDGED'
+    ? escalation.data.acknowledgedStepId ?? ''
+    : [...(execution.data ?? [])].reverse().find(state => state.status === 'SENT')?.id ?? ''
+  const actionTarget = (execution.data ?? []).find(state => ['PAUSED', 'PENDING', 'SCHEDULED'].includes(state.status))
+  const actionTargetStepId = actionTarget?.id ?? ''
+  const manualActionRequest = actionSourceStepId && actionTargetStepId
+    ? { expectedSourceStepId: actionSourceStepId, expectedTargetStepId: actionTargetStepId }
+    : null
+  const [showEscalateNow, setShowEscalateNow] = useState(false)
+  const manualPreview = useQuery({
+    queryKey: ['escalate-now-preview', teamId, escalationId, actionSourceStepId, actionTargetStepId],
+    queryFn: () => previewEscalateNow(escalationId, manualActionRequest!),
+    enabled: showEscalateNow && Boolean(manualActionRequest),
+  })
+  const manualAction = useMutation({
+    mutationFn: () => escalateNow(escalationId, manualActionRequest!),
+    onSuccess: async () => {
+      setShowEscalateNow(false)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
+        queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
+        queryClient.invalidateQueries({ queryKey: ['execution-states', teamId, escalationId] }),
+      ])
+    },
+  })
 
   if (escalation.isPending) return <LoadingRows count={4} />
   if (escalation.isError) return <ErrorState message={escalation.error.message} onRetry={() => void escalation.refetch()} />
@@ -86,6 +111,7 @@ export function EscalationDetailPage() {
   const task = tasks.data?.find(candidate => candidate.id === item.taskId)
   const completed = item.status === 'COMPLETED'
   const scheduled = item.status === 'SCHEDULED'
+  const canOfferEscalateNow = (item.status === 'OPEN' || item.status === 'ACKNOWLEDGED') && Boolean(manualActionRequest)
 
   return <>
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
@@ -105,7 +131,20 @@ export function EscalationDetailPage() {
         <div className="button-row"><Button variant="secondary" disabled={reschedule.isPending || cancel.isPending}>{reschedule.isPending ? 'Saving…' : 'Reschedule'}</Button><Button type="button" variant="danger" disabled={reschedule.isPending || cancel.isPending} onClick={() => cancel.mutate()}>{cancel.isPending ? 'Cancelling…' : 'Cancel schedule'}</Button></div>
       </form>
     </Card>}
-    {item.resolutionType === 'ACKNOWLEDGED' && item.acknowledgedAt && <InlineNotice tone="success">Acknowledged by <strong>{item.issueSolvedBy}</strong> at {formatDate(item.acknowledgedAt)}. Remaining steps were stopped.</InlineNotice>}
+    {item.status === 'ACKNOWLEDGED' && item.acknowledgedAt && <InlineNotice tone="success">Acknowledged by <strong>{item.issueSolvedBy ?? 'the current recipient'}</strong> at {formatDate(item.acknowledgedAt)}. Resolution is expected by {item.resolutionDeadline ? formatDate(item.resolutionDeadline) : 'the saved deadline'}; the next step is paused.</InlineNotice>}
+    {canOfferEscalateNow && <Card className="manual-action-card">
+      <div className="card-heading"><div><span className="eyebrow">MANUAL ACTION</span><h2>Escalate now</h2></div><StatusBadge status={item.status} /></div>
+      <p className="form-intro">Remove the current wait and notify {actionTarget?.userEmail ?? 'the next recipient'} immediately. The saved step order stays unchanged.</p>
+      {!showEscalateNow && <Button variant="secondary" onClick={() => setShowEscalateNow(true)}>Review next notification <span>→</span></Button>}
+      {showEscalateNow && <>
+        {manualPreview.isPending && <p role="status">Checking the current next step…</p>}
+        {manualPreview.isError && <div className="form-error" role="alert">{manualPreview.error.message}</div>}
+        {manualPreview.data && <div className="acknowledgement-details"><span>NEXT RECIPIENT</span><strong>{manualPreview.data.targetRecipientEmail ?? 'Unavailable'}</strong>{manualPreview.data.actionDeadline && <><span>ACTION AVAILABLE UNTIL</span><strong>{formatDate(manualPreview.data.actionDeadline)}</strong></>}</div>}
+        {manualPreview.data && !manualPreview.data.actionAvailable && <div className="form-error" role="alert">{manualPreview.data.unavailableReason ?? 'This action is no longer available.'}</div>}
+        {manualAction.error && <div className="form-error" role="alert">{manualAction.error.message}</div>}
+        <div className="button-row"><Button variant="secondary" disabled={manualAction.isPending} onClick={() => setShowEscalateNow(false)}>Cancel</Button><Button disabled={manualAction.isPending || !manualPreview.data?.actionAvailable} onClick={() => manualAction.mutate()}>{manualAction.isPending ? 'Scheduling…' : item.status === 'ACKNOWLEDGED' ? 'Confirm and escalate now' : 'Escalate now'}</Button></div>
+      </>}
+    </Card>}
     <div className="detail-summary-grid">
       <Card className="detail-summary-card"><span className="eyebrow">TASK CONTEXT</span><strong>{task?.name ?? item.taskId.slice(0, 8)}</strong><p>{task?.description || 'Task details are not available.'}</p></Card>
       <Card className="detail-summary-card"><span className="eyebrow">ESCALATION PATH</span>{flow.data ? <Link className="detail-link" to={`/app/${teamId}/flows/${flow.data.id}`}>{flow.data.name} <span>↗</span></Link> : <strong>{item.flowId.slice(0, 8)}</strong>}<p>{nodes.data ? `${nodes.data.length} configured response ${nodes.data.length === 1 ? 'step' : 'steps'}` : 'Loading path configuration…'}</p></Card>

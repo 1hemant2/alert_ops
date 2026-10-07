@@ -124,11 +124,31 @@ export interface Escalation {
   resolutionType?: string | null
   issueSolvedBy?: string | null
   acknowledgedAt?: string | null
+  acknowledgedStepId?: string | null
+  resolutionDeadline?: string | null
   scheduledStartAt?: string | null
   scheduleTimezone?: string | null
   cancelledAt?: string | null
   createdAt: string
   updatedAt?: string
+}
+
+export interface EscalationManualActionRequest {
+  expectedSourceStepId: string
+  expectedTargetStepId: string
+}
+
+export interface EscalationManualAction {
+  escalationName: string
+  status: string
+  sourceStepId?: string | null
+  sourceRecipientEmail?: string | null
+  targetStepId?: string | null
+  targetRecipientEmail?: string | null
+  actionDeadline?: string | null
+  actionAvailable: boolean
+  alreadyEscalated: boolean
+  unavailableReason?: string | null
 }
 
 export interface EscalationAcknowledgement {
@@ -142,11 +162,13 @@ export interface EscalationAcknowledgement {
 }
 
 export interface ExecutionState {
+  id: string
   nodeId: string
   position: string | number
   userEmail: string
   status: string
   sendAttemptCount: number
+  dueAt?: string | null
   createdAt: string
   updatedAt?: string
 }

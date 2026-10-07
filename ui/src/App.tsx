@@ -16,6 +16,7 @@ import { FlowsPage } from './features/flows/FlowsPage'
 import { EscalationDetailPage } from './features/escalations/EscalationDetailPage'
 import { EscalationsPage } from './features/escalations/EscalationsPage'
 import { AcknowledgeEscalationPage } from './features/escalations/AcknowledgeEscalationPage'
+import { EscalateNowPage } from './features/escalations/EscalateNowPage'
 import { WebhooksPage } from './features/webhooks/WebhooksPage'
 
 const queryClient = new QueryClient({
@@ -57,6 +58,7 @@ function AppRoutes() {
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/verify-email" element={<VerifyEmailPage />} />
     <Route path="/acknowledge" element={<AcknowledgeEscalationPage />} />
+    <Route path="/escalate" element={<EscalateNowPage />} />
     <Route path="/join" element={<JoinTeamPage />} />
     <Route element={<RequireAuth />}>
       <Route path="/teams" element={<TeamPickerPage />} />
