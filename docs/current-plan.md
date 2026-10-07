@@ -1,51 +1,49 @@
 # Current task plan
 
-## Task: Complete task and run context UI
+## Task: Complete webhook event history navigation
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Complete the next launch-checklist item by adding task detail/editing and
-showing all saved task metadata in task and escalation views. Reuse existing
-task APIs and execution-step snapshots. Keep webhook event history and
-deployment verification out of scope.
+Finish the remaining webhook UI implementation item: let team members reveal
+all saved events for a webhook and open the exact task created by an event.
+Reuse the existing event-list API and task-detail route. Do not change backend
+event storage, pagination contracts, webhook configuration, or deployment
+verification.
 
-Previous backend task: task metadata snapshotting and email display is complete
-in commits `f2d4f7a`, `83c4627`, and `9577f23`.
+Previous task: task detail/editing and saved run context UI is complete in
+commits `89abc0d` and `d8cc188`.
 
 ### Decision-compliance note
 
-- Task detail/editing uses the existing team-scoped task API; do not add a
-  duplicate UI-only task store or a new backend endpoint without evidence.
-- Active and historical escalation views use `FlowExecutionState` snapshot
-  fields, not the mutable current task, for run context.
-- Keep optional priority, category, and reference URL nullable and display
-  clear fallback text when older rows do not contain them.
+- The existing team-scoped `GET /api/v1/team/webhooks/{id}/events` response is
+  the source of truth; do not add a second history endpoint or client store.
+- Event task links must use the existing `/app/:teamId/tasks/:taskId` route,
+  preserving team-scoped access and the task detail editor.
+- Keep the current recent-event view compact and make older events explicitly
+  available through a clear user action.
 
 ### Acceptance criteria
 
-- Team members can open a task from the task library, view all fields, edit
-  name, description, source, priority, category, and reference URL, and see
-  saved success/error states.
-- The task list exposes useful metadata and links to the task detail view.
-- Escalation detail displays saved run metadata from execution snapshots,
-  including after the task is edited later.
-- UI typecheck, lint, production build, focused tests if available, and diff
-  checks pass; launch documentation records the updated status.
+- A webhook with more than three events provides an obvious way to show and
+  hide the complete event history.
+- Each event links to its specific task detail page and existing run detail.
+- Empty, loading, and error states remain understandable.
+- UI typecheck, lint, production build, and diff checks pass.
+- The launch checklist and changelog record the completed UI item.
 
 ### Steps
 
-- [x] Add task detail route, edit form, and task-list metadata/linking.
-- [x] Render saved task metadata in the escalation context card.
+- [x] Add expandable full-history navigation and specific task links.
 - [x] Run UI verification and update launch documentation/changelog.
 
 ### Verification and limitations
 
 `npm run typecheck` and `npm run build` pass. `npm run lint` passes with two
-pre-existing warnings in `FlowDetailPage.tsx`; the new task UI adds no lint
-warnings. No focused UI test script exists. Browser/deployed verification
-remains pending, and the separate webhook-history UI task is not included.
+pre-existing warnings in `FlowDetailPage.tsx`; the webhook UI adds no warnings.
+`git diff --check` passes. No focused UI test script is available. PostgreSQL,
+Redis, browser, and deployed verification remain separate release checks.
 Independent read-only verification was skipped because no usable subagent
 mechanism was available.

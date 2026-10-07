@@ -4,6 +4,14 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Complete webhook event history UI
+
+- Add expandable webhook event history and link each event to its specific task
+  detail page while preserving the existing run and payload links.
+- Verification: UI typecheck and production build pass; lint passes with two
+  pre-existing flow-editor warnings, and `git diff --check` passes. PostgreSQL,
+  Redis, browser, and deployed verification remain pending.
+
 ## 2026-10-08 — Complete task and run context UI
 
 - Add team-scoped task detail/editing, metadata links, and saved task context on
