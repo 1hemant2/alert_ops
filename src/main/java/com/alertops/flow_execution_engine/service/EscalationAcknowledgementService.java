@@ -369,7 +369,8 @@ public class EscalationAcknowledgementService {
                 token.getExpiresAt(),
                 escalation.getAcknowledgedAt(),
                 escalation.getIssueSolvedBy(),
-                alreadyAcknowledged);
+                alreadyAcknowledged,
+                escalation.getResolutionDeadline());
     }
 
     private String newRawToken() {
