@@ -300,6 +300,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .execution-title { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .execution-badges { display: flex; flex-wrap: wrap; justify-content: end; gap: 5px; }
 .execution-details { display: flex; flex-wrap: wrap; gap: 16px; border-top: 1px solid #f0f2ed; padding-top: 9px; margin-top: 10px; color: #98a198; font-size: 11px; letter-spacing: .04em; }
+.execution-explanation { margin: 9px 0 0; color: #667085; font-size: 13px; line-height: 1.5; }
 .polling-note { border-top: 1px solid #f0f2ed; margin-top: 6px; padding-top: 12px; display: flex; align-items: center; gap: 8px; color: #88938a; font-size: 12px; }
 .polling-note .live-dot { width: 6px; height: 6px; }
 .start-error { margin-top: 12px; }

@@ -159,6 +159,15 @@ export interface EscalationAcknowledgement {
   acknowledgedAt?: string | null
   acknowledgedBy?: string | null
   alreadyAcknowledged: boolean
+  resolutionDeadline?: string | null
+}
+
+export interface EscalationResolution {
+  escalationName: string
+  status: string
+  resolvedBy?: string | null
+  resolvedAt?: string | null
+  alreadyResolved: boolean
 }
 
 export interface ExecutionState {

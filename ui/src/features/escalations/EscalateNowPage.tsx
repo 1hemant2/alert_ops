@@ -9,7 +9,7 @@ import { formatDate } from '../../lib/format'
 function manualActionError(error: Error | null): string {
   if (error instanceof ApiError) {
     if (error.status === 410) return 'This Escalate now link has expired.'
-    if (error.status === 409) return 'This escalation has already moved or the action is no longer available.'
+    if (error.status === 409) return 'This escalation has advanced or its response window has closed. The link cannot change a later step.'
     if (error.status === 400) return 'This Escalate now link is invalid. Open the complete link from your email.'
   }
   return error?.message ?? 'AlertOps could not load this Escalate now link.'
@@ -39,8 +39,10 @@ export function EscalateNowPage() {
     <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
     <div className="auth-card acknowledgement-card">
       <span className="eyebrow">ESCALATION RESPONSE</span>
-      <h1>{completed ? 'Next step scheduled' : 'Escalate this alert now'}</h1>
-      <p>This removes the current wait and notifies the next person in the saved escalation path.</p>
+      <h1>{completed ? 'Next step scheduled' : preview.data && !preview.data.actionAvailable ? 'Escalate now unavailable' : 'Escalate this alert now'}</h1>
+      <p>{completed
+        ? 'The next response step is now due and will be delivered by AlertOps.'
+        : 'This read-only preview checks the current saved step before you confirm.'}</p>
 
       {!token && <div className="form-error" role="alert">The Escalate now link is missing its token. Open the complete link from your email.</div>}
       {token && preview.isPending && <p role="status">Checking this secure Escalate now link…</p>}
@@ -48,12 +50,13 @@ export function EscalateNowPage() {
 
       {preview.data && <div className="acknowledgement-details">
         <span>ESCALATION</span><strong>{preview.data.escalationName}</strong>
+        <span>YOUR STEP</span><strong>{preview.data.sourceRecipientEmail ?? 'Current recipient'}</strong>
         <span>NEXT RECIPIENT</span><strong>{preview.data.targetRecipientEmail ?? 'Unavailable'}</strong>
       </div>}
 
       {completed
         ? <CompletedAction result={completed} />
-        : preview.data && !preview.error && <>
+        : preview.data && preview.isSuccess && <>
             {!preview.data.actionAvailable && <div className="form-error" role="alert">{preview.data.unavailableReason ?? 'This action is no longer available.'}</div>}
             {preview.data.actionAvailable && <>
               {confirm.error && <div className="form-error" role="alert">{manualActionError(confirm.error)}</div>}

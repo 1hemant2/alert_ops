@@ -1,11 +1,25 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelScheduledEscalation, escalateNow, getEscalation, getExecutionStates, previewEscalateNow, rescheduleEscalation, startEscalation } from '../../api/escalations'
+import { cancelScheduledEscalation, escalateNow, getEscalation, getExecutionStates, previewEscalateNow, resolveEscalation, rescheduleEscalation, startEscalation } from '../../api/escalations'
 import { getFlow, getFlowNodes, nodeDelayMinutes, nodeName } from '../../api/flows'
 import { getTasks } from '../../api/tasks'
 import { Button, Card, ErrorState, InlineNotice, LoadingRows, PageHeader, StatusBadge } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
+
+// Explains the current saved state of one execution step.
+function stepStatusExplanation(status: string): string {
+  switch (status) {
+    case 'PENDING': return 'Waiting for an earlier step to finish.'
+    case 'SCHEDULED': return 'Waiting until its saved response time.'
+    case 'PAUSED': return 'Paused while the current recipient resolves the escalation.'
+    case 'SENDING': return 'Sending the notification.'
+    case 'SENT': return 'Notification accepted; waiting for acknowledgement.'
+    case 'FAILED': return 'Notification delivery failed after its retry attempts.'
+    case 'SKIPPED': return 'Skipped because the escalation finished before this step was sent.'
+    default: return 'Saved step state.'
+  }
+}
 
 export function EscalationDetailPage() {
   const { teamId = '', escalationId = '' } = useParams()
@@ -20,7 +34,7 @@ export function EscalationDetailPage() {
       return getEscalation(escalationId)
     },
     enabled: Boolean(escalationId),
-    refetchInterval: query => query.state.data?.status === 'OPEN' ? 3000 : false,
+    refetchInterval: query => ['OPEN', 'ACKNOWLEDGED'].includes(query.state.data?.status ?? '') ? 3000 : false,
   })
   const execution = useQuery({
     queryKey: ['execution-states', teamId, escalationId],
@@ -29,7 +43,7 @@ export function EscalationDetailPage() {
       return getExecutionStates(escalationId)
     },
     enabled: Boolean(escalationId && escalation.data),
-    refetchInterval: escalation.data?.status === 'OPEN' ? 3000 : false,
+    refetchInterval: ['OPEN', 'ACKNOWLEDGED'].includes(escalation.data?.status ?? '') ? 3000 : false,
   })
   const tasks = useQuery({ queryKey: ['tasks', teamId], queryFn: getTasks })
   const flowId = escalation.data?.flowId
@@ -104,6 +118,16 @@ export function EscalationDetailPage() {
       ])
     },
   })
+  const resolution = useMutation({
+    mutationFn: () => resolveEscalation(escalationId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
+        queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
+        queryClient.invalidateQueries({ queryKey: ['execution-states', teamId, escalationId] }),
+      ])
+    },
+  })
 
   if (escalation.isPending) return <LoadingRows count={4} />
   if (escalation.isError) return <ErrorState message={escalation.error.message} onRetry={() => void escalation.refetch()} />
@@ -131,7 +155,14 @@ export function EscalationDetailPage() {
         <div className="button-row"><Button variant="secondary" disabled={reschedule.isPending || cancel.isPending}>{reschedule.isPending ? 'Saving…' : 'Reschedule'}</Button><Button type="button" variant="danger" disabled={reschedule.isPending || cancel.isPending} onClick={() => cancel.mutate()}>{cancel.isPending ? 'Cancelling…' : 'Cancel schedule'}</Button></div>
       </form>
     </Card>}
-    {item.status === 'ACKNOWLEDGED' && item.acknowledgedAt && <InlineNotice tone="success">Acknowledged by <strong>{item.issueSolvedBy ?? 'the current recipient'}</strong> at {formatDate(item.acknowledgedAt)}. Resolution is expected by {item.resolutionDeadline ? formatDate(item.resolutionDeadline) : 'the saved deadline'}; the next step is paused.</InlineNotice>}
+    {item.status === 'ACKNOWLEDGED' && <Card className="resolution-action-card">
+      <div className="card-heading"><div><span className="eyebrow">ACTIVE RESOLUTION</span><h2>Someone is working on this escalation</h2></div><StatusBadge status="ACKNOWLEDGED" /></div>
+      <p className="form-intro">Acknowledged by <strong>{item.issueSolvedBy ?? 'the current recipient'}</strong>{item.acknowledgedAt ? ` at ${formatDate(item.acknowledgedAt)}` : ''}. The next step is paused until the issue is resolved or the deadline is reached.</p>
+      <div className="acknowledgement-details"><span>RESOLUTION DEADLINE</span><strong>{item.resolutionDeadline ? formatDate(item.resolutionDeadline) : 'Saved deadline unavailable'}</strong></div>
+      {resolution.error && <div className="form-error" role="alert">{resolution.error.message}</div>}
+      <Button disabled={resolution.isPending} onClick={() => resolution.mutate()}>{resolution.isPending ? 'Resolving…' : 'Resolve escalation'}</Button>
+    </Card>}
+    {resolution.data && <InlineNotice tone="success">Escalation resolved by <strong>{resolution.data.resolvedBy ?? 'the current team member'}</strong>{resolution.data.resolvedAt ? ` at ${formatDate(resolution.data.resolvedAt)}` : ''}. Remaining response steps were skipped.</InlineNotice>}
     {canOfferEscalateNow && <Card className="manual-action-card">
       <div className="card-heading"><div><span className="eyebrow">MANUAL ACTION</span><h2>Escalate now</h2></div><StatusBadge status={item.status} /></div>
       <p className="form-intro">Remove the current wait and notify {actionTarget?.userEmail ?? 'the next recipient'} immediately. The saved step order stays unchanged.</p>
@@ -155,10 +186,10 @@ export function EscalationDetailPage() {
       {execution.isPending ? <LoadingRows count={3} /> : execution.isError ? <ErrorState message={execution.error.message} onRetry={() => void execution.refetch()} /> : execution.data.length === 0 ? <div className="prestart-state"><div className="prestart-illustration">01 <span>→</span> 02 <span>→</span> 03</div><div><strong>{scheduled ? 'This escalation is scheduled to start later.' : 'This escalation is ready to start.'}</strong><p>{scheduled ? 'Start now begins it immediately and keeps the first step’s configured wait.' : 'Starting it saves the path steps and schedules the first wait.'}</p></div>{(item.status === 'IDLE' || scheduled) && <Button disabled={start.isPending || !nodes.data?.length} onClick={() => start.mutate()}>{start.isPending ? 'Starting…' : scheduled ? 'Start now' : 'Start escalation'} <span>→</span></Button>}</div> : <div className="execution-timeline">{execution.data.map((state, index) => {
         const node = nodes.data?.find(candidate => candidate.id === state.nodeId)
         const terminal = state.status === 'SENT' || state.status === 'FAILED' || state.status === 'SKIPPED'
-        return <article className="execution-row" key={state.nodeId}><div className={`execution-index execution-${state.status.toLowerCase()}`}>{terminal ? '✓' : String(index + 1).padStart(2, '0')}</div><div className="execution-connector" /><div className="execution-copy"><div className="execution-title"><div><strong>{node ? nodeName(node) : `Response step ${index + 1}`}</strong><small>{state.userEmail}</small></div><div className="execution-badges"><StatusBadge status={state.status} /></div></div><div className="execution-details"><span>WAIT&nbsp; {node ? `${nodeDelayMinutes(node)} MIN` : '—'}</span><span>ATTEMPTS&nbsp; {state.sendAttemptCount}</span><span>UPDATED&nbsp; {formatDate(state.updatedAt ?? state.createdAt)}</span></div></div></article>
+        return <article className="execution-row" key={state.nodeId}><div className={`execution-index execution-${state.status.toLowerCase()}`}>{terminal ? '✓' : String(index + 1).padStart(2, '0')}</div><div className="execution-connector" /><div className="execution-copy"><div className="execution-title"><div><strong>{node ? nodeName(node) : `Response step ${index + 1}`}</strong><small>{state.userEmail}</small></div><div className="execution-badges"><StatusBadge status={state.status} /></div></div><div className="execution-details"><span>WAIT&nbsp; {node ? `${nodeDelayMinutes(node)} MIN` : '—'}</span><span>ATTEMPTS&nbsp; {state.sendAttemptCount}</span><span>UPDATED&nbsp; {formatDate(state.updatedAt ?? state.createdAt)}</span></div><p className="execution-explanation">{stepStatusExplanation(state.status)}{state.dueAt && ['PENDING', 'SCHEDULED'].includes(state.status) ? ` Due ${formatDate(state.dueAt)}.` : ''}</p></div></article>
       })}</div>}
       {start.error && <div className="form-error start-error" role="alert">{start.error.message}</div>}
-      {item.status === 'OPEN' && <div className="polling-note"><span className="live-dot" /> Refreshing saved state every 3 seconds while this run is active.</div>}
+      {['OPEN', 'ACKNOWLEDGED'].includes(item.status) && <div className="polling-note"><span className="live-dot" /> Refreshing saved state every 3 seconds while this run is active.</div>}
     </Card>
     <div className="last-updated">ESCALATION ID&nbsp; <code>{item.id}</code></div>
   </>
