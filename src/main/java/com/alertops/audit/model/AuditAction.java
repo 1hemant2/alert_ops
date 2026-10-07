@@ -7,5 +7,6 @@ public enum AuditAction {
     STARTED,
     CANCELLED,
     START_FAILED,
-    ACKNOWLEDGED
+    ACKNOWLEDGED,
+    RESOLVED
 }

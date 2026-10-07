@@ -45,6 +45,12 @@ public class Escalation {
     @Column(name = "resolution_deadline")
     private Instant resolutionDeadline;
 
+    @Column(name = "resolved_by", length = 320)
+    private String resolvedBy;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     private Instant scheduledStartAt;
 
     private String scheduleTimezone;
@@ -175,6 +181,22 @@ public class Escalation {
 
     public void setResolutionDeadline(Instant resolutionDeadline) {
         this.resolutionDeadline = resolutionDeadline;
+    }
+
+    public String getResolvedBy() {
+        return resolvedBy;
+    }
+
+    public void setResolvedBy(String resolvedBy) {
+        this.resolvedBy = resolvedBy;
+    }
+
+    public Instant getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public void setResolvedAt(Instant resolvedAt) {
+        this.resolvedAt = resolvedAt;
     }
 
     public Instant getScheduledStartAt() {

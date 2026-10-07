@@ -35,6 +35,19 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
    FlowExecutionState findFirstByProcessIdAndStatusInOrderByPositionAscIdAsc(
            UUID processId, List<FlowExecutionStepStatus> statuses);
 
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   @Query("""
+           SELECT state FROM FlowExecutionState state
+           WHERE state.processId = :processId
+             AND state.status IN (
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PENDING,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PAUSED
+             )
+           ORDER BY state.position ASC, state.id ASC
+           """)
+   List<FlowExecutionState> findUnsentStepsForUpdate(@Param("processId") UUID processId);
+
    @Query("""
            SELECT state FROM FlowExecutionState state
            WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
@@ -102,7 +115,8 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
            WHERE state.processId = :processId
              AND state.status IN (
                  com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PENDING,
-                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PAUSED
              )
            """)
    int markUnsentStepsSkipped(@Param("processId") UUID processId);

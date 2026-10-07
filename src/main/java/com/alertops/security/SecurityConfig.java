@@ -73,7 +73,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/webhooks/*/events",
                                 "/api/v1/escalation/acknowledgement/preview",
-                                "/api/v1/escalation/acknowledgement/confirm").permitAll()
+                                "/api/v1/escalation/acknowledgement/confirm",
+                                "/api/v1/escalation/resolution/confirm").permitAll()
                         .requestMatchers("/api/v1/auth/**", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/team/join").permitAll()
                         .anyRequest().authenticated()
