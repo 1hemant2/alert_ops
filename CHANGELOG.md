@@ -4,12 +4,13 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
-## 2026-10-08 — Fix Spring Boot 4 Redis test imports
+## 2026-10-08 — Fix Spring Boot 4 integration-test imports
 
-- Update integration-test Redis auto-configuration exclusions to the Spring Boot
-  4 package and `DataRedis*` class names, restoring CI test compilation.
-- Verification: test compilation, full `./mvnw -q package`, and
-  `git diff --check` pass.
+- Update integration-test Redis, JDBC, JPA, AMQP, and entity-scan imports to
+  the Spring Boot 4 packages and class names, restoring clean CI compilation.
+- Verification: clean test compilation and `./mvnw --batch-mode
+  --no-transfer-progress clean verify` pass with 238 tests, 0 failures/errors,
+  and 17 environment-gated skips; `git diff --check` passes.
 
 ## 2026-10-08 — Complete webhook event history UI
 
