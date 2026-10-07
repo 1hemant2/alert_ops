@@ -92,6 +92,9 @@ public class FlowExecutionStateService {
                 flowExecutionState.setTaskDetails(task.getDescription());
                 flowExecutionState.setTaskName(task.getName());
                 flowExecutionState.setTaskSource(task.getSource());
+                flowExecutionState.setTaskPriority(task.getPriority());
+                flowExecutionState.setTaskCategory(task.getCategory());
+                flowExecutionState.setTaskReferenceUrl(task.getReferenceUrl());
                 flowExecutionState.setNodeId(node.getId());
                 flowExecutionState.setUserEmail(node.getEmail());
                 flowExecutionState.setDuration(node.getDuration());

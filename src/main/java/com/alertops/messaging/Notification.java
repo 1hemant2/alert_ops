@@ -67,6 +67,9 @@ public class Notification {
             String taskDetails = Objects.toString(flowExecutionState.getTaskDetails(), "").trim();
             String taskName = sanitizeSubject(Objects.toString(flowExecutionState.getTaskName(), "").trim());
             String taskSource = sanitizeSubject(Objects.toString(flowExecutionState.getTaskSource(), "Manual").trim());
+            String taskPriority = sanitizeMetadata(flowExecutionState.getTaskPriority());
+            String taskCategory = sanitizeMetadata(flowExecutionState.getTaskCategory());
+            String taskReferenceUrl = sanitizeMetadata(flowExecutionState.getTaskReferenceUrl());
             if (taskSource.isEmpty()) {
                 taskSource = "Manual";
             }
@@ -81,7 +84,8 @@ public class Notification {
             }
 
             String markdown = buildMarkdown(
-                    flowExecutionState, taskName, taskSource, taskDetails, acknowledgementUrl, escalateNowUrl);
+                    flowExecutionState, taskName, taskSource, taskPriority, taskCategory, taskReferenceUrl,
+                    taskDetails, acknowledgementUrl, escalateNowUrl);
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(
                     message,
@@ -196,6 +200,9 @@ public class Notification {
             FlowExecutionState state,
             String taskName,
             String taskSource,
+            String taskPriority,
+            String taskCategory,
+            String taskReferenceUrl,
             String taskDetails,
             String acknowledgementUrl,
             String escalateNowUrl) {
@@ -214,6 +221,9 @@ public class Notification {
 
                 - **Title:** %s
                 - **Source:** %s
+                - **Priority:** %s
+                - **Category:** %s
+                - **Reference URL:** %s
 
                 %s
 
@@ -231,7 +241,8 @@ public class Notification {
                 ---
 
                 *Automated notification from AlertOps. Replies may not be monitored.*
-                """.formatted(taskName.isBlank() ? "Response needed" : taskName, taskSource, details,
+                """.formatted(taskName.isBlank() ? "Response needed" : taskName, taskSource, taskPriority,
+                        taskCategory, taskReferenceUrl, details,
                         escalationId, recipient, acknowledgementUrl, escalateNowAction);
     }
 
@@ -306,6 +317,15 @@ public class Notification {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    // Normalizes optional task metadata before it is placed into an email line.
+    private String sanitizeMetadata(String value) {
+        String normalized = Objects.toString(value, "")
+                .replaceAll("[\\r\\n\\t]+", " ")
+                .replaceAll("\\s{2,}", " ")
+                .trim();
+        return normalized.isEmpty() ? "Not provided" : normalized;
     }
 
     private String sanitizeSubject(String value) {

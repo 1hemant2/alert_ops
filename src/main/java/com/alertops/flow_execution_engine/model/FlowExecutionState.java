@@ -30,6 +30,12 @@ public class FlowExecutionState {
     private String taskName;
     @Column(name = "task_source", length = 120)
     private String taskSource;
+    @Column(name = "task_priority", length = 20)
+    private String taskPriority;
+    @Column(name = "task_category", length = 80)
+    private String taskCategory;
+    @Column(name = "task_reference_url", length = 2048)
+    private String taskReferenceUrl;
     @Column(name = "task_details", columnDefinition = "TEXT")
     private String taskDetails;
     private UUID nodeId;
@@ -101,6 +107,24 @@ public class FlowExecutionState {
     public void setTaskName(String taskName) { this.taskName = taskName; }
     public String getTaskSource() { return taskSource; }
     public void setTaskSource(String taskSource) { this.taskSource = taskSource; }
+
+    // Returns the priority captured when this execution step was created.
+    public String getTaskPriority() { return taskPriority; }
+
+    // Stores the task priority for this immutable execution-step snapshot.
+    public void setTaskPriority(String taskPriority) { this.taskPriority = taskPriority; }
+
+    // Returns the category captured when this execution step was created.
+    public String getTaskCategory() { return taskCategory; }
+
+    // Stores the task category for this immutable execution-step snapshot.
+    public void setTaskCategory(String taskCategory) { this.taskCategory = taskCategory; }
+
+    // Returns the reference URL captured when this execution step was created.
+    public String getTaskReferenceUrl() { return taskReferenceUrl; }
+
+    // Stores the reference URL for this immutable execution-step snapshot.
+    public void setTaskReferenceUrl(String taskReferenceUrl) { this.taskReferenceUrl = taskReferenceUrl; }
 
     public String getTaskDetails() {
         return taskDetails;
