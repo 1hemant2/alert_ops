@@ -1,53 +1,51 @@
 # Current task plan
 
-## Task: Snapshot task metadata for runs and emails
+## Task: Complete task and run context UI
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Complete the remaining backend portion of the webhook/task launch feature by
-preserving optional task priority, category, and reference URL in execution
-steps and showing those values in escalation emails. Do not change the
-webhook-history UI or deployment verification in this task.
+Complete the next launch-checklist item by adding task detail/editing and
+showing all saved task metadata in task and escalation views. Reuse existing
+task APIs and execution-step snapshots. Keep webhook event history and
+deployment verification out of scope.
 
-Previous task: backend image vulnerability remediation is complete; see the
-latest changelog entry and commits `776c4e4`, `6380594`, and `013ac6e`.
+Previous backend task: task metadata snapshotting and email display is complete
+in commits `f2d4f7a`, `83c4627`, and `9577f23`.
 
 ### Decision-compliance note
 
-- `Task.priority`, `Task.category`, and `Task.referenceUrl` are the canonical
-  source values; copy them once into each `FlowExecutionState` at run start.
-- Runtime snapshots are authoritative after start, so later task edits must
-  not change an active or historical run.
-- Keep priority and category as validated strings because they are user-owned
-  labels, and retain the existing HTTP(S) validation for reference URLs.
-- Add only the three snapshot columns; do not create a second task metadata
-  model or reread the mutable task while sending email.
+- Task detail/editing uses the existing team-scoped task API; do not add a
+  duplicate UI-only task store or a new backend endpoint without evidence.
+- Active and historical escalation views use `FlowExecutionState` snapshot
+  fields, not the mutable current task, for run context.
+- Keep optional priority, category, and reference URL nullable and display
+  clear fallback text when older rows do not contain them.
 
 ### Acceptance criteria
 
-- New execution-step rows retain all three optional task fields, including for
-  immediate and scheduled starts; existing rows remain readable with nulls.
-- Alert emails display the saved metadata without allowing user content to
-  create unsafe HTML or links.
-- Focused snapshot and notification tests pass, followed by the full Maven
-  package and diff checks.
-- The launch checklist, feature plan, and changelog record the completed
-  backend work and remaining UI/deployed limitations.
+- Team members can open a task from the task library, view all fields, edit
+  name, description, source, priority, category, and reference URL, and see
+  saved success/error states.
+- The task list exposes useful metadata and links to the task detail view.
+- Escalation detail displays saved run metadata from execution snapshots,
+  including after the task is edited later.
+- UI typecheck, lint, production build, focused tests if available, and diff
+  checks pass; launch documentation records the updated status.
 
 ### Steps
 
-- [x] Add the migration, entity fields, and start-time snapshot assignment.
-- [x] Add safe email rendering and focused regression coverage.
-- [x] Run focused tests, the full package, and documentation checks.
+- [x] Add task detail route, edit form, and task-list metadata/linking.
+- [x] Render saved task metadata in the escalation context card.
+- [x] Run UI verification and update launch documentation/changelog.
 
 ### Verification and limitations
 
-Focused snapshot/email tests and `./mvnw -q package` pass with 260 tests,
-0 failures/errors, and 17 environment-gated skips. `git diff --check` passes.
-The migration was reviewed for existing-row null compatibility, but PostgreSQL
-execution and deployed email verification remain pending. The remaining task
-and webhook UI work stays outside this task. Independent read-only verification
-was skipped because no usable subagent mechanism was available.
+`npm run typecheck` and `npm run build` pass. `npm run lint` passes with two
+pre-existing warnings in `FlowDetailPage.tsx`; the new task UI adds no lint
+warnings. No focused UI test script exists. Browser/deployed verification
+remains pending, and the separate webhook-history UI task is not included.
+Independent read-only verification was skipped because no usable subagent
+mechanism was available.

@@ -1,7 +1,7 @@
 # Webhook task creation plan
 
-Status: Partially implemented — core backend and configuration UI exist; metadata
-presentation, full event access, and deployed verification remain pending.
+Status: Partially implemented — core backend and configuration UI exist; full
+event access and deployed verification remain pending.
 Source audit: 2026-10-06. Track inspected progress and remaining release checks in
 [Feature 2 of the launch checklist](product-launch-readiness.md#feature-2-create-and-start-an-escalation-through-a-webhook).
 This plan describes the target behavior, not proof that every item is implemented.
@@ -63,7 +63,7 @@ Create the task, run, and event in one database transaction. If any part fails, 
 
 - Let team owners/admins create a webhook with a default response path, copy its one-time secret, and later rotate or disable it. Show team flow IDs so a sender can choose a different path when needed.
 - Show received events with their time and a link to the task they created. The event detail shows the complete saved JSON payload and a link to the run. Only members of that team can view it.
-- Show `Task.source` on task and run screens and in the email. Team members can open the webhook event when they need the original request.
+- Show task source and optional metadata on the task detail, run, and email surfaces. Team members can open the webhook event when they need the original request.
 
 ## Implementation order
 

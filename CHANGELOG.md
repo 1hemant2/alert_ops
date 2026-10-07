@@ -4,6 +4,14 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Complete task and run context UI
+
+- Add team-scoped task detail/editing, metadata links, and saved task context on
+  escalation details using the run snapshot rather than mutable task values.
+- Verification: UI typecheck and production build pass; lint passes with two
+  pre-existing flow-editor warnings. Browser/deployed verification and older
+  webhook event navigation remain pending.
+
 ## 2026-10-08 — Snapshot task metadata in executions and emails
 
 - Persist priority, category, and reference URL in each execution-step snapshot
