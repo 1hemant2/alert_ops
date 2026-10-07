@@ -4,6 +4,13 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Fix CI container image build
+
+- Remove brittle exact Jammy OpenSSL package pins while continuing to install
+  the current patched `libssl3` and `openssl` packages from the pinned base.
+- Verification: GitHub Actions run `37685067113` passed Maven, container image
+  build, and Trivy scanning; local Docker was unavailable.
+
 ## 2026-10-08 — Fix Spring Boot 4 integration-test imports
 
 - Update integration-test Redis, JDBC, JPA, AMQP, and entity-scan imports to

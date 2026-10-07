@@ -3,7 +3,7 @@
 ## Task: Fix CI container image build
 
 Started: 2026-10-08
-Status: In progress
+Status: Complete
 
 ### Goal and scope
 
@@ -32,14 +32,14 @@ failed during `Build commit image`.
 
 ### Steps
 
-- [ ] Update the Dockerfile package installation.
-- [ ] Run the local diff checks and push the fix.
-- [ ] Monitor CI through Maven, image build, and Trivy completion.
-- [ ] Update the changelog with the final CI result.
+- [x] Update the Dockerfile package installation.
+- [x] Run the local diff checks and push the fix.
+- [x] Monitor CI through Maven, image build, and Trivy completion.
+- [x] Update the changelog with the final CI result.
 
 ### Verification and limitations
 
-The prior clean Maven verification ran 238 tests with 0 failures/errors and
-17 environment-gated skips. Docker is unavailable locally, so image build and
-Trivy verification must be confirmed by GitHub Actions. Independent read-only
-verification will be skipped if no usable subagent mechanism is available.
+Local Docker is unavailable. GitHub Actions run `37685067113` passed Maven
+verification, the container image build, and the Trivy scan; Maven ran 238 tests
+with 0 failures/errors and 17 environment-gated skips. Independent read-only
+verification was skipped because no usable subagent mechanism was available.
