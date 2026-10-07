@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
-FROM maven:3.9.9-eclipse-temurin-17@sha256:f58d59b6273e785ac0a4477f6e9b5ba1d7731c75b906c0f7b34076f1851318cc AS build
+FROM maven:3.9.12-eclipse-temurin-17@sha256:a0603aab698040d9c94259f379ec0487da1678560748d6c7508483034033c53d AS build
 WORKDIR /app
 
 COPY pom.xml ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 mvn -DskipTests clean package
 
-FROM eclipse-temurin:17.0.20.1_1-jre-jammy@sha256:0776d74b60f5a0bf34d1dc8ee339bbb21d7243c9d50b134c8de69a8e822e9ede
+FROM eclipse-temurin:17-jre-jammy@sha256:8993f1aed8b25fcea7a7047a7949c1866fa558fc6830d938c22c4f13b26be9d7
 WORKDIR /app
 
 # The pinned base can lag behind Ubuntu security updates.
