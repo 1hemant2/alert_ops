@@ -1,6 +1,6 @@
 # AlertOps: critical path to product release
 
-Reassessed: 2026-10-02. This list contains critical bugs to fix first, the two product features selected for this release, and the in-progress review of the Alert Escalation v1 requirements. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
+Reassessed: 2026-10-08. This list contains critical bugs to fix first, the two product features selected for this release, and the in-progress review of the Alert Escalation v1 requirements. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
 
 ## Alert Escalation v1 requirements review
 

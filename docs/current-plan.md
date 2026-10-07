@@ -1,50 +1,38 @@
 # Current task plan
 
-## Task: Complete webhook backend readiness
+## Task: Refresh launch checklist reassessment date
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Align webhook and manual task validation, harden replay/rollback and team
-isolation behavior, verify rate and request-size limits, and add focused
-backend tests. Keep UI follow-up and deployment verification out of scope.
+Update the stale reassessment date in the product launch checklist so it
+matches the latest documented readiness review. Preserve all existing
+implementation and production-verification statuses.
 
 ### Decision-compliance note
 
-- The webhook event's saved JSON and linked task/escalation rows remain the
-  durable source of truth; retries must reuse the unique webhook/event key.
-- Reuse the existing task fields and domain enums; do not add duplicate
-  metadata columns or a second event store.
-- Preserve the existing one-transaction webhook create/start boundary and
-  team-scoped flow selection; rollback must remove all linked rows together.
-- Keep Redis as the distributed rate-limit source when available; any local
-  fallback must be explicit and tested as a degraded single-instance mode.
+- Do not change any readiness checkbox or claim deployed verification.
+- Keep the launch checklist as the source of truth for release priorities.
+- Record the documentation-only change in `CHANGELOG.md`.
 
 ### Acceptance criteria
 
-- Manual and webhook task limits are aligned and server-side validation rejects
-  oversized or invalid values before persistence.
-- Required fields, same-team flow selection, secret rotation/disable, replay,
-  changed-payload conflicts, rollback, size limits, and rate limits have tests.
-- Webhook-created tasks and runs preserve the agreed metadata and event links.
-- Focused webhook tests, full Maven package, and whitespace checks pass.
+- The checklist header shows `2026-10-08`.
+- Existing checklist statuses and production limitations are unchanged.
+- The changelog records the completed documentation update.
+- Diff and whitespace checks pass.
 
 ### Steps
 
-- [x] Map current webhook behavior, limits, and missing focused coverage.
-- [x] Implement the smallest validation/limit fixes and add focused tests.
-- [x] Run verification and update readiness/changelog without committing.
+- [x] Update the checklist reassessment date.
+- [x] Record the documentation change.
+- [x] Run final diff checks without committing.
 
 ### Verification and limitations
 
-- Focused webhook, payload-filter, and task validation tests pass.
-- `./mvnw -q package` passes: 260 tests, 0 failures, 0 errors, 17
-  environment-gated skips. `git diff --check` passes.
-- PostgreSQL concurrent replay/rollback, Redis multi-instance behavior, and
-  deployed verification remain open. The local rate-limit fallback and
-  failure path are unit-tested only.
-- Independent read-only verification was skipped because no usable subagent
-  mechanism was available. Changes remain uncommitted because no commit was
-  requested.
+Use a focused diff review and `git diff --check`. No runtime tests are needed
+for this date-only documentation change. The change remains uncommitted
+because no commit was requested. Independent read-only verification was
+skipped because no usable subagent mechanism was available.
