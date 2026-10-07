@@ -1,11 +1,104 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelScheduledEscalation, escalateNow, getEscalation, getExecutionStates, previewEscalateNow, resolveEscalation, rescheduleEscalation, startEscalation } from '../../api/escalations'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { cancelScheduledEscalation, escalateNow, getEscalation, getEscalationHistory, getExecutionStates, previewEscalateNow, resolveEscalation, rescheduleEscalation, startEscalation } from '../../api/escalations'
+import type { EscalationHistoryEvent } from '../../api/types'
 import { getFlow, getFlowNodes, nodeDelayMinutes, nodeName } from '../../api/flows'
 import { getTasks } from '../../api/tasks'
 import { Button, Card, ErrorState, InlineNotice, LoadingRows, PageHeader, StatusBadge } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
+
+const ACTIVITY_PAGE_SIZE = 20
+
+const activityActionLabels: Record<string, string> = {
+  CREATED: 'Escalation created',
+  SCHEDULED: 'Escalation scheduled',
+  RESCHEDULED: 'Escalation rescheduled',
+  STARTED: 'Escalation started',
+  CANCELLED: 'Schedule cancelled',
+  START_FAILED: 'Escalation could not start',
+  NOTIFICATION_SENT: 'Notification sent',
+  NOTIFICATION_FAILED: 'Notification delivery failed',
+  NOTIFICATION_RETRY_SCHEDULED: 'Notification retry scheduled',
+  ACKNOWLEDGED: 'Escalation acknowledged',
+  ESCALATED_NOW: 'Escalated to the next recipient',
+  RESOLVED: 'Escalation resolved',
+  ACKNOWLEDGEMENT_EXPIRED: 'Acknowledgement wait expired',
+  RESOLUTION_EXPIRED: 'Resolution wait expired',
+  COMPLETED: 'Escalation completed',
+}
+
+interface ActivityGroup {
+  key: string
+  events: EscalationHistoryEvent[]
+  isRetryGroup: boolean
+}
+
+// Identifies delivery failures and retries that belong in one expandable group.
+function isRetryActivity(event: EscalationHistoryEvent): boolean {
+  return event.action === 'NOTIFICATION_FAILED' || event.action === 'NOTIFICATION_RETRY_SCHEDULED'
+}
+
+// Keeps retry events together while preserving the order of their first occurrence.
+function groupActivityEvents(events: EscalationHistoryEvent[]): ActivityGroup[] {
+  const groups: ActivityGroup[] = []
+  const retryGroups = new Map<string, ActivityGroup>()
+  events.forEach(event => {
+    if (!isRetryActivity(event)) {
+      groups.push({ key: event.id, events: [event], isRetryGroup: false })
+      return
+    }
+    const stepKey = event.details.executionStepId ?? event.id
+    const existingGroup = retryGroups.get(stepKey)
+    if (existingGroup) {
+      existingGroup.events.push(event)
+      return
+    }
+    const newGroup = { key: `retry-${stepKey}`, events: [event], isRetryGroup: true }
+    retryGroups.set(stepKey, newGroup)
+    groups.push(newGroup)
+  })
+  return groups
+}
+
+// Converts an audit action into short wording suitable for the activity timeline.
+function activityLabel(event: EscalationHistoryEvent): string {
+  return activityActionLabels[event.action] ?? event.action.replaceAll('_', ' ').toLowerCase()
+}
+
+// Describes the safe actor information returned by the history endpoint.
+function activityActor(event: EscalationHistoryEvent): string {
+  return event.actorType === 'SYSTEM' ? 'AlertOps system' : event.actorEmail ?? 'Team member'
+}
+
+// Formats safe step, recipient, attempt, and timing details without exposing raw metadata.
+function activityDetails(event: EscalationHistoryEvent): string {
+  const details = event.details
+  const values = [
+    details.recipientEmail ? `Recipient ${details.recipientEmail}` : '',
+    details.executionStepId ? `Step ${details.executionStepId.slice(0, 8)}` : '',
+    details.attempt ? `Attempt ${details.attempt}` : '',
+    details.nextAttempt ? `Next attempt ${details.nextAttempt}` : '',
+    details.retryAt ? `Retry at ${formatDate(details.retryAt)}` : '',
+    details.acknowledgementTimeoutAt ? `Acknowledgement by ${formatDate(details.acknowledgementTimeoutAt)}` : '',
+    details.timeoutAt ? `Timeout at ${formatDate(details.timeoutAt)}` : '',
+    event.previousState && event.newState ? `${event.previousState} → ${event.newState}` : '',
+  ]
+  return values.filter(Boolean).join(' · ')
+}
+
+// Renders one saved activity event with its actor, time, and safe supporting details.
+function ActivityEventEntry({ event }: { event: EscalationHistoryEvent }) {
+  const details = activityDetails(event)
+  return <article className="activity-entry">
+    <div className="activity-marker" />
+    <div className="activity-copy">
+      <div className="activity-title"><strong>{activityLabel(event)}</strong><time dateTime={event.occurredAt}>{formatDate(event.occurredAt)}</time></div>
+      <p>{activityActor(event)}{event.reason ? ` · ${event.reason}` : ''}</p>
+      {details && <div className="activity-details">{details}</div>}
+    </div>
+  </article>
+}
 
 // Explains the current saved state of one execution step.
 function stepStatusExplanation(status: string): string {
@@ -21,12 +114,16 @@ function stepStatusExplanation(status: string): string {
   }
 }
 
+// Displays the current escalation, saved step progress, and activity history.
 export function EscalationDetailPage() {
   const { teamId = '', escalationId = '' } = useParams()
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleTime, setScheduleTime] = useState('')
   const [scheduleTimezone, setScheduleTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
   const queryClient = useQueryClient()
+  const activityHistoryKey = ['escalation-history', teamId, escalationId]
+  // Refreshes saved activity after an escalation action changes its history.
+  const invalidateActivityHistory = () => queryClient.invalidateQueries({ queryKey: activityHistoryKey })
   const escalation = useQuery({
     queryKey: ['escalation', teamId, escalationId],
     queryFn: () => {
@@ -44,6 +141,16 @@ export function EscalationDetailPage() {
     },
     enabled: Boolean(escalationId && escalation.data),
     refetchInterval: ['OPEN', 'ACKNOWLEDGED'].includes(escalation.data?.status ?? '') ? 3000 : false,
+  })
+  const activityHistory = useInfiniteQuery({
+    queryKey: activityHistoryKey,
+    queryFn: ({ pageParam }) => {
+      if (!escalationId) throw new Error('Escalation id is required')
+      return getEscalationHistory(escalationId, pageParam, ACTIVITY_PAGE_SIZE)
+    },
+    initialPageParam: 0,
+    getNextPageParam: lastPage => lastPage.last ? undefined : lastPage.page + 1,
+    enabled: Boolean(escalationId && escalation.data),
   })
   const tasks = useQuery({ queryKey: ['tasks', teamId], queryFn: getTasks })
   const flowId = escalation.data?.flowId
@@ -70,6 +177,7 @@ export function EscalationDetailPage() {
         queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
         queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
         queryClient.invalidateQueries({ queryKey: ['execution-states', teamId, escalationId] }),
+        invalidateActivityHistory(),
       ])
     },
   })
@@ -79,6 +187,7 @@ export function EscalationDetailPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
         queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
+        invalidateActivityHistory(),
       ])
       setScheduleDate('')
       setScheduleTime('')
@@ -90,6 +199,7 @@ export function EscalationDetailPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
         queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
+        invalidateActivityHistory(),
       ])
     },
   })
@@ -115,6 +225,7 @@ export function EscalationDetailPage() {
         queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
         queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
         queryClient.invalidateQueries({ queryKey: ['execution-states', teamId, escalationId] }),
+        invalidateActivityHistory(),
       ])
     },
   })
@@ -125,6 +236,7 @@ export function EscalationDetailPage() {
         queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
         queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
         queryClient.invalidateQueries({ queryKey: ['execution-states', teamId, escalationId] }),
+        invalidateActivityHistory(),
       ])
     },
   })
@@ -136,6 +248,9 @@ export function EscalationDetailPage() {
   const completed = item.status === 'COMPLETED'
   const scheduled = item.status === 'SCHEDULED'
   const canOfferEscalateNow = (item.status === 'OPEN' || item.status === 'ACKNOWLEDGED') && Boolean(manualActionRequest)
+  const activityEvents = activityHistory.data?.pages.flatMap(page => page.events) ?? []
+  const activityGroups = groupActivityEvents(activityEvents)
+  const activityEventCount = activityHistory.data?.pages[0]?.totalEvents ?? 0
 
   return <>
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
@@ -182,7 +297,7 @@ export function EscalationDetailPage() {
       <Card className="detail-summary-card"><span className="eyebrow">CREATED AT</span><strong>{formatDate(item.createdAt)}</strong><p>{completed && item.resolutionType ? `Resolution: ${item.resolutionType}` : 'Time shown in your local timezone.'}</p></Card>
     </div>
     <Card className="execution-card">
-      <div className="card-heading"><div><span className="eyebrow">SAVED STEP PROGRESS</span><h2>Execution timeline</h2></div><Button variant="secondary" onClick={() => { void escalation.refetch(); void execution.refetch() }}>Refresh&nbsp; ↻</Button></div>
+      <div className="card-heading"><div><span className="eyebrow">SAVED STEP PROGRESS</span><h2>Step progress</h2></div><Button variant="secondary" onClick={() => { void escalation.refetch(); void execution.refetch(); void activityHistory.refetch() }}>Refresh&nbsp; ↻</Button></div>
       {execution.isPending ? <LoadingRows count={3} /> : execution.isError ? <ErrorState message={execution.error.message} onRetry={() => void execution.refetch()} /> : execution.data.length === 0 ? <div className="prestart-state"><div className="prestart-illustration">01 <span>→</span> 02 <span>→</span> 03</div><div><strong>{scheduled ? 'This escalation is scheduled to start later.' : 'This escalation is ready to start.'}</strong><p>{scheduled ? 'Start now begins it immediately and keeps the first step’s configured wait.' : 'Starting it saves the path steps and schedules the first wait.'}</p></div>{(item.status === 'IDLE' || scheduled) && <Button disabled={start.isPending || !nodes.data?.length} onClick={() => start.mutate()}>{start.isPending ? 'Starting…' : scheduled ? 'Start now' : 'Start escalation'} <span>→</span></Button>}</div> : <div className="execution-timeline">{execution.data.map((state, index) => {
         const node = nodes.data?.find(candidate => candidate.id === state.nodeId)
         const terminal = state.status === 'SENT' || state.status === 'FAILED' || state.status === 'SKIPPED'
@@ -190,6 +305,24 @@ export function EscalationDetailPage() {
       })}</div>}
       {start.error && <div className="form-error start-error" role="alert">{start.error.message}</div>}
       {['OPEN', 'ACKNOWLEDGED'].includes(item.status) && <div className="polling-note"><span className="live-dot" /> Refreshing saved state every 3 seconds while this run is active.</div>}
+    </Card>
+    <Card className="activity-card">
+      <div className="card-heading">
+        <div><span className="eyebrow">ACTIVITY HISTORY</span><h2>What happened</h2></div>
+        {activityHistory.data && <span className="count-pill">{activityEventCount} events</span>}
+      </div>
+      {activityHistory.isPending ? <LoadingRows count={3} /> : activityHistory.isError ? <ErrorState message={activityHistory.error.message} onRetry={() => void activityHistory.refetch()} /> : activityEvents.length === 0 ? <div className="activity-empty">No activity has been recorded yet.</div> : <>
+        <div className="activity-list">
+          {activityGroups.map(group => {
+            if (!group.isRetryGroup) return <ActivityEventEntry event={group.events[0]!} key={group.key} />
+            return <details className="activity-retry-group" key={group.key}>
+              <summary><span><strong>Delivery retry activity</strong><small>{group.events[0]?.details.recipientEmail ?? 'Recipient unavailable'}</small></span><em>{group.events.length} saved events</em></summary>
+              <div className="activity-retry-events">{group.events.map(event => <ActivityEventEntry event={event} key={event.id} />)}</div>
+            </details>
+          })}
+        </div>
+        {activityHistory.hasNextPage && <div className="activity-load-more"><Button variant="secondary" disabled={activityHistory.isFetchingNextPage} onClick={() => void activityHistory.fetchNextPage()}>{activityHistory.isFetchingNextPage ? 'Loading…' : 'Load more activity'}</Button></div>}
+      </>}
     </Card>
     <div className="last-updated">ESCALATION ID&nbsp; <code>{item.id}</code></div>
   </>

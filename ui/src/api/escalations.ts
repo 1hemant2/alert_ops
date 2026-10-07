@@ -1,5 +1,5 @@
 import { jsonBody, request } from './client'
-import type { Escalation, EscalationAcknowledgement, EscalationManualAction, EscalationManualActionRequest, EscalationResolution, ExecutionState } from './types'
+import type { Escalation, EscalationAcknowledgement, EscalationHistoryPage, EscalationManualAction, EscalationManualActionRequest, EscalationResolution, ExecutionState } from './types'
 
 export function getEscalations(): Promise<Escalation[]> {
   return request<Escalation[]>('/api/v1/escalation/all?page=0&size=100&sortBy=createdAt&sortDir=desc')
@@ -57,6 +57,11 @@ export function startEscalation(escalationId: string): Promise<string> {
 
 export function getExecutionStates(escalationId: string): Promise<ExecutionState[]> {
   return request<ExecutionState[]>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/execution-states`)
+}
+
+// Loads the saved lifecycle activity for one escalation page.
+export function getEscalationHistory(escalationId: string, page = 0, size = 20): Promise<EscalationHistoryPage> {
+  return request<EscalationHistoryPage>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/history?page=${page}&size=${size}`)
 }
 
 export function previewEscalationAcknowledgement(token: string): Promise<EscalationAcknowledgement> {

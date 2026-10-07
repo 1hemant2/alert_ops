@@ -170,6 +170,48 @@ export interface EscalationResolution {
   alreadyResolved: boolean
 }
 
+export type EscalationHistoryAction =
+  | 'CREATED'
+  | 'SCHEDULED'
+  | 'RESCHEDULED'
+  | 'STARTED'
+  | 'CANCELLED'
+  | 'START_FAILED'
+  | 'NOTIFICATION_SENT'
+  | 'NOTIFICATION_FAILED'
+  | 'NOTIFICATION_RETRY_SCHEDULED'
+  | 'ACKNOWLEDGED'
+  | 'ESCALATED_NOW'
+  | 'RESOLVED'
+  | 'ACKNOWLEDGEMENT_EXPIRED'
+  | 'RESOLUTION_EXPIRED'
+  | 'COMPLETED'
+
+export type EscalationHistoryActorType = 'USER' | 'SYSTEM'
+
+export interface EscalationHistoryEvent {
+  id: string
+  action: EscalationHistoryAction
+  previousState?: string | null
+  newState?: string | null
+  actorType: EscalationHistoryActorType
+  actorId?: string | null
+  actorEmail?: string | null
+  occurredAt: string
+  reason?: string | null
+  details: Record<string, string>
+}
+
+export interface EscalationHistoryPage {
+  events: EscalationHistoryEvent[]
+  page: number
+  size: number
+  totalEvents: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}
+
 export interface ExecutionState {
   id: string
   nodeId: string

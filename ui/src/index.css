@@ -278,7 +278,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .detail-summary-card > strong, .detail-link { margin-top: 2px; color: #304036; font-size: 15px; font-weight: 700; }
 .detail-summary-card > p { color: #929c93; margin: 0; font-size: 12px; line-height: 1.5; }
 .detail-link span { color: #89a14f; margin-left: 5px; }
-.execution-card { padding: 21px 22px; }
+.execution-card, .activity-card { padding: 21px 22px; }
 .prestart-state { display: flex; align-items: center; gap: 16px; border-top: 1px solid #f0f2ed; padding-top: 22px; margin-top: 18px; }
 .prestart-illustration { padding: 14px 12px; color: #768767; font: 700 12px ui-monospace, SFMono-Regular, monospace; background: #f7f9f2; border: 1px solid #edf1e4; border-radius: 7px; white-space: nowrap; }
 .prestart-illustration span { color: #b0bc9c; padding: 0 5px; }
@@ -304,6 +304,31 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .polling-note { border-top: 1px solid #f0f2ed; margin-top: 6px; padding-top: 12px; display: flex; align-items: center; gap: 8px; color: #88938a; font-size: 12px; }
 .polling-note .live-dot { width: 6px; height: 6px; }
 .start-error { margin-top: 12px; }
+.activity-card { margin-top: 16px; }
+.activity-list { margin-top: 20px; }
+.activity-entry { position: relative; display: flex; gap: 13px; min-height: 76px; }
+.activity-entry:not(:last-child) .activity-marker::after { content: ''; position: absolute; top: 24px; bottom: -1px; left: 6px; width: 1px; background: #e4eadd; }
+.activity-marker { position: relative; z-index: 1; flex: 0 0 13px; width: 13px; height: 13px; margin-top: 3px; border: 3px solid #fff; border-radius: 50%; background: #7d9b5a; box-shadow: 0 0 0 1px #cbd9b9; }
+.activity-copy { min-width: 0; flex: 1; padding-bottom: 16px; }
+.activity-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.activity-title strong { color: #2d3b32; font-size: 14px; }
+.activity-title time { flex: 0 0 auto; color: #8d988f; font-size: 12px; }
+.activity-copy p { margin: 5px 0 0; color: #66746a; font-size: 12px; line-height: 1.5; }
+.activity-details { margin-top: 8px; color: #98a198; font-size: 11px; line-height: 1.5; }
+.activity-empty { margin-top: 20px; border-top: 1px solid #f0f2ed; padding-top: 20px; color: #8b978e; font-size: 13px; }
+.activity-retry-group { position: relative; border: 1px solid #e8ece4; border-radius: 8px; margin-bottom: 12px; background: #fbfcf9; }
+.activity-retry-group summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 13px; color: #344239; cursor: pointer; list-style: none; }
+.activity-retry-group summary::-webkit-details-marker { display: none; }
+.activity-retry-group summary::before { content: '＋'; width: 18px; flex: 0 0 auto; color: #82995a; font-size: 16px; line-height: 1; }
+.activity-retry-group[open] summary::before { content: '−'; }
+.activity-retry-group summary > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.activity-retry-group summary strong { font-size: 13px; }
+.activity-retry-group summary small { color: #88938a; font-size: 12px; overflow-wrap: anywhere; }
+.activity-retry-group summary em { flex: 0 0 auto; color: #8b978e; font-size: 11px; font-style: normal; }
+.activity-retry-events { border-top: 1px solid #e8ece4; padding: 14px 13px 0 17px; }
+.activity-retry-events .activity-entry { min-height: 70px; }
+.activity-retry-events .activity-entry:last-child { min-height: 54px; }
+.activity-load-more { display: flex; justify-content: center; border-top: 1px solid #f0f2ed; margin-top: 4px; padding-top: 17px; }
 .team-picker { max-width: 920px; margin: 42px auto; }
 .team-picker h1 { font-size: 37.0px; }
 .team-picker-grid { display: grid; grid-template-columns: minmax(0,1.08fr) minmax(280px,.92fr); gap: 16px; margin-top: 25px; }
@@ -436,7 +461,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
   .metric-card { min-height: 113px; padding: 13px; }
   .metric-top { font-size: 13px; }
   .metric-card > strong { font-size: 26.0px; }
-  .journey-card, .architecture-card, .main-list-card, .side-form-card, .node-timeline-card, .execution-card { padding: 17px 15px; }
+  .journey-card, .architecture-card, .main-list-card, .side-form-card, .node-timeline-card, .execution-card, .activity-card { padding: 17px 15px; }
   .setup-step { gap: 9px; min-height: 82px; }
   .step-action { font-size: 0; }
   .step-action span { font-size: 16px; }
@@ -447,6 +472,8 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
   .execution-title { flex-direction: column; }
   .execution-badges { justify-content: flex-start; }
   .execution-details { gap: 8px 13px; }
+  .activity-title { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .activity-retry-group summary { align-items: flex-start; }
   .public-header { padding: 0 18px; height: 64px; }
   .public-header > div { gap: 14px; }
   .public-header .brand { font-size: 15px; }
@@ -554,7 +581,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .metric-accent { background: #eefbf4; border-color: #d4f5e2; }
 .metric-accent .metric-mark { color: #087443; background: #d8f7e6; }
 .overview-columns { gap: 22px; }
-.journey-card, .architecture-card, .main-list-card, .side-form-card, .node-timeline-card, .execution-card,
+.journey-card, .architecture-card, .main-list-card, .side-form-card, .node-timeline-card, .execution-card, .activity-card,
 .members-card, .invite-card, .team-list-card, .create-team-card { padding: 26px; }
 .setup-steps { margin-top: 22px; }
 .setup-step { min-height: 84px; gap: 15px; border-color: #eaecf0; }
@@ -771,7 +798,7 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
   .metric-card { min-height: 132px; padding: 16px; }
   .metric-top { font-size: 12px; }
   .metric-card > strong { font-size: 28px; }
-  .journey-card, .architecture-card, .main-list-card, .side-form-card, .node-timeline-card, .execution-card,
+  .journey-card, .architecture-card, .main-list-card, .side-form-card, .node-timeline-card, .execution-card, .activity-card,
   .members-card, .invite-card, .team-list-card, .create-team-card { padding: 20px 17px; }
   .card-heading h2 { font-size: 19px; }
   .setup-step { min-height: 88px; gap: 10px; }
