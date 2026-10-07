@@ -8,7 +8,7 @@ import com.alertops.security.SecurityConfig;
 import com.alertops.team.repository.TeamMemberRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,10 +37,10 @@ class EscalationAcknowledgementSecurityTest {
     void anonymousEmailLinkCanPreviewAndConfirmUsingPost() throws Exception {
         when(acknowledgementService.preview("email-token"))
                 .thenReturn(new EscalationAcknowledgementResponse(
-                        "Database outage", "oncall@example.com", "OPEN", Instant.now().plusSeconds(600), null, null, false));
+                        "Database outage", "oncall@example.com", "OPEN", Instant.now().plusSeconds(600), null, null, false, null));
         when(acknowledgementService.acknowledge("email-token"))
                 .thenReturn(new EscalationAcknowledgementResponse(
-                        "Database outage", "oncall@example.com", "COMPLETED", Instant.now().plusSeconds(600), Instant.now(), "oncall@example.com", true));
+                        "Database outage", "oncall@example.com", "COMPLETED", Instant.now().plusSeconds(600), Instant.now(), "oncall@example.com", true, null));
 
         mockMvc.perform(post("/api/v1/escalation/acknowledgement/preview")
                         .contentType(APPLICATION_JSON)

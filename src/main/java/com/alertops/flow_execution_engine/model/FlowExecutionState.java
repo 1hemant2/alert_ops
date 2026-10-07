@@ -8,6 +8,8 @@ import org.hibernate.annotations.UuidGenerator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
@@ -20,13 +22,20 @@ public class FlowExecutionState {
     @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
 
-    private String executionState;
-    private String notificationState;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FlowExecutionStepStatus status;
     private UUID taskId;
     @Column(name = "task_name", length = 120)
     private String taskName;
     @Column(name = "task_source", length = 120)
     private String taskSource;
+    @Column(name = "task_priority", length = 20)
+    private String taskPriority;
+    @Column(name = "task_category", length = 80)
+    private String taskCategory;
+    @Column(name = "task_reference_url", length = 2048)
+    private String taskReferenceUrl;
     @Column(name = "task_details", columnDefinition = "TEXT")
     private String taskDetails;
     private UUID nodeId;
@@ -34,6 +43,12 @@ public class FlowExecutionState {
     private Duration duration;
     @Column(name = "due_at")
     private Instant dueAt;
+
+    @Column(name = "resolution_timeout_enabled", nullable = false)
+    private boolean resolutionTimeoutEnabled;
+
+    @Column(name = "resolution_timeout")
+    private Duration resolutionTimeout;
 
     @Column(name = "publication_pending", nullable = false)
     private boolean publicationPending;
@@ -72,20 +87,12 @@ public class FlowExecutionState {
         this.id = id;
     }
 
-    public String getExecutionState() {
-        return executionState;
+    public FlowExecutionStepStatus getStatus() {
+        return status;
     }
 
-    public void setExecutionState(String executionState) {
-        this.executionState = executionState;
-    }
-
-    public String getNotificationState() {
-        return notificationState;
-    }
-
-    public void setNotificationState(String notificationState) {
-        this.notificationState = notificationState;
+    public void setStatus(FlowExecutionStepStatus status) {
+        this.status = status;
     }
 
     public UUID getTaskId() {
@@ -100,6 +107,24 @@ public class FlowExecutionState {
     public void setTaskName(String taskName) { this.taskName = taskName; }
     public String getTaskSource() { return taskSource; }
     public void setTaskSource(String taskSource) { this.taskSource = taskSource; }
+
+    // Returns the priority captured when this execution step was created.
+    public String getTaskPriority() { return taskPriority; }
+
+    // Stores the task priority for this immutable execution-step snapshot.
+    public void setTaskPriority(String taskPriority) { this.taskPriority = taskPriority; }
+
+    // Returns the category captured when this execution step was created.
+    public String getTaskCategory() { return taskCategory; }
+
+    // Stores the task category for this immutable execution-step snapshot.
+    public void setTaskCategory(String taskCategory) { this.taskCategory = taskCategory; }
+
+    // Returns the reference URL captured when this execution step was created.
+    public String getTaskReferenceUrl() { return taskReferenceUrl; }
+
+    // Stores the reference URL for this immutable execution-step snapshot.
+    public void setTaskReferenceUrl(String taskReferenceUrl) { this.taskReferenceUrl = taskReferenceUrl; }
 
     public String getTaskDetails() {
         return taskDetails;
@@ -139,6 +164,22 @@ public class FlowExecutionState {
 
     public void setDueAt(Instant dueAt) {
         this.dueAt = dueAt;
+    }
+
+    public boolean isResolutionTimeoutEnabled() {
+        return resolutionTimeoutEnabled;
+    }
+
+    public void setResolutionTimeoutEnabled(boolean resolutionTimeoutEnabled) {
+        this.resolutionTimeoutEnabled = resolutionTimeoutEnabled;
+    }
+
+    public Duration getResolutionTimeout() {
+        return resolutionTimeout;
+    }
+
+    public void setResolutionTimeout(Duration resolutionTimeout) {
+        this.resolutionTimeout = resolutionTimeout;
     }
 
     public boolean isPublicationPending() {

@@ -3,10 +3,12 @@ import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getFlows } from '../../api/flows'
 import { createWebhook, getWebhookEvents, getWebhooks, rotateWebhook, updateWebhook } from '../../api/webhooks'
+import type { WebhookEvent } from '../../api/types'
 import { useSession } from '../../app/useSession'
 import { Button, Card, EmptyState, ErrorState, Field, InlineNotice, LoadingRows, PageHeader } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
 
+// Manages team webhook configuration and the saved event history.
 export function WebhooksPage() {
   const { teamId = '' } = useParams()
   const { team } = useSession()
@@ -37,6 +39,7 @@ export function WebhooksPage() {
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['webhooks', teamId] }) },
   })
 
+  // Submits the webhook configuration form.
   function submit(event: FormEvent) {
     event.preventDefault()
     setNewSecret('')
@@ -66,6 +69,7 @@ export function WebhooksPage() {
   </>
 }
 
+// Loads and renders one webhook's recent or complete event history.
 function WebhookRow({ webhook, flowName, teamId, canManage, onToggle, onRotate }: {
   webhook: { id: string; name: string; defaultFlowId: string; enabled: boolean; createdAt: string; lastTriggeredAt?: string | null }
   flowName?: string
@@ -77,7 +81,34 @@ function WebhookRow({ webhook, flowName, teamId, canManage, onToggle, onRotate }
   const events = useQuery({ queryKey: ['webhook-events', teamId, webhook.id], queryFn: () => getWebhookEvents(webhook.id) })
   return <article className="task-row">
     <span className="task-icon">↗</span>
-    <div className="task-copy"><strong>{webhook.name}</strong><p>{webhook.enabled ? 'Enabled' : 'Disabled'} · Default path {flowName ?? webhook.defaultFlowId.slice(0, 8)}</p><small>Created {formatDate(webhook.createdAt)}{webhook.lastTriggeredAt ? ` · Last used ${formatDate(webhook.lastTriggeredAt)}` : ''}</small>{events.data?.length ? <><small>{events.data.length} event{events.data.length === 1 ? '' : 's'}</small><div className="webhook-event-list">{events.data.slice(0, 3).map(event => <details key={event.id}><summary>{event.eventId} · {formatDate(event.receivedAt)}</summary><p><Link to={`/app/${teamId}/tasks`}>Task {event.taskId.slice(0, 8)}</Link> · <Link to={`/app/${teamId}/escalations/${event.escalationId}`}>Run {event.escalationId.slice(0, 8)}</Link></p><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>)}</div></> : null}</div>
+    <div className="task-copy"><strong>{webhook.name}</strong><p>{webhook.enabled ? 'Enabled' : 'Disabled'} · Default path {flowName ?? webhook.defaultFlowId.slice(0, 8)}</p><small>Created {formatDate(webhook.createdAt)}{webhook.lastTriggeredAt ? ` · Last used ${formatDate(webhook.lastTriggeredAt)}` : ''}</small><WebhookEventHistory teamId={teamId} webhookId={webhook.id} events={events.data ?? []} isLoading={events.isPending} errorMessage={events.isError ? events.error instanceof Error ? events.error.message : 'Try again later.' : null} /></div>
     {canManage && <div className="webhook-actions"><Button variant="quiet" onClick={() => onToggle(!webhook.enabled)}>{webhook.enabled ? 'Disable' : 'Enable'}</Button><Button variant="quiet" onClick={onRotate}>Rotate</Button></div>}
   </article>
+}
+
+// Shows recent webhook events and lets users reveal the complete history.
+function WebhookEventHistory({ teamId, webhookId, events, isLoading, errorMessage }: {
+  teamId: string
+  webhookId: string
+  events: WebhookEvent[]
+  isLoading: boolean
+  errorMessage: string | null
+}) {
+  const [showAllEvents, setShowAllEvents] = useState(false)
+  if (isLoading) return <small>Loading event history…</small>
+  if (errorMessage) return <div className="form-error" role="alert">Couldn’t load event history: {errorMessage}</div>
+  if (events.length === 0) return <small>No events received yet.</small>
+
+  const visibleEvents = showAllEvents ? events : events.slice(0, 3)
+  return <>
+    <small>{events.length} event{events.length === 1 ? '' : 's'}</small>
+    {events.length > 3 && <div className="webhook-event-controls"><Button variant="quiet" aria-expanded={showAllEvents} aria-controls={`webhook-events-${webhookId}`} onClick={() => setShowAllEvents(current => !current)}>{showAllEvents ? 'Show latest 3' : `View all ${events.length} events`}</Button></div>}
+    <div className="webhook-event-list" id={`webhook-events-${webhookId}`}>
+      {visibleEvents.map(event => <details key={event.id}>
+        <summary>{event.eventId} · {formatDate(event.receivedAt)}</summary>
+        <p><Link to={`/app/${teamId}/tasks/${event.taskId}`}>Task {event.taskId.slice(0, 8)}</Link> · <Link to={`/app/${teamId}/escalations/${event.escalationId}`}>Run {event.escalationId.slice(0, 8)}</Link></p>
+        <pre>{JSON.stringify(event.payload, null, 2)}</pre>
+      </details>)}
+    </div>
+  </>
 }

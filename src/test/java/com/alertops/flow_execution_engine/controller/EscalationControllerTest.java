@@ -10,10 +10,13 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class EscalationControllerTest {
@@ -60,5 +63,25 @@ class EscalationControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals("started", response.getBody());
         verify(scheduler).cancel(escalationId);
+    }
+
+    @Test
+    // Keeps the scheduled wake-up when the start transition fails.
+    void startNowDoesNotCancelTheOldTimerWhenStartingFails() {
+        EscalationService service = mock(EscalationService.class);
+        StartFlowExecutionUseCase startUseCase = mock(StartFlowExecutionUseCase.class);
+        EscalationStartScheduler scheduler = mock(EscalationStartScheduler.class);
+        var controller = new EscalationController(
+                service,
+                mock(FlowExecutionStateService.class),
+                startUseCase,
+                scheduler);
+        UUID escalationId = UUID.randomUUID();
+        doThrow(new IllegalStateException("start failed"))
+                .when(startUseCase).execute(any(), org.mockito.ArgumentMatchers.eq(escalationId));
+
+        assertThrows(IllegalStateException.class, () -> controller.startEscalation(escalationId));
+
+        verifyNoInteractions(scheduler);
     }
 }

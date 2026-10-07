@@ -163,6 +163,21 @@ class StepTimerRegistryTest {
     }
 
     @Test
+    void cancellationRemovesAndCancelsAStillScheduledWakeUp() throws Exception {
+        registry = registry(10);
+        UUID stepId = UUID.randomUUID();
+        EscalationStepSchedule scheduled = step(stepId, 0, START.plusSeconds(30));
+
+        assertThat(registry.tryScheduleInMemoryTimer(scheduled)).isTrue();
+        ScheduledCall call = takeCall();
+
+        assertThat(registry.cancel(stepId)).isTrue();
+        assertThat(registry.cancel(stepId)).isFalse();
+        verify(call.future()).cancel(false);
+        assertThat(registry.activeTimerCount()).isZero();
+    }
+
+    @Test
     void overdueTimerPublishesReadyWorkAndFreesItsSlot() throws Exception {
         registry = registry(1);
         EscalationStepSchedule overdue = step(UUID.randomUUID(), 3, START.minusSeconds(1));
@@ -184,7 +199,8 @@ class StepTimerRegistryTest {
     }
 
     @Test
-    void earlyCallbackIsRearmedUntilItsSavedDueTime() throws Exception {
+    // Verifies that an early callback reschedules until the saved due time.
+    void earlyCallbackReschedulesUntilSavedDueTime() throws Exception {
         registry = registry(10);
         EscalationStepSchedule future = step(UUID.randomUUID(), 0, START.plusSeconds(30));
         when(scheduling.isStepStillPendingForPublication(future)).thenReturn(true);
@@ -194,8 +210,8 @@ class StepTimerRegistryTest {
         assertThat(registry.activeTimerCount()).isEqualTo(1);
         verifyNoInteractions(publisher);
 
-        ScheduledCall rearmed = takeCall();
-        assertThat(rearmed.dueAt()).isEqualTo(future.dueAt());
+        ScheduledCall rescheduledCall = takeCall();
+        assertThat(rescheduledCall.dueAt()).isEqualTo(future.dueAt());
         clock.set(future.dueAt());
         CountDownLatch published = new CountDownLatch(1);
         CountDownLatch slotFreed = listenForSlotFreed();
@@ -204,7 +220,7 @@ class StepTimerRegistryTest {
             return null;
         }).when(publisher).publishEscalationStepReady(new EscalationStepReadyMessage(future.stepId(), future.sendAttemptCount(), future.dueAt()));
 
-        rearmed.runnable().run();
+        rescheduledCall.runnable().run();
         assertThat(published.await(3, TimeUnit.SECONDS)).isTrue();
         assertThat(slotFreed.await(3, TimeUnit.SECONDS)).isTrue();
     }
@@ -276,7 +292,8 @@ class StepTimerRegistryTest {
     }
 
     @Test
-    void saturatedPublicationExecutorRearmsTheDueStep() throws Exception {
+    // Verifies that executor saturation reschedules the due step.
+    void saturatedExecutorReschedulesDueStep() throws Exception {
         registry = registry(3);
         EscalationStepSchedule first = step(UUID.randomUUID(), 0, START.minusSeconds(1));
         EscalationStepSchedule second = step(UUID.randomUUID(), 0, START.minusSeconds(1));

@@ -21,6 +21,7 @@ export function createFlowNode(input: {
   flowId: string
   nodeName: string
   durationInMinutes: number
+  resolutionTimeoutInMinutes: number | null
   email: string
 }): Promise<FlowNode> {
   return request<FlowNode>('/api/v1/flow/node', { method: 'POST', body: jsonBody(input) })
@@ -40,10 +41,22 @@ export function reorderFlowNode(input: {
 export function updateFlowNode(nodeId: string, input: {
   nodeName: string
   durationInMinutes: number
+  resolutionTimeoutInMinutes: number | null
   email: string
   version: number
 }): Promise<FlowNode> {
   return request<FlowNode>(`/api/v1/flow/node/${encodeURIComponent(nodeId)}`, {
+    method: 'PUT',
+    body: jsonBody(input),
+  })
+}
+
+export function updateFlowTiming(flowId: string, input: {
+  resolutionTimeoutEnabled: boolean
+  nodeTimings: Array<{ nodeId: string; resolutionTimeoutInMinutes: number }>
+  version: number
+}): Promise<Flow> {
+  return request<Flow>(`/api/v1/flow/${encodeURIComponent(flowId)}/timing`, {
     method: 'PUT',
     body: jsonBody(input),
   })
@@ -65,5 +78,15 @@ export function nodeDelayMinutes(node: FlowNode): number {
   const duration = node.duration ?? ''
   const match = String(duration).match(/^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/)
   if (!match) return 0
+  return Math.round(Number(match[1] ?? 0) * 60 + Number(match[2] ?? 0) + Number(match[3] ?? 0) / 60)
+}
+
+export function nodeResolutionTimeoutMinutes(node: FlowNode): number | null {
+  if (typeof node.resolutionTimeoutInMinutes === 'number') return node.resolutionTimeoutInMinutes
+  if (typeof node.resolutionTimeout === 'number') return Math.round(node.resolutionTimeout / 60)
+  const timeout = node.resolutionTimeout
+  if (!timeout) return null
+  const match = String(timeout).match(/^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/)
+  if (!match) return null
   return Math.round(Number(match[1] ?? 0) * 60 + Number(match[2] ?? 0) + Number(match[3] ?? 0) / 60)
 }

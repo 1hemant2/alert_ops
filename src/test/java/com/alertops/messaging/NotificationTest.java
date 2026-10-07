@@ -23,6 +23,7 @@ import jakarta.mail.internet.MimeMessage;
 class NotificationTest {
     @SuppressWarnings("unchecked")
     @Test
+    // Verifies alert emails retain safe plain-text and HTML action links.
     void sendsMarkdownFallbackAndStyledSafeHtmlAlternative() throws Exception {
         ObjectProvider<JavaMailSender> senderProvider = mock(ObjectProvider.class);
         JavaMailSender mailSender = mock(JavaMailSender.class);
@@ -35,10 +36,16 @@ class NotificationTest {
         state.setUserEmail("user@example.com");
         state.setProcessId(escalationId);
         state.setTaskDetails("Queue **backlog** <img src=x onerror=alert(1)>");
+        state.setTaskPriority("P1");
+        state.setTaskCategory("Platform <on-call>");
+        state.setTaskReferenceUrl("https://example.com/requests/123?view=full&tab=alerts");
 
         Notification notification = new Notification(senderProvider, "alerts@example.com");
 
-        assertTrue(notification.sendEmail(state, "https://alerts.example.com/acknowledge?token=sample-token"));
+        assertTrue(notification.sendEmail(
+                state,
+                "https://alerts.example.com/acknowledge?token=sample-token",
+                "https://alerts.example.com/escalate?token=escalate-token"));
 
         verify(mailSender).send(mimeMessage);
         Multipart parts = assertInstanceOf(Multipart.class, mimeMessage.getContent());
@@ -48,13 +55,20 @@ class NotificationTest {
         String html = parts.getBodyPart(1).getContent().toString();
         assertTrue(markdown.contains("## Task"));
         assertTrue(markdown.contains("**backlog**"));
+        assertTrue(markdown.contains("P1"));
+        assertTrue(markdown.contains("Platform <on-call>"));
+        assertTrue(markdown.contains("https://example.com/requests/123?view=full&tab=alerts"));
         assertTrue(markdown.contains(escalationId.toString()));
         assertTrue(markdown.contains("https://alerts.example.com/acknowledge?token=sample-token"));
         assertTrue(html.contains("<strong style="));
         assertTrue(html.contains("&lt;img src=x onerror=alert(1)&gt;"));
+        assertTrue(html.contains("P1"));
+        assertTrue(html.contains("Platform &lt;on-call&gt;"));
+        assertTrue(html.contains("https://example.com/requests/123?view=full&amp;tab=alerts"));
         assertTrue(html.contains("ESCALATION NOTIFICATION"));
         assertTrue(html.contains("Acknowledge escalation"));
         assertTrue(html.contains("href=\"https://alerts.example.com/acknowledge?token=sample-token\""));
+        assertTrue(html.contains("Escalate now and notify the next person"));
         assertTrue(html.contains("width:100%;"));
         assertTrue(!html.contains("<img src=x"));
     }

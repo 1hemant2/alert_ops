@@ -33,6 +33,16 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
 
       @Query("""
               select e from Escalation e
+              where e.status = com.alertops.flow_execution_engine.model.EscalationStatus.ACKNOWLEDGED
+                and e.acknowledgedStepId is not null
+                and e.resolutionDeadline is not null
+              order by e.resolutionDeadline asc, e.id asc
+              """)
+      // Finds acknowledged escalations that still have a durable resolution timeout.
+      List<Escalation> findPendingResolutionTimeouts(Pageable pageable);
+
+      @Query("""
+              select e from Escalation e
               where e.status = com.alertops.flow_execution_engine.model.EscalationStatus.SCHEDULED
                 and e.scheduledStartAt is not null
               order by e.scheduledStartAt asc, e.id asc

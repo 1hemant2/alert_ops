@@ -1,7 +1,7 @@
 # Escalation lifecycle: resolution timeout, manual actions, and activity timeline
 
 Created: 2026-10-05
-Status: Planning — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, and existing team permissions agreed; final storage details require review; implementation pending.
+Status: In progress — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; tasks 6 through 8 are implemented locally and later tasks remain pending.
 Release priorities: [scheduled starts](product-launch-readiness.md#1-scheduled-escalation-start),
 [resolution timeout](product-launch-readiness.md#3-resolution-timeout-after-acknowledgement), and
 [Escalate now](product-launch-readiness.md#4-escalate-now), and
@@ -168,7 +168,7 @@ be the original acknowledging recipient or introduce extra roles or states.
 | `Flow` | Resolution-timeout toggle for the reusable configuration |
 | `Node` | Existing duration representing the shared acknowledgement/delivery wait, plus resolution duration when enabled; no separate send-delay duration |
 | `Escalation` | Snapshotted toggle, lifecycle status, acknowledged execution-step ID, acknowledgement time/actor, UTC resolution deadline, and resolution time/actor |
-| `FlowExecutionState` | Snapshotted node timing, notification step status, due time, UTC acknowledgement deadline, and existing send-attempt/publication metadata |
+| `FlowExecutionState` | Snapshotted node timing, notification step status, due time (the canonical shared acknowledgement/delivery deadline), and existing send-attempt/publication metadata |
 | Acknowledgement token | Exact execution-step reference, recipient scope, and token hash; response eligibility comes from current ownership and saved deadlines, not link expiry |
 
 Create execution-step rows at escalation start. Copy the flow toggle and node timeouts in the same transaction that claims the run and creates its steps. Validate and read a consistent flow configuration: a concurrent flow/node edit cannot produce a mixed snapshot. Once started, reusable-flow edits must not change that run's toggle, node timeouts, or delays. Scheduled runs take this snapshot when they actually start; advance snapshotting at schedule creation is outside the currently agreed scope.
@@ -210,7 +210,7 @@ Keep the disabled-flow path unchanged apart from explicit step-state representat
 
 ## Timer and concurrency contract
 
-1. Ordinary progression uses one shared acknowledgement/delivery wait. After SMTP acceptance, persist the sent step and its acknowledgement deadline atomically, aligning the next eligible delivery with that same wait rather than adding another delay. Do not exhaust solely because this was the final send; persist its normal acknowledgement wait too. Keep the initial first-step delay unchanged.
+1. Ordinary progression uses one shared acknowledgement/delivery wait. After SMTP acceptance, persist the sent step and the canonical shared wait boundary atomically, aligning the next eligible delivery's `dueAt` with that same wait rather than adding another delay. Do not exhaust solely because this was the final send; persist its normal acknowledgement wait too. Keep the initial first-step delay unchanged.
 2. Acknowledgement locks the run and validates the exact sent step/token. With timeout enabled, atomically save `ACKNOWLEDGED`, the owning step, the deadline, and the paused next step.
 3. After commit, cancel its delivery wake-up where available and register the resolution timer. A delivery callback/message already in flight must reload state and ignore paused or obsolete attempts.
 4. Resolution, timeout, and manual escalation use the same run-lock/conditional-transition boundary. Only one valid transition wins for the same acknowledgement/step. Publish timer changes or delivery work after commit, never on rollback.
@@ -222,17 +222,21 @@ Keep the disabled-flow path unchanged apart from explicit step-state representat
 
 Repeated acknowledgement of the same step must return its saved accepted result without extending its deadline or reclaiming current ownership. Duplicate timer callbacks must not advance two steps. Continue serializing acknowledgement with sends already in progress; SMTP acceptance still has the existing crash/duplicate uncertainty. New acknowledgement/resolution requests must enforce their saved deadlines under the run lock, even when timer execution is delayed.
 
-## Decisions to settle before dependent implementation
+## Final lifecycle storage decision
 
-- **Resolution lifecycle fields:** Finalize whether `RESOLVED` needs a completion reason in addition to its status, and how current owner fields are cleared while audit history preserves earlier acknowledgements/timeouts.
+- `RESOLVED` is a terminal lifecycle status and needs no additional completion reason; the status itself records the successful outcome.
+- `COMPLETED` remains the terminal status for non-resolution completion and requires one explicit completion reason: `ACKNOWLEDGED` when resolution timeout is disabled, or `EXHAUSTED` when the acknowledgement/resolution wait ends without another step or acknowledgement. `CANCELLED`, `START_FAILED`, and non-terminal statuses have no completion reason.
+- The implementation may rename the legacy `resolutionType` field to a clearly named completion-reason field, while preserving readable string enum values and migrating existing rows explicitly. Do not add a second reason field for `RESOLVED`.
+- Active acknowledgement ownership consists of the acknowledged execution-step ID, actor, acknowledgement time, and resolution deadline. Populate these only while the run is `ACKNOWLEDGED`; clear them atomically when resolution wins, a resolution timeout advances the run, or Escalate now ends the wait. Persist the resolving actor/time only for `RESOLVED`.
+- Audit events retain the acknowledgement, timeout, escalation, and resolution actor/step/deadline facts after active ownership is cleared. UI/API history reads audit facts rather than reconstructing them from nullable current-owner fields.
 
-These are open product decisions, not completed requirements. Manual-action and activity-timeline behavior are agreed. Review the remaining resolution cases one at a time before their dependent implementation.
+This prerequisite is complete. Manual-action and activity-timeline behavior remain agreed; dependent implementation proceeds one task at a time.
 
 ## Implementation tasks, one at a time
 
 ### 1. Settle remaining product edge cases
 
-- [ ] Agree on the decisions above and update this plan and the launch checklist.
+- [x] Agree on the final lifecycle storage semantics above and update this plan and the launch checklist.
 - Acceptance: final lifecycle storage meanings have explicit rules without adding states. The shared acknowledgement/delivery wait, optional resolution duration, final-step behavior, deadline-gated actions, email source eligibility, existing team permissions, and timeline presentation are already agreed above; do not reopen them.
 
 ### 2. Support Start now for scheduled runs
@@ -244,54 +248,64 @@ These are open product decisions, not completed requirements. Manual-action and 
 
 ### 3. Unify execution-step statuses
 
-- [ ] Add the enum and database constraints; migrate the model, repository queries, consumer, scheduler, recovery, DTOs, and UI status mappings together.
+- [x] Add the enum and database constraints; migrate the model, repository queries, consumer, scheduler, recovery, DTOs, and UI status mappings together.
 - Acceptance: one status per step; existing send, retry, duplicate-message, and disabled acknowledgement behavior still works. No unsupported status combinations remain.
+- **Local implementation evidence:** `FlowExecutionStepStatus` is persisted as a string enum with `PENDING`, `SCHEDULED`, `PAUSED`, `SENDING`, `SENT`, `FAILED`, and `SKIPPED`. Migration V11 converts legacy rows, replaces the old columns, adds a database check, and rebuilds the recovery index. Queue claiming, scheduling, startup recovery, DTOs, UI badges, duplicate-delivery tests, and disabled acknowledgement now use the single status. Focused tests, the normal backend suite, backend packaging, and the UI build pass; PostgreSQL integration remains environment-gated and skipped.
 
 ### 4. Add agreed flow/node timing configuration
 
-- [ ] Implement the flow toggle and the agreed two node response durations, API validation, consistent configuration updates, and flow-editor controls. Reuse the existing duration for the shared acknowledgement/delivery wait; add no separate send-delay control. Use the same response controls/rules for first, middle, and last nodes, retaining the initial first-step delay.
-- Acceptance: disabled flows have null resolution timeouts; enabled flows have positive resolution timeouts on every node; acknowledgement timing matches the agreed mapping; invalid or concurrent edits do not save a partial configuration. No final-only setting is introduced.
+- [x] Implement the flow toggle and the agreed two node response durations, API validation, consistent configuration updates, and flow-editor controls. Reuse the existing duration for the shared acknowledgement/delivery wait; add no separate send-delay control. Use the same response controls/rules for first, middle, and last nodes, retaining the initial first-step delay.
+- Acceptance: disabled flows have null resolution timeouts; enabled flows have positive resolution timeouts on every node; the configuration update is all-or-nothing under the flow version; and no final-only setting is introduced. Runtime acknowledgement, snapshot, and expiry behavior remain in later tasks.
+- **Local implementation evidence:** Migration V12 stores the flow toggle and nullable positive node timeout. `PUT /api/v1/flow/{flowId}/timing` requires the current flow version and validates the complete node set before saving. Node create/edit requests apply the same enabled/disabled rules, and the flow editor exposes the toggle plus per-node timeout controls. Focused flow-service tests cover enable/disable, partial input, stale versions, and node-level validation.
 
 ### 5. Persist a consistent runtime snapshot
 
-- [ ] Copy settings during immediate/scheduled start and bind acknowledgement tokens to exact execution steps. Add escalation acknowledgement/resolution ownership and durable per-step acknowledgement deadlines using the agreed timing mapping.
+- [x] Copy settings during immediate/scheduled start and bind acknowledgement tokens to exact execution steps. Add escalation acknowledgement/resolution ownership while reusing each step's durable `dueAt` as the canonical shared acknowledgement/delivery deadline.
 - Acceptance: flow edits cannot change a started run; failed start rolls back snapshot creation; same-recipient nodes remain distinguishable.
+- **Local implementation evidence:** Migration V13 adds per-step resolution snapshots, run-level acknowledgement ownership/resolution deadline fields, and exact execution-step token references; `dueAt` remains the canonical durable shared acknowledgement/delivery deadline. Immediate, early scheduled, and due scheduled starts load the flow and copy the toggle/timeout into each execution step inside the existing start transaction. Token creation and validation require the exact step, run, and recipient. Focused tests cover enabled/disabled snapshots, failed snapshot writes, same-recipient steps, and cross-run token rejection.
 
 ### 6. Implement acknowledgement pause
 
-- [ ] Branch on the saved toggle, invalidate the acknowledgement wait, pause the next step if present, save the resolution deadline, and record lifecycle audit data atomically. Emit wake-up changes after commit.
+- [x] Branch on the saved toggle, invalidate the acknowledgement wait, pause the next step if present, save the resolution deadline, and record lifecycle audit data atomically. Emit wake-up changes after commit.
 - Acceptance: disabled acknowledgement still completes; enabled acknowledgement pauses even on the final node; repeated acknowledgement does not extend the deadline; a stale send cannot bypass the pause.
+- **Local implementation evidence (2026-10-06):** `EscalationAcknowledgementService` locks the run, validates the exact `SENT` step and current sent-step token, keeps disabled acknowledgement terminal as `COMPLETED` / `ACKNOWLEDGED`, and changes enabled acknowledgement to `ACKNOWLEDGED` with the saved step timeout, owner, deadline, and `ACKNOWLEDGED` audit event. The next unsent step is changed to `PAUSED` without changing its canonical shared `dueAt`; its in-memory wake-up is cancelled after commit. Final successful sends remain `OPEN` so the final recipient can acknowledge. Focused acknowledgement, consumer, and timer tests pass; the full Maven suite passes with PostgreSQL/RabbitMQ/Redis integration tests environment-gated and skipped. Independent read-only verifier verdict: **Achieved**. Deadline expiry/recovery, explicit resolution, and deployed verification remain later tasks.
 
 ### 7. Implement explicit resolution
 
-- [ ] Add the agreed resolve action, actor/time persistence, idempotency, authorization, skipped steps, audit, and after-commit timer cancellation.
+- [x] Add the agreed resolve action, actor/time persistence, idempotency, authorization, skipped steps, audit, and after-commit timer cancellation.
 - Acceptance: authenticated same-team members and the current acknowledging email recipient can resolve before the saved deadline; another team or an obsolete email owner cannot. Terminal runs stay terminal; resolution and timeout have one winner. No new role/state is introduced.
+- **Local implementation evidence (2026-10-07):** `EscalationResolutionService` exposes separate team-member and recipient-token operations, locks the run, enforces the saved resolution deadline and current acknowledgement owner, transitions `ACKNOWLEDGED → RESOLVED`, persists resolving actor/time, clears active acknowledgement ownership, skips pending/scheduled/paused steps, records a `RESOLVED` audit event with the pre-clear step/source/token-hash facts, and cancels step wake-ups after commit. Recipient action eligibility uses the saved resolution deadline rather than token TTL; repeated recipient resolution requires the exact saved token hash plus the accepted step/source recorded in the resolution audit. Repeated same-actor resolution returns the saved result without another write; foreign-team, obsolete-token, late, terminal, and anonymous team requests are rejected. Focused service/controller/security tests pass; independent read-only review was **Inconclusive** only for PostgreSQL/deployed concurrency and rollback because those checks are environment-gated. Deadline expiry/recovery and UI remain later work.
 
 ### 8. Implement deadline expiry and recovery
 
-- [ ] Persist the acknowledgement wait after a successful send instead of immediate final-send exhaustion. Use shared deadline handling with current-owner validation, running-process retry, startup recovery, and the advance-or-exhaust branch; reuse durable publication machinery.
+- [x] Persist the acknowledgement wait after a successful send instead of immediate final-send exhaustion. Use shared deadline handling with current-owner validation, running-process retry, startup recovery, and the advance-or-exhaust branch; reuse durable publication machinery.
 - Acceptance: acknowledgement expiry continues or exhausts under the agreed timing mapping; resolution expiry makes the next step due immediately in all original-due-time comparisons or exhausts if none exists. No extra last-node logic, fresh wait after restart, automatic resend, or duplicate transition; failed publication remains recoverable.
+- **Local implementation evidence (2026-10-07):** Successful sends persist the next step's `dueAt` as the current acknowledgement boundary; final sends persist their node wait and register a recoverable deadline. POST acknowledgement validates that boundary, cancels the final acknowledgement wake-up after commit, and schedules the saved resolution deadline. Expiry reloads and locks the run/step, exhausts final acknowledgement or resolution waits, and reopens a paused/pending next step with `dueAt=now` for earlier, equal, and later original due times. Deadline wake-ups recover saved final/resolution boundaries after restart, while durable publication recovery handles broker/database failures. Focused expiry/wake-up-scheduler/consumer/acknowledgement tests and the full local suite (190 tests, 0 failures/errors, 17 environment-gated skips) pass; PostgreSQL/deployed concurrency, rollback, and restart checks remain environment-gated, and no independent read-only subagent was available in this session.
 
 ### 9. Implement Escalate now
 
-- [ ] Add immediate-due scheduling shared with deadline expiry, a same-team manual action with expected-step validation, atomic audit, durable publication, and deadline invalidation.
-- [ ] Add the UI action for waiting/paused steps, confirmation for acknowledged runs, and clear unavailable/conflict responses.
-- [ ] Add the email button, anonymous recipient-token preview/POST confirmation, explicit token capability, and recipient-email actor audit using the same business operation.
+- [x] Add immediate-due scheduling shared with deadline expiry, a same-team manual action with expected-step validation, atomic audit, durable publication, and deadline invalidation.
+- [x] Add the UI action for waiting/paused steps, confirmation for acknowledged runs, and clear unavailable/conflict responses.
+- [x] Add the email button, anonymous recipient-token preview/POST confirmation, explicit token capability, and recipient-email actor audit using the same business operation.
+- **Local implementation evidence (2026-10-08):** OPEN and ACKNOWLEDGED Escalate now transitions lock the run, validate expected source/target steps and relevant deadlines, reuse immediate scheduling, clear resolution ownership when needed, and record actor/source/target audit metadata. Email action tokens use the existing hash storage with an explicit capability and expected target; preview remains read-only while POST rechecks scope under the run lock. Focused tests and the full local suite (224 tests, 0 failures/errors, 17 environment-gated skips) pass; PostgreSQL/deployed concurrency, rollback, restart, and broker checks remain environment-gated.
 - Acceptance: OPEN and ACKNOWLEDGED cases both make only the intended next step due immediately from UI or email. Email eligibility uses the current source's acknowledgement/resolution window and is revalidated on POST; expired windows make the action unavailable without hiding the scoped preview. No next step means no change; sent/terminal steps cannot be reopened. Opening/scanning the link is read-only. Invalid/foreign/stale tokens, repeated confirmations, changed preview targets, concurrent resolution/timeout/send, publication failure, and restart do not skip or resend steps or duplicate action audit events.
 
 ### 10. Complete escalation/email UI
 
-- [ ] Show acknowledgement ownership and deadline, provide the agreed resolve action, explain paused/skipped steps, and keep valid recipient previews viewable with deadline-specific unavailable-action messages. Handle invalid tokens and email Escalate now source-window restrictions clearly.
+- [x] Show acknowledgement ownership and deadline, provide the agreed resolve action, explain paused/skipped steps, and keep valid recipient previews viewable with deadline-specific unavailable-action messages. Handle invalid tokens and email Escalate now source-window restrictions clearly.
+- **Local implementation evidence (2026-10-08):** The team detail page shows the current acknowledgement owner/deadline and resolves `ACKNOWLEDGED` runs through the existing same-team endpoint. The recipient acknowledgement page now distinguishes acknowledgement, active resolution, and resolved outcomes, uses the existing scoped resolution endpoint, and displays the saved resolution deadline. Saved step rows explain waiting, paused, sent, failed, and skipped states; Escalate now preview/action errors explain stale, expired, and unavailable-window cases.
 - Acceptance: UI distinguishes acknowledgement from resolution only for enabled runs and always displays saved server state.
 
 ### 11. Extend audit event coverage
 
-- [ ] Add the missing action enums and safe event details; record creation, sends/retries, acknowledgement/deadline, manual escalation, resolution/timeout, and completion events at their owning operations.
+- [x] Add the missing action enums and safe event details; record creation, sends/retries, acknowledgement/deadline, manual escalation, resolution/timeout, and completion events at their owning operations.
+- **Local implementation evidence (2026-10-08):** Creation now records the authenticated actor when available and system creation otherwise; automatic notification acceptance, failure, retry scheduling, and final exhaustion record step, recipient, attempt, and saved wait metadata without tokens or diagnostics. Existing acknowledgement events retain the resolution deadline, while existing timeout/manual/resolution events remain unchanged. Focused lifecycle and audit tests pass; normal package and deployed rollback/concurrency verification remain pending.
 - Acceptance: domain updates and audit roll back together; idempotent/stale paths do not repeat events; step context survives flow edits; email and system actors are labelled correctly. Include audit assertions with each implementation task instead of waiting until the UI is built.
 
 ### 12. Add the activity history read API
 
-- [ ] Add same-team access checks, safe timeline DTOs, stable ordering, pagination, and grouped-attempt detail support using the existing audit repository.
+- [x] Add same-team access checks, safe timeline DTOs, stable ordering, pagination, and grouped-attempt detail support using the existing audit repository.
+- **Local implementation evidence (2026-10-08):** `GET /api/v1/escalation/{escalationId}/history` verifies the selected team before querying audit rows, returns stable `occurredAt`/`id` pages, classifies user/system actors, structures safe step and retry details, and removes token-like metadata. Focused history tests and the full Maven package pass; PostgreSQL/deployed verification remains pending.
 - Acceptance: foreign-team/anonymous/token-only access cannot expose history; event order and retry counts remain correct across pages; raw diagnostics and secrets are excluded.
 
 ### 13. Build the readable activity timeline
@@ -353,13 +367,19 @@ transition/audit event and no additional send.
 
 ## Current evidence
 
-This document specifies planned behavior. Manual start now accepts same-team `IDLE`
-and `SCHEDULED` runs, while automatic scheduled start remains due-gated. Current
-code still completes runs on acknowledgement and uses two step-state strings.
-Audit actions cover scheduling, rescheduling, start, cancellation, and start
-failure; the detail-page execution timeline shows current step rows rather than
-event history. No Escalate now, resolution-timeout, or full activity-timeline
-implementation/test success is claimed here. Start now has local implementation
-and focused-test evidence only; PostgreSQL/deployed verification is pending.
+This document specifies the agreed lifecycle and tracks implementation. Manual
+start now accepts same-team `IDLE` and `SCHEDULED` runs, while automatic scheduled
+start remains due-gated. Execution steps use the single persisted
+`FlowExecutionStepStatus` enum. Runtime snapshots, acknowledgement pause,
+explicit resolution, deadline expiry/recovery, and Escalate now are implemented
+locally; the activity timeline remains unimplemented.
+Audit actions now cover creation, scheduling, rescheduling, start, cancellation,
+start failure, notification acceptance/failure/retry, acknowledgement,
+resolution, timeout expiry, and final exhaustion; the detail-page execution
+timeline shows current step rows rather than event history. No full activity-
+timeline read API/UI implementation or test success is claimed here. Start now,
+acknowledgement pause, explicit resolution, and deadline expiry/recovery have
+local implementation and focused-test evidence only; PostgreSQL/deployed
+verification is pending.
 
 Relevant entry points: [flow model](../src/main/java/com/alertops/flow/model/Flow.java), [node model](../src/main/java/com/alertops/flow/model/Node.java), [start service](../src/main/java/com/alertops/flow_execution_engine/service/FlowExecutionStateService.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), and [step scheduling service](../src/main/java/com/alertops/messaging/StepSchedulingService.java).

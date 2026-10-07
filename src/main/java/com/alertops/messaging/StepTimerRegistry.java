@@ -118,6 +118,25 @@ public class StepTimerRegistry {
         }
     }
 
+    /** Cancels the wake-up for a step that became paused or otherwise ineligible. */
+    public boolean cancel(UUID stepId) {
+        if (stepId == null) {
+            return false;
+        }
+        boolean removed;
+        synchronized (timerLock) {
+            TimerEntry entry = timers.remove(stepId);
+            removed = entry != null;
+            if (entry != null) {
+                cancelScheduledTimer(entry);
+            }
+        }
+        if (removed && !shuttingDown) {
+            eventPublisher.publishEvent(new TimerCapacityAvailable());
+        }
+        return removed;
+    }
+
     // Runs when one timer reaches its due time.
     private void onTimer(TimerEntry entry) {
         synchronized (timerLock) {

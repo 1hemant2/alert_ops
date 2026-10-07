@@ -2,16 +2,21 @@ package com.alertops.flow_execution_engine.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
+
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 
 
 @Repository
@@ -20,12 +25,38 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
    
    FlowExecutionState findTopByProcessIdOrderByPositionAsc(UUID processId);
 
-   FlowExecutionState findFirstByProcessIdAndExecutionStateOrderByPositionAsc(UUID processId, String status);
+   FlowExecutionState findFirstByProcessIdAndStatusOrderByPositionAsc(
+           UUID processId, FlowExecutionStepStatus status);
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   @Query("select state from FlowExecutionState state where state.id = :id")
+   // Locks one execution step so timeout transitions use current durable state.
+   Optional<FlowExecutionState> findByIdForUpdate(@Param("id") UUID id);
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   FlowExecutionState findTopByProcessIdAndStatusOrderByPositionDesc(
+           UUID processId, FlowExecutionStepStatus status);
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   FlowExecutionState findFirstByProcessIdAndStatusInOrderByPositionAscIdAsc(
+           UUID processId, List<FlowExecutionStepStatus> statuses);
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   @Query("""
+           SELECT state FROM FlowExecutionState state
+           WHERE state.processId = :processId
+             AND state.status IN (
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PENDING,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PAUSED
+             )
+           ORDER BY state.position ASC, state.id ASC
+           """)
+   List<FlowExecutionState> findUnsentStepsForUpdate(@Param("processId") UUID processId);
 
    @Query("""
            SELECT state FROM FlowExecutionState state
-           WHERE state.executionState = 'ACTIVE'
-             AND state.notificationState = 'NOT_SENT'
+           WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.publicationPending = true
              AND state.dueAt IS NOT NULL
              AND EXISTS (
@@ -38,9 +69,27 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
    List<FlowExecutionState> findPendingPublications(Pageable pageable);
 
    @Query("""
+           SELECT state FROM FlowExecutionState state
+           WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SENT
+             AND state.dueAt IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT later.id FROM FlowExecutionState later
+                 WHERE later.processId = state.processId
+                   AND later.position > state.position
+             )
+             AND EXISTS (
+                 SELECT escalation.id FROM Escalation escalation
+                 WHERE escalation.id = state.processId
+                   AND escalation.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN
+             )
+           ORDER BY state.dueAt ASC, state.id ASC
+           """)
+   // Finds open final sent steps whose acknowledgement timeout can be recovered.
+   List<FlowExecutionState> findOpenFinalAcknowledgementSteps(Pageable pageable);
+
+   @Query("""
            SELECT COUNT(state) FROM FlowExecutionState state
-           WHERE state.executionState = 'ACTIVE'
-             AND state.notificationState = 'NOT_SENT'
+           WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.publicationPending = true
              AND EXISTS (
                  SELECT escalation.id FROM Escalation escalation
@@ -55,7 +104,7 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
            UPDATE FlowExecutionState state
            SET state.publicationPending = false
            WHERE state.id = :stateId
-             AND state.executionState = 'ACTIVE'
+             AND state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.sendAttemptCount = :sendAttemptCount
              AND state.dueAt = :dueAt
              AND state.publicationPending = true
@@ -69,10 +118,10 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
    @Modifying
    @Query("""
            UPDATE FlowExecutionState state
-           SET state.executionState = 'PROCESSING', state.publicationPending = false
+           SET state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SENDING,
+               state.publicationPending = false
            WHERE state.id = :stateId
-             AND state.executionState = 'ACTIVE'
-             AND state.notificationState = 'NOT_SENT'
+             AND state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED
              AND state.sendAttemptCount = :sendAttemptCount
              AND state.dueAt = :dueAt
            """)
@@ -81,5 +130,20 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
            @Param("sendAttemptCount") int sendAttemptCount,
            @Param("dueAt") Instant dueAt
    );
+
+   @Modifying
+   @Query("""
+           UPDATE FlowExecutionState state
+           SET state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SKIPPED,
+               state.publicationPending = false,
+               state.dueAt = null
+           WHERE state.processId = :processId
+             AND state.status IN (
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PENDING,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SCHEDULED,
+                 com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.PAUSED
+             )
+           """)
+   int markUnsentStepsSkipped(@Param("processId") UUID processId);
 
 }

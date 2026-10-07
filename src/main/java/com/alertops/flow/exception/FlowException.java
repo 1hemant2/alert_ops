@@ -17,6 +17,10 @@ public class FlowException extends AppException {
         return new FlowException("FLOW_STEP_NOT_FOUND", "That step could not be found in this team.", HttpStatus.NOT_FOUND);
     }
 
+    public static FlowException flowNotFound() {
+        return new FlowException("FLOW_NOT_FOUND", "That escalation path could not be found in this team.", HttpStatus.NOT_FOUND);
+    }
+
     public static FlowException staleVersion() {
         return new FlowException("FLOW_VERSION_CONFLICT", "This path changed since it was loaded. Refresh and try again.", HttpStatus.CONFLICT);
     }

@@ -9,6 +9,8 @@ import com.alertops.flow.model.Node;
 import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow.repository.NodeRepository;
 import com.alertops.flow.exception.FlowException;
+import com.alertops.flow.dto.NodeTimingDto;
+import com.alertops.flow.dto.UpdateFlowTimingDto;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 import org.junit.jupiter.api.AfterEach;
@@ -130,7 +132,7 @@ class FlowServiceTest {
         when(userRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(user);
         when(teamMemberRepository.findTeamMemeber(user.getId(), teamId)).thenReturn(mock(TeamMember.class));
 
-        var updated = flowService.updateNode(nodeId, " edited escalation step ", 12, "member@example.com", 3L);
+        var updated = flowService.updateNode(nodeId, " edited escalation step ", 12, "member@example.com", null, 3L);
 
         assertEquals("edited escalation step", updated.getNodeName());
         assertEquals(12, updated.getDurationInMinutes());
@@ -153,7 +155,47 @@ class FlowServiceTest {
         when(nodeRepository.findById(nodeId)).thenReturn(Optional.of(node));
         when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
 
-        assertThrows(FlowException.class, () -> flowService.updateNode(nodeId, "step", 5, "member@example.com", 4L));
+        assertThrows(FlowException.class, () -> flowService.updateNode(nodeId, "step", 5, "member@example.com", null, 4L));
+
+        verify(nodeRepository, never()).save(any());
+        verify(flowRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updatingAnEnabledFlowNodeRequiresAPositiveResolutionTimeout() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        UUID nodeId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Flow flow = mock(Flow.class);
+        when(flow.getVersion()).thenReturn(5L);
+        when(flow.isResolutionTimeoutEnabled()).thenReturn(true);
+        Node node = node(nodeId, flowId);
+        when(nodeRepository.findById(nodeId)).thenReturn(Optional.of(node));
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+
+        assertThrows(FlowException.class, () -> flowService.updateNode(
+                nodeId, "step", 5, "member@example.com", null, 5L));
+
+        verify(nodeRepository, never()).save(any());
+        verify(flowRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updatingADisabledFlowNodeRejectsAResolutionTimeoutValue() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        UUID nodeId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Flow flow = mock(Flow.class);
+        when(flow.getVersion()).thenReturn(5L);
+        when(flow.isResolutionTimeoutEnabled()).thenReturn(false);
+        Node node = node(nodeId, flowId);
+        when(nodeRepository.findById(nodeId)).thenReturn(Optional.of(node));
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+
+        assertThrows(FlowException.class, () -> flowService.updateNode(
+                nodeId, "step", 5, "member@example.com", 20, 5L));
 
         verify(nodeRepository, never()).save(any());
         verify(flowRepository, never()).saveAndFlush(any());
@@ -169,7 +211,7 @@ class FlowServiceTest {
         when(nodeRepository.findById(nodeId)).thenReturn(Optional.of(node));
         when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(null);
 
-        assertThrows(FlowException.class, () -> flowService.updateNode(nodeId, "step", 5, "member@example.com", 4L));
+        assertThrows(FlowException.class, () -> flowService.updateNode(nodeId, "step", 5, "member@example.com", null, 4L));
 
         verify(nodeRepository, never()).save(any());
     }
@@ -190,9 +232,91 @@ class FlowServiceTest {
         when(userRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(user);
         when(teamMemberRepository.findTeamMemeber(user.getId(), teamId)).thenReturn(null);
 
-        assertThrows(FlowException.class, () -> flowService.updateNode(nodeId, "step", 5, "member@example.com", 2L));
+        assertThrows(FlowException.class, () -> flowService.updateNode(nodeId, "step", 5, "member@example.com", null, 2L));
 
         verify(nodeRepository, never()).save(any());
+        verify(flowRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void disablingResolutionTimeoutClearsEveryNodeInOneFlowUpdate() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Flow flow = mock(Flow.class);
+        when(flow.getVersion()).thenReturn(7L);
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+        Node first = node(UUID.randomUUID(), flowId);
+        Node second = node(UUID.randomUUID(), flowId);
+        when(nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId)).thenReturn(List.of(first, second));
+
+        flowService.updateTiming(flowId, timing(false, List.of(), 7L));
+
+        verify(first).setResolutionTimeout(null);
+        verify(second).setResolutionTimeout(null);
+        verify(nodeRepository).saveAll(List.of(first, second));
+        verify(flow).setResolutionTimeoutEnabled(false);
+        verify(flowRepository).saveAndFlush(flow);
+    }
+
+    @Test
+    void enablingResolutionTimeoutRequiresOnePositiveTimeoutForEveryNode() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Flow flow = mock(Flow.class);
+        when(flow.getVersion()).thenReturn(8L);
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+        Node first = node(firstId, flowId);
+        Node second = node(secondId, flowId);
+        when(nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId)).thenReturn(List.of(first, second));
+
+        flowService.updateTiming(flowId, timing(true, List.of(
+                nodeTiming(firstId, 30),
+                nodeTiming(secondId, 45)), 8L));
+
+        verify(first).setResolutionTimeout(Duration.ofMinutes(30));
+        verify(second).setResolutionTimeout(Duration.ofMinutes(45));
+        verify(flow).setResolutionTimeoutEnabled(true);
+        verify(flowRepository).saveAndFlush(flow);
+    }
+
+    @Test
+    void enablingResolutionTimeoutRejectsPartialConfigurationWithoutWriting() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Flow flow = mock(Flow.class);
+        when(flow.getVersion()).thenReturn(9L);
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+        Node first = node(UUID.randomUUID(), flowId);
+        Node second = node(UUID.randomUUID(), flowId);
+        when(nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId)).thenReturn(List.of(first, second));
+
+        assertThrows(FlowException.class, () -> flowService.updateTiming(flowId,
+                timing(true, List.of(nodeTiming(first.getId(), 30)), 9L)));
+
+        verify(first, never()).setResolutionTimeout(any());
+        verify(second, never()).setResolutionTimeout(any());
+        verify(nodeRepository, never()).saveAll(any());
+        verify(flowRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void timingUpdateRejectsAStaleFlowVersionWithoutWriting() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Flow flow = mock(Flow.class);
+        when(flow.getVersion()).thenReturn(10L);
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+
+        assertThrows(FlowException.class, () -> flowService.updateTiming(flowId, timing(false, List.of(), 9L)));
+
+        verify(nodeRepository, never()).findAllByFlowIdOrderByPositionAsc(any());
+        verify(nodeRepository, never()).saveAll(any());
         verify(flowRepository, never()).saveAndFlush(any());
     }
 
@@ -257,5 +381,20 @@ class FlowServiceTest {
         when(node.getId()).thenReturn(id);
         when(node.getFlowId()).thenReturn(flowId);
         return node;
+    }
+
+    private NodeTimingDto nodeTiming(UUID nodeId, int minutes) {
+        NodeTimingDto timing = new NodeTimingDto();
+        timing.setNodeId(nodeId);
+        timing.setResolutionTimeoutInMinutes(minutes);
+        return timing;
+    }
+
+    private UpdateFlowTimingDto timing(boolean enabled, List<NodeTimingDto> nodeTimings, long version) {
+        UpdateFlowTimingDto timing = new UpdateFlowTimingDto();
+        timing.setResolutionTimeoutEnabled(enabled);
+        timing.setNodeTimings(nodeTimings);
+        timing.setVersion(version);
+        return timing;
     }
 }

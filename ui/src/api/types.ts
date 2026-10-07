@@ -99,6 +99,7 @@ export interface Flow {
   version: number
   createdAt?: string
   updatedAt?: string
+  resolutionTimeoutEnabled: boolean
 }
 
 export interface FlowNode {
@@ -108,6 +109,8 @@ export interface FlowNode {
   nodeName?: string
   duration: string | number
   durationInMinutes?: number
+  resolutionTimeout?: string | number | null
+  resolutionTimeoutInMinutes?: number | null
   email: string
   position: string | number
 }
@@ -121,11 +124,31 @@ export interface Escalation {
   resolutionType?: string | null
   issueSolvedBy?: string | null
   acknowledgedAt?: string | null
+  acknowledgedStepId?: string | null
+  resolutionDeadline?: string | null
   scheduledStartAt?: string | null
   scheduleTimezone?: string | null
   cancelledAt?: string | null
   createdAt: string
   updatedAt?: string
+}
+
+export interface EscalationManualActionRequest {
+  expectedSourceStepId: string
+  expectedTargetStepId: string
+}
+
+export interface EscalationManualAction {
+  escalationName: string
+  status: string
+  sourceStepId?: string | null
+  sourceRecipientEmail?: string | null
+  targetStepId?: string | null
+  targetRecipientEmail?: string | null
+  actionDeadline?: string | null
+  actionAvailable: boolean
+  alreadyEscalated: boolean
+  unavailableReason?: string | null
 }
 
 export interface EscalationAcknowledgement {
@@ -136,15 +159,73 @@ export interface EscalationAcknowledgement {
   acknowledgedAt?: string | null
   acknowledgedBy?: string | null
   alreadyAcknowledged: boolean
+  resolutionDeadline?: string | null
+}
+
+export interface EscalationResolution {
+  escalationName: string
+  status: string
+  resolvedBy?: string | null
+  resolvedAt?: string | null
+  alreadyResolved: boolean
+}
+
+export type EscalationHistoryAction =
+  | 'CREATED'
+  | 'SCHEDULED'
+  | 'RESCHEDULED'
+  | 'STARTED'
+  | 'CANCELLED'
+  | 'START_FAILED'
+  | 'NOTIFICATION_SENT'
+  | 'NOTIFICATION_FAILED'
+  | 'NOTIFICATION_RETRY_SCHEDULED'
+  | 'ACKNOWLEDGED'
+  | 'ESCALATED_NOW'
+  | 'RESOLVED'
+  | 'ACKNOWLEDGEMENT_EXPIRED'
+  | 'RESOLUTION_EXPIRED'
+  | 'COMPLETED'
+
+export type EscalationHistoryActorType = 'USER' | 'SYSTEM'
+
+export interface EscalationHistoryEvent {
+  id: string
+  action: EscalationHistoryAction
+  previousState?: string | null
+  newState?: string | null
+  actorType: EscalationHistoryActorType
+  actorId?: string | null
+  actorEmail?: string | null
+  occurredAt: string
+  reason?: string | null
+  details: Record<string, string>
+}
+
+export interface EscalationHistoryPage {
+  events: EscalationHistoryEvent[]
+  page: number
+  size: number
+  totalEvents: number
+  totalPages: number
+  first: boolean
+  last: boolean
 }
 
 export interface ExecutionState {
+  id: string
   nodeId: string
   position: string | number
+  taskName?: string | null
+  taskSource?: string | null
+  taskPriority?: string | null
+  taskCategory?: string | null
+  taskReferenceUrl?: string | null
+  taskDetails?: string | null
   userEmail: string
-  executionState: string
-  notificationState: string
+  status: string
   sendAttemptCount: number
+  dueAt?: string | null
   createdAt: string
   updatedAt?: string
 }

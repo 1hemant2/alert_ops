@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createTask, getTasks } from '../../api/tasks'
 import { Button, Card, EmptyState, ErrorState, Field, LoadingRows, PageHeader } from '../../components/Elements'
@@ -45,7 +45,7 @@ export function TasksPage() {
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">TEAM TASKS</span><h2>Task library</h2></div><span className="count-pill">{tasks.data?.length ?? '—'}</span></div>
-        {tasks.isPending ? <LoadingRows count={4} /> : tasks.isError ? <ErrorState message={tasks.error.message} onRetry={() => void tasks.refetch()} /> : tasks.data.length === 0 ? <EmptyState title="No tasks yet" description="Create a task to give your first response path useful context." /> : <div className="task-list">{tasks.data.map(task => <article className="task-row" key={task.id}><span className="task-icon">▤</span><div className="task-copy"><strong>{task.name}</strong><p>{task.description || 'No description provided.'}</p><small>{task.source || 'Manual'}{task.category ? ` · ${task.category}` : ''} · Created {formatDate(task.createdAt)}</small></div><span className="task-id">{task.id.slice(0, 8)}</span></article>)}</div>}
+        {tasks.isPending ? <LoadingRows count={4} /> : tasks.isError ? <ErrorState message={tasks.error.message} onRetry={() => void tasks.refetch()} /> : tasks.data.length === 0 ? <EmptyState title="No tasks yet" description="Create a task to give your first response path useful context." /> : <div className="task-list">{tasks.data.map(task => <article className="task-row" key={task.id}><span className="task-icon">▤</span><div className="task-copy"><Link className="task-title-link" to={`/app/${teamId}/tasks/${task.id}`}>{task.name}</Link><p>{task.description || 'No description provided.'}</p><small>{task.source || 'Manual'} · {task.priority || 'No priority'}{task.category ? ` · ${task.category}` : ''} · Created {formatDate(task.createdAt)}</small>{task.referenceUrl && <a className="task-reference-link" href={task.referenceUrl} target="_blank" rel="noreferrer">Open reference ↗</a>}</div><Link className="task-id task-row-link" to={`/app/${teamId}/tasks/${task.id}`}>View</Link></article>)}</div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW TASK</span><h2>Add context</h2></div><span className="form-number">01</span></div>

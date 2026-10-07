@@ -13,9 +13,39 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 ## Changes
 
 - Use clear, descriptive names for variables, methods, and classes.
-- Choose the simplest solution that meets the request. Keep the change focused and reuse existing code where practical.
-- Add files, abstractions, or dependencies only when they are needed and can be justified.
+- Name types and methods for the business responsibility or user-visible
+  outcome first, not for the internal mechanism. Prefer names such as
+  `EscalationTimeoutService` and `scheduleResolutionTimeout` that explain what
+  the escalation is waiting for, rather than names such as
+  `EscalationDeadlineTransitionService` or `registerDeadlineWakeUp` that focus
+  on implementation details. If an infrastructure role must be named, put the
+  domain subject first and keep the mechanism secondary; explain the mechanics
+  in a comment or class description.
+- Name methods with concise verb-object phrases, normally two to five words.
+  Prefer precise domain terms such as `rescheduleTimeoutWakeUp` over vague
+  names such as `rearm`, `handle`, `process`, or `doWork`; do not chain clauses
+  until a method name reads like a sentence or paragraph. Split a method when
+  one concise name cannot describe a single responsibility.
+- Add a one-line `//` purpose comment immediately above every new or modified
+  method, including private helpers, lifecycle callbacks, and test methods.
+  Keep the comment behavior-focused and on one line; do not use a long block
+  comment to compensate for an unclear method name.
+- Prefer the smallest readable implementation that meets the request. Keep the
+  normal path easy to follow from validation to state change; avoid speculative
+  abstractions, wrappers, and defensive branches that do not protect a real
+  boundary.
+- Remove helpers that only forward arguments, rename a one-line expression, or
+  duplicate a check. Keep a helper when it names a business rule, protects a
+  security/concurrency invariant, handles a nullable boundary, or makes a
+  repeated operation easier to review.
+- Add files, abstractions, or dependencies only when they reduce real
+  complexity or are required by the product behavior. Before handoff, review
+  the diff for dead methods, duplicate logic, and code that can be made clear
+  with a local variable or a focused method.
 - When one operation supports materially different business modes, do not encode the mode with overloaded method signatures or boolean flags. Use one clear method with a specific enum/request object, or separate methods with distinct names when the operations truly differ. Keep the mode values finite and explicit, and add focused coverage for each mode.
+- Treat decisions recorded as agreed behavior, core decisions, final storage decisions, canonical mappings, or acceptance rules in the linked product checklist and feature plans as binding implementation requirements. Before changing a model, schema, API, or lifecycle transition, read those sections and record the relevant canonical source of truth in the current plan.
+- Do not add a second field, column, timer, or API property for a concept already represented by an agreed canonical field or timing boundary. Search the code and plans for domain synonyms first; if reuse is insufficient, document the reason and resolve the conflict before coding.
+- When the user clarifies or corrects an agreed decision, update the current plan and relevant feature plan before changing code, remove or revise conflicting implementation and tests, and rerun the focused verification. Do not preserve an earlier implementation merely because it already exists.
 - Review the final diff for unrelated changes and explain any important limitation.
 
 ## Domain values and enums
@@ -36,6 +66,7 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 ## Task plans and documentation
 
 - Before implementing any task, including fixes and documentation changes, write a concise plan in [the current task plan](docs/current-plan.md). Include the task name, start date, status, goal and scope, acceptance criteria, implementation steps, and intended verification. Small tasks need only a few bullets. Planning does not require a separate approval unless the user requests it or scope needs clarification.
+- Before implementation, add a short decision-compliance note for any task governed by an existing feature plan: list the relevant agreed decisions, canonical fields/sources of truth, and explicitly excluded alternatives. Use that note during diff review so implementation does not silently introduce a parallel representation.
 - Maintain one current task plan. Update its checkboxes, decisions, blockers, and verification results as work progresses. Resume an unfinished plan rather than overwriting it; replace a completed plan's contents when the next agreed task begins. If the user explicitly switches tasks, preserve a short resume note and link from the new plan to the existing feature plan or backlog item before replacing it.
 - Keep the current plan roughly one screen long (aim for at most 60 lines). Summarize findings and link to relevant code or documentation instead of copying requirements, test logs, conversation history, or earlier plan revisions.
 - Use [the product launch checklist](docs/product-launch-readiness.md) as the source of truth for release priorities and readiness. The current plan describes only the task being worked on; link to the relevant checklist item or existing feature plan instead of duplicating it. Update readiness only when supported by verification evidence.
@@ -55,13 +86,15 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 - Persist real-world moments as `Instant`/UTC and inject `Clock` into business services instead of calling `Instant.now()` directly; this keeps comparisons deterministic and tests controllable.
 - Accept a local date/time plus an IANA timezone at the boundary, resolve it to one UTC `Instant`, and retain the submitted timezone when the product needs to display or reschedule the value.
 - Treat in-memory timers as wake-up handles only. Timer callbacks must reload current state from PostgreSQL and tolerate cancellation, replacement, restart recovery, and duplicate callbacks.
-- Add concise comments around calendar/timezone conversion, retry timing, and concurrency code when the reason is not obvious from the syntax. Do not comment routine getters, setters, or self-explanatory code.
+- Add concise comments around calendar/timezone conversion, retry timing, and concurrency code when the reason is not obvious from the syntax. The one-line comment rule applies to every new or modified method; unchanged routine getters and setters do not need retroactive comments.
 
 ## Verification and handoff
 
 - Add or update a focused test for each meaningful behavior or failure path, especially races, retries, restart recovery, idempotency, and null repository results.
 - When a Spring component's constructor dependencies change, update every affected test context before handoff. Provide new dependencies with `@MockitoBean` or explicit test configuration in `@WebMvcTest` and other slice tests, update direct constructor tests, and run the focused slice test. If a context failure threshold appears, inspect the first underlying `UnsatisfiedDependencyException` rather than treating the threshold as the root cause.
 - Run the narrowest relevant tests plus the normal project build before handoff. Clearly distinguish passed local checks from integration or deployed checks that were skipped because required services or environment variables were unavailable.
+- Before handoff for every repository task, run an independent, read-only verification subagent using the original request, acceptance criteria, changed-file list, and intended verification commands as its inputs. Ask it to inspect the current worktree and relevant code, tests, and documentation; run the narrowest relevant checks it can run; and return an evidence-based verdict of `Achieved`, `Not achieved`, or `Inconclusive`, with each acceptance criterion mapped to evidence, command results, gaps, regressions, and recommended follow-up.
+- Keep the verifier independent: do not seed it with the desired conclusion, and do not allow it to modify files, stage changes, commit, or otherwise change repository state. The primary agent remains responsible for the result, must reconcile any disagreement or `Inconclusive` finding before claiming completion, and must record the verifier verdict, evidence, and material limitations in the current plan and final handoff. If the environment has no usable subagent mechanism, explicitly record that verification was skipped and why; do not present the task as independently verified.
 
 ## Transactions
 
