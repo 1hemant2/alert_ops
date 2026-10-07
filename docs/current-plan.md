@@ -1,46 +1,50 @@
 # Current task plan
 
-## Task: Complete incident lifecycle transition coverage
+## Task: Complete webhook backend readiness
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Close the remaining local launch-checklist gap by adding focused backend tests
-for lifecycle transitions, authorization, stale callbacks, idempotency, and
-concurrency. Keep deployment verification out of scope and do not commit.
+Align webhook and manual task validation, harden replay/rollback and team
+isolation behavior, verify rate and request-size limits, and add focused
+backend tests. Keep UI follow-up and deployment verification out of scope.
 
 ### Decision-compliance note
 
-- PostgreSQL conditional updates and row locks are the lifecycle source of
-  truth; in-memory callbacks must not decide ownership.
-- Use the existing status/resolution enums and canonical lifecycle fields; do
-  not add parallel state or timing fields for tests.
-- Audit events must remain part of the same lifecycle transaction where the
-  existing implementation records them.
+- The webhook event's saved JSON and linked task/escalation rows remain the
+  durable source of truth; retries must reuse the unique webhook/event key.
+- Reuse the existing task fields and domain enums; do not add duplicate
+  metadata columns or a second event store.
+- Preserve the existing one-transaction webhook create/start boundary and
+  team-scoped flow selection; rollback must remove all linked rows together.
+- Keep Redis as the distributed rate-limit source when available; any local
+  fallback must be explicit and tested as a degraded single-instance mode.
 
 ### Acceptance criteria
 
-- Focused tests cover the remaining start/schedule, start/cancel,
-  start/reschedule, acknowledgement/send, and failure/cancellation races.
-- Tests cover authorization, stale callbacks, repeated actions, terminal
-  protections, and the agreed conflict/idempotency responses.
-- Existing behavior remains unchanged unless a test exposes a real defect.
-- Focused tests, full Maven package, and whitespace checks pass.
+- Manual and webhook task limits are aligned and server-side validation rejects
+  oversized or invalid values before persistence.
+- Required fields, same-team flow selection, secret rotation/disable, replay,
+  changed-payload conflicts, rollback, size limits, and rate limits have tests.
+- Webhook-created tasks and runs preserve the agreed metadata and event links.
+- Focused webhook tests, full Maven package, and whitespace checks pass.
 
 ### Steps
 
-- [x] Map existing lifecycle coverage and identify only missing cases.
-- [x] Add focused service/controller/integration tests or fix defects exposed
-  by those tests.
-- [x] Run verification and update the checklist/changelog without committing.
+- [x] Map current webhook behavior, limits, and missing focused coverage.
+- [x] Implement the smallest validation/limit fixes and add focused tests.
+- [x] Run verification and update readiness/changelog without committing.
 
 ### Verification and limitations
 
-- Lifecycle-focused service, controller, scheduling, acknowledgement,
-  resolution, manual-action, and timeout tests passed.
-- `./mvnw -q package` and `git diff --check` passed. PostgreSQL/deployed
-  verification remains unavailable because the integration environment is
-  gated, and no independent read-only verifier was available.
-- Changes remain uncommitted because the user did not request a commit.
+- Focused webhook, payload-filter, and task validation tests pass.
+- `./mvnw -q package` passes: 260 tests, 0 failures, 0 errors, 17
+  environment-gated skips. `git diff --check` passes.
+- PostgreSQL concurrent replay/rollback, Redis multi-instance behavior, and
+  deployed verification remain open. The local rate-limit fallback and
+  failure path are unit-tested only.
+- Independent read-only verification was skipped because no usable subagent
+  mechanism was available. Changes remain uncommitted because no commit was
+  requested.

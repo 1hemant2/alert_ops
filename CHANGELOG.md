@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Harden webhook task validation and ingress limits
+
+- Align manual and webhook task limits, validate manual priority and description updates, inject the application clock for webhook event timing, and reject oversized declared webhook bodies before JSON parsing.
+- Add focused coverage for webhook metadata, required/optional validation, same-team flow selection, secret state, replay/conflict, failure paths, size/rate limits, and manual task limits.
+- Verification: focused tests and `./mvnw -q package` pass (260 tests, 0 failures/errors, 17 environment-gated skips); PostgreSQL/Redis multi-instance and deployed verification remain pending, and changes are intentionally uncommitted.
+
 ## 2026-10-08 — Complete incident lifecycle test coverage
 
 - Add focused authorization and lifecycle-boundary tests for anonymous access, foreign-team starts, early scheduled starts, and preserving scheduler wake-ups when a start fails; retain the existing race, idempotency, acknowledgement, resolution, and timeout coverage.
