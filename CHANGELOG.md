@@ -4,6 +4,15 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Snapshot task metadata in executions and emails
+
+- Persist priority, category, and reference URL in each execution-step snapshot
+  at run start and include the saved values in escalation email content without
+  changing later runs when the task is edited.
+- Add migration and focused coverage; `./mvnw -q package` passes with 260 tests,
+  0 failures/errors, and 17 environment-gated skips. PostgreSQL migration and
+  deployed email verification remain pending; task/webhook UI gaps remain open.
+
 ## 2026-10-08 — Fix backend image vulnerabilities
 
 - Upgrade the backend to Spring Boot `4.0.8`/Spring Framework `7.0.9`, apply fixed

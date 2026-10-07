@@ -1,7 +1,7 @@
 # Webhook task creation plan
 
 Status: Partially implemented — core backend and configuration UI exist; metadata
-presentation, full event access, input-limit alignment, and focused verification remain pending.
+presentation, full event access, and deployed verification remain pending.
 Source audit: 2026-10-06. Track inspected progress and remaining release checks in
 [Feature 2 of the launch checklist](product-launch-readiness.md#feature-2-create-and-start-an-escalation-through-a-webhook).
 This plan describes the target behavior, not proof that every item is implemented.
@@ -21,7 +21,7 @@ Tasks work for alerts, onboarding questions, and other requests. Add these field
 | `category` | Optional short text, such as “Onboarding” |
 | `referenceUrl` | Optional HTTP(S) link useful to the responder |
 
-Keep the current task description length limit. Validate lengths for the new text fields. Existing tasks get `source = "Manual"`; leave their optional fields empty. Show these fields on task and run screens. Every escalation email shows the task title and source, including a short, safe source label in its subject. Use wording that works for more than incidents.
+Keep the current task description length limit. Validate lengths for the new text fields. Existing tasks get `source = "Manual"`; leave their optional fields empty. Show these fields on task and run screens. At run start, snapshot the task title, source, optional metadata, and description into each execution step so later task edits do not change a saved run. Every escalation email shows the task title, source, and available task metadata, including a short, safe source label in its subject. Use wording that works for more than incidents.
 
 ## Webhook request
 
@@ -79,4 +79,4 @@ Create the task, run, and event in one database transaction. If any part fails, 
 - Omitting `flowId` uses the default path; a same-team `flowId` overrides it; a foreign or unknown flow creates nothing.
 - Replaying an event ID never creates another run; a changed payload with the same ID is rejected.
 - Invalid secrets, disabled webhooks, oversized requests, and foreign-team access are rejected.
-- The task and run appear in the UI, the event links to them, and the email includes `Task.source`. Email acknowledgement still stops later steps.
+- The task and run appear in the UI, the event links to them, and the email includes the saved task title, source, optional metadata, and description. Email acknowledgement still stops later steps.

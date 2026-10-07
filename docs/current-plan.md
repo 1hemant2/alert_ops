@@ -1,49 +1,53 @@
 # Current task plan
 
-## Task: Fix production image vulnerabilities
+## Task: Snapshot task metadata for runs and emails
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Remove the critical Spring MVC dependency finding that fails the Trivy image
-gate and refresh the pinned runtime image while preserving application
-behavior. Keep the separate UI-only dependency finding out of scope.
+Complete the remaining backend portion of the webhook/task launch feature by
+preserving optional task priority, category, and reference URL in execution
+steps and showing those values in escalation emails. Do not change the
+webhook-history UI or deployment verification in this task.
+
+Previous task: backend image vulnerability remediation is complete; see the
+latest changelog entry and commits `776c4e4`, `6380594`, and `013ac6e`.
 
 ### Decision-compliance note
 
-- The Spring MVC vulnerability is fixed by the Spring Framework 7.0.9 line;
-  use the compatible Spring Boot 4 maintenance release rather than mixing
-  Spring Framework 7 into the Boot 3 dependency graph.
-- Keep Java 17 compatibility and existing Jakarta APIs; update only the
-  starter names or application code required by the Boot 4 migration.
-- Keep Trivy HIGH/CRITICAL findings as the release gate; do not suppress the
-  finding or add an ignore rule.
+- `Task.priority`, `Task.category`, and `Task.referenceUrl` are the canonical
+  source values; copy them once into each `FlowExecutionState` at run start.
+- Runtime snapshots are authoritative after start, so later task edits must
+  not change an active or historical run.
+- Keep priority and category as validated strings because they are user-owned
+  labels, and retain the existing HTTP(S) validation for reference URLs.
+- Add only the three snapshot columns; do not create a second task metadata
+  model or reread the mutable task while sending email.
 
 ### Acceptance criteria
 
-- Maven resolves Spring Framework 7.0.9 or newer and the application builds.
-- Existing focused tests and the full Maven package pass.
-- The Dockerfile uses refreshed pinned base images and retains the fixed
-  OpenSSL package version.
-- Trivy reports no unfixed HIGH or CRITICAL backend image vulnerabilities when
-  the image can be built locally or by CI.
-- The changelog records the completed security fix and limitations.
+- New execution-step rows retain all three optional task fields, including for
+  immediate and scheduled starts; existing rows remain readable with nulls.
+- Alert emails display the saved metadata without allowing user content to
+  create unsafe HTML or links.
+- Focused snapshot and notification tests pass, followed by the full Maven
+  package and diff checks.
+- The launch checklist, feature plan, and changelog record the completed
+  backend work and remaining UI/deployed limitations.
 
 ### Steps
 
-- [x] Upgrade the Spring Boot dependency graph and resolve migration issues.
-- [x] Refresh pinned container bases and apply current transitive security fixes.
+- [x] Add the migration, entity fields, and start-time snapshot assignment.
+- [x] Add safe email rendering and focused regression coverage.
 - [x] Run focused tests, the full package, and documentation checks.
 
 ### Verification and limitations
 
-The backend dependency scan reports zero HIGH or CRITICAL findings, and
-`./mvnw -q package` passes with 260 tests, 0 failures/errors, and 17
-environment-gated skips. The pinned runtime base still contains an older
-`libssl3`, but the Dockerfile installs the fixed `3.0.2-0ubuntu1.30` package.
-Docker is unavailable locally, so the final image build/scan remains a CI check.
-The UI `source-map-js` finding is outside this backend image task. Independent
-read-only verification was skipped because no usable subagent mechanism was
-available.
+Focused snapshot/email tests and `./mvnw -q package` pass with 260 tests,
+0 failures/errors, and 17 environment-gated skips. `git diff --check` passes.
+The migration was reviewed for existing-row null compatibility, but PostgreSQL
+execution and deployed email verification remain pending. The remaining task
+and webhook UI work stays outside this task. Independent read-only verification
+was skipped because no usable subagent mechanism was available.
