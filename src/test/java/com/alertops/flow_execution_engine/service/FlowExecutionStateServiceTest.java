@@ -42,6 +42,7 @@ class FlowExecutionStateServiceTest {
     }
 
     @Test
+    // Verifies that early scheduled starts use the explicit step scheduler.
     void manualScheduledStartClaimsWithoutCheckingSavedDueTimeAndAuditsActor() {
         UUID teamId = UUID.randomUUID();
         UUID escalationId = UUID.randomUUID();
@@ -61,7 +62,7 @@ class FlowExecutionStateServiceTest {
 
         verify(escalations).claimScheduledForManualStart(escalationId, teamId);
         verify(escalations, never()).claimScheduledForStart(eq(escalationId), eq(teamId), any());
-        verify(scheduling).schedule(firstState);
+        verify(scheduling).scheduleStep(firstState);
         ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
         verify(audit).record(event.capture());
         org.junit.jupiter.api.Assertions.assertEquals(actorId, event.getValue().userId());
@@ -134,6 +135,7 @@ class FlowExecutionStateServiceTest {
     }
 
     @Test
+    // Verifies that failed snapshot persistence never schedules the first step.
     void failedSnapshotSaveDoesNotScheduleTheFirstStep() {
         UUID teamId = UUID.randomUUID();
         UUID escalationId = UUID.randomUUID();
@@ -146,6 +148,6 @@ class FlowExecutionStateServiceTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> service.startFlowExecution(
                 new Task(), new Flow(), List.of(new Node()), escalationId, teamId, FlowExecutionStartMode.IDLE));
 
-        verify(scheduling, never()).schedule(any(FlowExecutionState.class));
+        verify(scheduling, never()).scheduleStep(any(FlowExecutionState.class));
     }
 }

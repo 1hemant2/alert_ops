@@ -37,6 +37,7 @@ import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTo
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepTimerRegistry;
+import com.alertops.messaging.EscalationTimeoutService;
 
 class EscalationAcknowledgementServiceTest {
     private static final UUID ESCALATION_ID = UUID.fromString("71000000-0000-0000-0000-000000000001");
@@ -48,10 +49,12 @@ class EscalationAcknowledgementServiceTest {
     private final FlowExecutionStateRepository stateRepository = org.mockito.Mockito.mock(FlowExecutionStateRepository.class);
     private final AuditService auditService = org.mockito.Mockito.mock(AuditService.class);
     private final StepTimerRegistry stepTimerRegistry = org.mockito.Mockito.mock(StepTimerRegistry.class);
+    private final EscalationTimeoutService timeoutService =
+            org.mockito.Mockito.mock(EscalationTimeoutService.class);
     private final Clock clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC);
     private final EscalationAcknowledgementService service = new EscalationAcknowledgementService(
             tokenRepository, escalationRepository, stateRepository,
-            auditService, stepTimerRegistry, clock,
+            auditService, stepTimerRegistry, timeoutService, clock,
             Duration.ofHours(72), "https://alerts.example.com/");
 
     private Escalation escalation;
@@ -59,6 +62,7 @@ class EscalationAcknowledgementServiceTest {
     private FlowExecutionState executionStep;
 
     @BeforeEach
+    // Creates an open run with a valid sent acknowledgement step.
     void setUp() {
         escalation = new Escalation();
         escalation.setId(ESCALATION_ID);
@@ -72,6 +76,7 @@ class EscalationAcknowledgementServiceTest {
         executionStep.setProcessId(ESCALATION_ID);
         executionStep.setUserEmail("oncall@example.com");
         executionStep.setStatus(FlowExecutionStepStatus.SENT);
+        executionStep.setDueAt(FIXED_NOW.plus(Duration.ofMinutes(5)));
         executionStep.setPosition(java.math.BigInteger.ONE);
         token.setExecutionStepId(executionStep.getId());
         token.setRecipientEmail("oncall@example.com");
@@ -172,6 +177,21 @@ class EscalationAcknowledgementServiceTest {
     }
 
     @Test
+    // Verifies that the shared acknowledgement timeout rejects a valid token.
+    void expiredAcknowledgementWindowRejectsValidToken() {
+        executionStep.setDueAt(FIXED_NOW.minusSeconds(1));
+        when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(escalation));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.acknowledge(RAW_TOKEN));
+
+        assertEquals(HttpStatus.GONE, error.getStatusCode());
+        verify(escalationRepository, never()).save(any(Escalation.class));
+        verify(timeoutService, never()).scheduleResolutionTimeout(any(), any(), any());
+    }
+
+    @Test
     void unknownTokenCannotAcknowledgeARun() {
         when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
 
@@ -229,7 +249,7 @@ class EscalationAcknowledgementServiceTest {
     }
 
     @Test
-    void enabledAcknowledgementPausesNextUnsentStepAndStoresResolutionDeadline() {
+    void enabledAcknowledgementPausesNextUnsentStepAndStoresResolutionTimeout() {
         executionStep.setResolutionTimeoutEnabled(true);
         executionStep.setResolutionTimeout(Duration.ofMinutes(10));
         FlowExecutionState nextStep = new FlowExecutionState();
@@ -288,7 +308,7 @@ class EscalationAcknowledgementServiceTest {
     }
 
     @Test
-    void repeatedActiveAcknowledgementDoesNotExtendSavedResolutionDeadline() {
+    void repeatedActiveAcknowledgementDoesNotExtendSavedResolutionTimeout() {
         Instant originalAcknowledgedAt = FIXED_NOW.minus(Duration.ofMinutes(5));
         Instant originalDeadline = FIXED_NOW.plus(Duration.ofMinutes(5));
         escalation.setStatus(EscalationStatus.ACKNOWLEDGED);

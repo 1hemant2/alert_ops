@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,14 +28,17 @@ class StepSchedulingServiceTest {
     private final FlowExecutionStateRepository states = mock(FlowExecutionStateRepository.class);
     private final EscalationRepository escalations = mock(EscalationRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-    private final StepSchedulingService service = new StepSchedulingService(states, escalations, events, 10);
+    private final StepSchedulingService service = new StepSchedulingService(
+            states, escalations, events, Clock.systemUTC(), 10);
 
     @Test
+    // Verifies that scheduling rejects a missing execution step.
     void scheduleRejectsNullStateClearly() {
-        assertThrows(IllegalArgumentException.class, () -> service.schedule(null));
+        assertThrows(IllegalArgumentException.class, () -> service.scheduleStep(null));
     }
 
     @Test
+    // Verifies that scheduling persists one scheduled step and publishes it.
     void scheduleUsesOnePersistedScheduledStatus() {
         FlowExecutionState state = new FlowExecutionState();
         state.setStatus(FlowExecutionStepStatus.PENDING);
@@ -42,7 +46,7 @@ class StepSchedulingServiceTest {
         when(states.save(any(FlowExecutionState.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.schedule(state);
+        service.scheduleStep(state);
 
         assertEquals(FlowExecutionStepStatus.SCHEDULED, state.getStatus());
         assertTrue(state.isPublicationPending());
@@ -50,6 +54,7 @@ class StepSchedulingServiceTest {
     }
 
     @Test
+    // Verifies that publication checks reject steps without an escalation.
     void publicationCheckIgnoresStateWithoutProcessId() {
         UUID stepId = UUID.randomUUID();
         Instant dueAt = Instant.parse("2026-01-01T00:00:00Z");
@@ -69,6 +74,7 @@ class StepSchedulingServiceTest {
     }
 
     @Test
+    // Verifies that rescheduling ignores a missing step.
     void rescheduleIgnoresNullState() {
         service.rescheduleStepAtDueTime(null);
 
@@ -76,6 +82,7 @@ class StepSchedulingServiceTest {
     }
 
     @Test
+    // Verifies that rescheduling ignores a step without a durable due time.
     void rescheduleIgnoresCurrentStateWithoutDueTime() {
         UUID stepId = UUID.randomUUID();
         FlowExecutionState requested = new FlowExecutionState();

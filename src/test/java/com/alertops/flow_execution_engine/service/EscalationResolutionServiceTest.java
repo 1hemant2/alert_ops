@@ -42,6 +42,7 @@ import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTo
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepTimerRegistry;
+import com.alertops.messaging.EscalationTimeoutService;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 
@@ -61,10 +62,12 @@ class EscalationResolutionServiceTest {
             org.mockito.Mockito.mock(AuditEventRepository.class);
     private final AuditService auditService = org.mockito.Mockito.mock(AuditService.class);
     private final StepTimerRegistry stepTimerRegistry = org.mockito.Mockito.mock(StepTimerRegistry.class);
+    private final EscalationTimeoutService timeoutService =
+            org.mockito.Mockito.mock(EscalationTimeoutService.class);
     private final Clock clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC);
     private final EscalationResolutionService service = new EscalationResolutionService(
             escalationRepository, stateRepository, tokenRepository, auditEventRepository,
-            auditService, stepTimerRegistry, clock);
+            auditService, stepTimerRegistry, timeoutService, clock);
 
     private Escalation escalation;
     private FlowExecutionState acknowledgedStep;
@@ -306,7 +309,7 @@ class EscalationResolutionServiceTest {
     }
 
     @Test
-    void resolutionAtTheDeadlineIsRejected() {
+    void resolutionAtTheTimeoutIsRejected() {
         setTeamMemberContext("resolver@example.com");
         escalation.setResolutionDeadline(FIXED_NOW);
 
@@ -331,7 +334,7 @@ class EscalationResolutionServiceTest {
     }
 
     @Test
-    void recipientResolutionUsesTheSavedDeadlineInsteadOfTokenTtl() {
+    void recipientResolutionUsesTheSavedTimeoutInsteadOfTokenTtl() {
         token.setExpiresAt(FIXED_NOW.minusSeconds(1));
         when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
 
