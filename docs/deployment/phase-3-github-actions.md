@@ -210,26 +210,26 @@ That condition means the report is retained even when the scan fails; it does no
 another scan. The later GHCR steps use their normal implicit `success()` condition,
 so they are skipped after a scan failure.
 
-`exit-code: "1"` turns HIGH or CRITICAL findings into a release gate. An earlier
-audit's 31 findings led to upgrading Spring Boot from `3.5.4` to `3.5.16` and
-temporarily overriding Netty and PostgreSQL versions. A later scan identified eight
-Java findings in RabbitMQ, Netty, and Tomcat. The current temporary overrides are
-Netty `4.1.137.Final`, RabbitMQ Java client `5.34.0`, Tomcat `10.1.60`, and
-PostgreSQL JDBC `42.7.12` until Spring Boot manages the fixed versions.
+`exit-code: "1"` turns HIGH or CRITICAL findings into a release gate. The backend
+now uses Spring Boot `4.0.8`, which brings Spring Framework `7.0.9` and removes the
+critical Spring MVC finding. Existing Jackson 2 application code remains supported
+through Spring Boot's `spring-boot-jackson2` compatibility module. The POM also
+pins the current fixed versions for Jackson 2 (`2.21.7`), RabbitMQ Java client
+(`5.34.0`), and Tomcat (`11.0.25`) until the Boot dependency line manages those
+versions without overrides.
 
 Netty is transitive rather than an AlertOps direct dependency:
 
 ```text
 spring-boot-starter-data-redis -> lettuce-core -> Netty
 spring-boot-starter-amqp -> spring-rabbit -> amqp-client
-spring-boot-starter-web -> spring-boot-starter-tomcat -> Tomcat
+spring-boot-starter-webmvc -> spring-boot-starter-tomcat -> Tomcat
 ```
 
-Do not add an individual Netty module directly just to patch a CVE. The `netty.version`
-override updates the Netty BOM consistently. The PostgreSQL driver is a direct runtime
-dependency, but its original version was also supplied by Spring Boot dependency
-management. Remove the temporary overrides once a Spring Boot update supplies the
-same or newer fixed versions.
+Do not add an individual Netty module directly just to patch a CVE. The PostgreSQL
+driver is a direct runtime dependency supplied by Spring Boot dependency management.
+Review the three security properties above when upgrading Spring Boot and remove an
+override only after the managed version is equal to or newer than the fixed version.
 
 ## Protected master branch
 

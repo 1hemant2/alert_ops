@@ -4,6 +4,16 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Fix backend image vulnerabilities
+
+- Upgrade the backend to Spring Boot `4.0.8`/Spring Framework `7.0.9`, apply fixed
+  Jackson, RabbitMQ, and Tomcat versions, refresh pinned container bases, and update
+  the Hibernate 7 and MVC test compatibility imports.
+- Verification: backend Maven dependencies report no HIGH or CRITICAL findings,
+  `./mvnw -q package` passes with 260 tests and 17 environment-gated skips, and
+  `git diff --check` passes. Final Docker image build/scan remains for CI because
+  Docker is unavailable locally; the UI has a separate `source-map-js` finding.
+
 ## 2026-10-08 — Refresh launch checklist reassessment date
 
 - Update the product launch checklist header to reflect the latest readiness review date without changing any implementation or production-verification status.

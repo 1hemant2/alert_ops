@@ -1,38 +1,49 @@
 # Current task plan
 
-## Task: Refresh launch checklist reassessment date
+## Task: Fix production image vulnerabilities
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Update the stale reassessment date in the product launch checklist so it
-matches the latest documented readiness review. Preserve all existing
-implementation and production-verification statuses.
+Remove the critical Spring MVC dependency finding that fails the Trivy image
+gate and refresh the pinned runtime image while preserving application
+behavior. Keep the separate UI-only dependency finding out of scope.
 
 ### Decision-compliance note
 
-- Do not change any readiness checkbox or claim deployed verification.
-- Keep the launch checklist as the source of truth for release priorities.
-- Record the documentation-only change in `CHANGELOG.md`.
+- The Spring MVC vulnerability is fixed by the Spring Framework 7.0.9 line;
+  use the compatible Spring Boot 4 maintenance release rather than mixing
+  Spring Framework 7 into the Boot 3 dependency graph.
+- Keep Java 17 compatibility and existing Jakarta APIs; update only the
+  starter names or application code required by the Boot 4 migration.
+- Keep Trivy HIGH/CRITICAL findings as the release gate; do not suppress the
+  finding or add an ignore rule.
 
 ### Acceptance criteria
 
-- The checklist header shows `2026-10-08`.
-- Existing checklist statuses and production limitations are unchanged.
-- The changelog records the completed documentation update.
-- Diff and whitespace checks pass.
+- Maven resolves Spring Framework 7.0.9 or newer and the application builds.
+- Existing focused tests and the full Maven package pass.
+- The Dockerfile uses refreshed pinned base images and retains the fixed
+  OpenSSL package version.
+- Trivy reports no unfixed HIGH or CRITICAL backend image vulnerabilities when
+  the image can be built locally or by CI.
+- The changelog records the completed security fix and limitations.
 
 ### Steps
 
-- [x] Update the checklist reassessment date.
-- [x] Record the documentation change.
-- [x] Run final diff checks without committing.
+- [x] Upgrade the Spring Boot dependency graph and resolve migration issues.
+- [x] Refresh pinned container bases and apply current transitive security fixes.
+- [x] Run focused tests, the full package, and documentation checks.
 
 ### Verification and limitations
 
-Use a focused diff review and `git diff --check`. No runtime tests are needed
-for this date-only documentation change. The change remains uncommitted
-because no commit was requested. Independent read-only verification was
-skipped because no usable subagent mechanism was available.
+The backend dependency scan reports zero HIGH or CRITICAL findings, and
+`./mvnw -q package` passes with 260 tests, 0 failures/errors, and 17
+environment-gated skips. The pinned runtime base still contains an older
+`libssl3`, but the Dockerfile installs the fixed `3.0.2-0ubuntu1.30` package.
+Docker is unavailable locally, so the final image build/scan remains a CI check.
+The UI `source-map-js` finding is outside this backend image task. Independent
+read-only verification was skipped because no usable subagent mechanism was
+available.
