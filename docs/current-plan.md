@@ -14,7 +14,8 @@ Jammy OpenSSL packages without depending on an unavailable repository version.
 Previous task: webhook event history navigation is complete in commits
 `1b56267` and `be4c40b`. Spring Boot 4 test-import fixes are in `2e8f807`,
 `c44ce71`, `63e8c7d`, and `6bc0f06`. CI run `37684605184` passed Maven but
-failed during `Build commit image`.
+failed during `Build commit image`; diagnostic logging in `c1f81ea` made the
+successful rerun `37686152716` observable.
 
 ### Decision-compliance note
 
@@ -34,12 +35,14 @@ failed during `Build commit image`.
 
 - [x] Update the Dockerfile package installation.
 - [x] Run the local diff checks and push the fix.
+- [x] Inspect the diagnostic Docker build result and apply the smallest fix.
 - [x] Monitor CI through Maven, image build, and Trivy completion.
-- [x] Update the changelog with the final CI result.
+- [x] Correct the changelog with the final CI result.
 
 ### Verification and limitations
 
-Local Docker is unavailable. GitHub Actions run `37685067113` passed Maven
-verification, the container image build, and the Trivy scan; Maven ran 238 tests
-with 0 failures/errors and 17 environment-gated skips. Independent read-only
-verification was skipped because no usable subagent mechanism was available.
+Local Docker is unavailable. GitHub Actions run `37686152716` passed Maven
+verification, the container image build, and the Trivy scan; the run shows five
+non-blocking deprecation warnings. Maven ran 238 tests with 0 failures/errors
+and 17 environment-gated skips. Independent read-only verification was skipped
+because no usable subagent mechanism was available.
