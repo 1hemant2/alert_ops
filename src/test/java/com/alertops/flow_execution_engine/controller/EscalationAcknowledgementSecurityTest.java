@@ -37,10 +37,10 @@ class EscalationAcknowledgementSecurityTest {
     void anonymousEmailLinkCanPreviewAndConfirmUsingPost() throws Exception {
         when(acknowledgementService.preview("email-token"))
                 .thenReturn(new EscalationAcknowledgementResponse(
-                        "Database outage", "oncall@example.com", "OPEN", Instant.now().plusSeconds(600), null, null, false));
+                        "Database outage", "oncall@example.com", "OPEN", Instant.now().plusSeconds(600), null, null, false, null));
         when(acknowledgementService.acknowledge("email-token"))
                 .thenReturn(new EscalationAcknowledgementResponse(
-                        "Database outage", "oncall@example.com", "COMPLETED", Instant.now().plusSeconds(600), Instant.now(), "oncall@example.com", true));
+                        "Database outage", "oncall@example.com", "COMPLETED", Instant.now().plusSeconds(600), Instant.now(), "oncall@example.com", true, null));
 
         mockMvc.perform(post("/api/v1/escalation/acknowledgement/preview")
                         .contentType(APPLICATION_JSON)

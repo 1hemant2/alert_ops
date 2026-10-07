@@ -306,6 +306,7 @@ class EscalationAcknowledgementServiceTest {
         assertEquals(null, escalation.getResolutionType());
         assertEquals(executionStep.getId(), escalation.getAcknowledgedStepId());
         assertEquals(FIXED_NOW.plus(Duration.ofMinutes(10)), escalation.getResolutionDeadline());
+        assertEquals(FIXED_NOW.plus(Duration.ofMinutes(10)), result.resolutionDeadline());
         assertEquals("oncall@example.com", escalation.getIssueSolvedBy());
         assertEquals(FlowExecutionStepStatus.PAUSED, nextStep.getStatus());
         assertFalse(nextStep.isPublicationPending());
