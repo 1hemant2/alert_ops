@@ -1,6 +1,10 @@
 package com.alertops.messaging;
 
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
@@ -13,6 +17,8 @@ import java.util.Optional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+
+import org.mockito.ArgumentCaptor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -35,9 +41,10 @@ class MessageConsumerTest {
     private final StepSchedulingService stepSchedulingService = mock(StepSchedulingService.class);
     private final EscalationAcknowledgementService acknowledgementService = mock(EscalationAcknowledgementService.class);
     private final EscalationTimeoutService timeoutService = mock(EscalationTimeoutService.class);
+    private final AuditService auditService = mock(AuditService.class);
     private final MessageConsumer consumer = new MessageConsumer(
             stateRepository, escalationRepository, notification, stepSchedulingService,
-            acknowledgementService, timeoutService, Clock.systemUTC());
+            acknowledgementService, timeoutService, auditService, Clock.systemUTC());
 
     @Test
     // Verifies that an older send attempt is ignored.
@@ -108,6 +115,13 @@ class MessageConsumerTest {
                 eq(ESCALATION_ID), eq(STEP_ID), eq(currentState.getDueAt()));
         verify(escalationRepository, never()).save(any(Escalation.class));
         verify(stepSchedulingService, never()).scheduleStep(any(FlowExecutionState.class));
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(audit.capture());
+        assertEquals(AuditAction.NOTIFICATION_SENT, audit.getValue().action());
+        assertEquals(FlowExecutionStepStatus.SENDING.name(), audit.getValue().previousState());
+        assertEquals(FlowExecutionStepStatus.SENT.name(), audit.getValue().newState());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                audit.getValue().metadata().contains("executionStepId=" + STEP_ID));
     }
 
     @Test
@@ -146,6 +160,61 @@ class MessageConsumerTest {
                 "https://alerts.example.com/acknowledge?token=test-token",
                 "https://alerts.example.com/escalate?token=escalate-token");
         verify(timeoutService, never()).scheduleAcknowledgementTimeout(any(), any(), any());
+    }
+
+    @Test
+    // Verifies that a failed send records both the failure and scheduled retry.
+    void failedNotificationSchedulesRetryAndRecordsAuditEvents() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        currentState.setRetryOnFailureEnabled(true);
+        currentState.setMaxRetryAttempts(1);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+                .thenReturn(false);
+        when(stepSchedulingService.scheduleStep(currentState)).thenAnswer(invocation -> {
+            currentState.setStatus(FlowExecutionStepStatus.SCHEDULED);
+            currentState.setDueAt(Instant.parse("2026-10-08T12:01:00Z"));
+            return currentState;
+        });
+
+        consumer.deliverReadyStep(queuedState);
+
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService, times(2)).record(audit.capture());
+        assertEquals(AuditAction.NOTIFICATION_FAILED, audit.getAllValues().get(0).action());
+        assertEquals(AuditAction.NOTIFICATION_RETRY_SCHEDULED, audit.getAllValues().get(1).action());
+        assertEquals(FlowExecutionStepStatus.SCHEDULED, currentState.getStatus());
+    }
+
+    @Test
+    // Verifies that an exhausted final send completes the escalation once.
+    void failedFinalNotificationCompletesEscalationAndRecordsExhaustion() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        Escalation escalation = runningEscalation();
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(escalation));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+                .thenReturn(false);
+
+        consumer.deliverReadyStep(queuedState);
+
+        assertEquals(FlowExecutionStepStatus.FAILED, currentState.getStatus());
+        assertEquals(EscalationStatus.COMPLETED, escalation.getStatus());
+        assertEquals(EscalationResolutionType.EXHAUSTED, escalation.getResolutionType());
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService, times(2)).record(audit.capture());
+        assertEquals(AuditAction.NOTIFICATION_FAILED, audit.getAllValues().get(0).action());
+        assertEquals(AuditAction.COMPLETED, audit.getAllValues().get(1).action());
+        assertEquals("EXHAUSTED", audit.getAllValues().get(1).reason());
     }
 
     @Test

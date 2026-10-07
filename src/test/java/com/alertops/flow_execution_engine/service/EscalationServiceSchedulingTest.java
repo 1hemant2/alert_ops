@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +58,7 @@ class EscalationServiceSchedulingTest {
     }
 
     @Test
+    // Verifies that scheduling still records its own event after creation is audited.
     void scheduledStartStoresUtcInstantAndTimezone() {
         UUID teamId = UUID.randomUUID();
         UUID flowId = UUID.randomUUID();
@@ -84,6 +86,7 @@ class EscalationServiceSchedulingTest {
         schedule.setTimezone("Asia/Kolkata");
 
         service.createEscalationForTeam("Database outage", taskId, flowId, teamId);
+        clearInvocations(auditService);
         Escalation result = service.schedule(escalationId, schedule);
 
         assertEquals(EscalationStatus.SCHEDULED, result.getStatus());
@@ -100,6 +103,36 @@ class EscalationServiceSchedulingTest {
         assertEquals(EscalationStatus.SCHEDULED.name(), audit.getValue().newState());
         assertEquals(actorId, audit.getValue().userId());
         assertEquals("owner@example.com", audit.getValue().userEmail());
+    }
+
+    @Test
+    // Verifies that creation records the authenticated actor and safe references.
+    void creationWritesAnAuditEventForTheAuthenticatedActor() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(actorId, teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        when(flows.findByIdAndTeamId(flowId, teamId)).thenReturn(new Flow());
+        when(tasks.findById(taskId, teamId)).thenReturn(mock(TaskView.class));
+        when(escalations.save(any(Escalation.class))).thenAnswer(invocation -> {
+            Escalation saved = invocation.getArgument(0);
+            saved.setId(escalationId);
+            return saved;
+        });
+
+        service.createEscalationForTeam("Database outage", taskId, flowId, teamId);
+
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(audit.capture());
+        assertEquals(AuditAction.CREATED, audit.getValue().action());
+        assertNull(audit.getValue().previousState());
+        assertEquals(EscalationStatus.IDLE.name(), audit.getValue().newState());
+        assertEquals(actorId, audit.getValue().userId());
+        assertEquals("owner@example.com", audit.getValue().userEmail());
+        org.junit.jupiter.api.Assertions.assertTrue(audit.getValue().metadata().contains("taskId=" + taskId));
+        org.junit.jupiter.api.Assertions.assertTrue(audit.getValue().metadata().contains("flowId=" + flowId));
     }
 
     @Test
