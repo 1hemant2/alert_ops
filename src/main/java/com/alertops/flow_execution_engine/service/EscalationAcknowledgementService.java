@@ -30,6 +30,7 @@ import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.dto.EscalationAcknowledgementResponse;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
+import com.alertops.flow_execution_engine.model.EscalationActionCapability;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
@@ -81,6 +82,7 @@ public class EscalationAcknowledgementService {
     }
 
     @Transactional
+    // Creates a recipient-scoped acknowledgement link for one sent step.
     public String createAcknowledgementUrl(Escalation escalation, FlowExecutionState executionStep) {
         if (escalation == null || escalation.getId() == null || executionStep == null
                 || executionStep.getId() == null
@@ -98,14 +100,49 @@ public class EscalationAcknowledgementService {
         token.setTokenHash(hash(rawToken));
         token.setCreatedAt(now);
         token.setExpiresAt(now.plus(tokenLifetime));
+        token.setCapability(EscalationActionCapability.ACKNOWLEDGE);
+        token.setExpectedTargetStepId(null);
         tokenRepository.save(token);
 
         return uiBaseUrl + "/acknowledge?token=" + rawToken;
     }
 
+    @Transactional
+    // Creates a recipient-scoped link that can advance one exact next step.
+    public String createEscalateNowUrl(
+            Escalation escalation,
+            FlowExecutionState sourceStep,
+            FlowExecutionState targetStep) {
+        if (escalation == null || escalation.getId() == null
+                || sourceStep == null || sourceStep.getId() == null
+                || targetStep == null || targetStep.getId() == null
+                || !escalation.getId().equals(sourceStep.getProcessId())
+                || !escalation.getId().equals(targetStep.getProcessId())
+                || isBlank(sourceStep.getUserEmail())) {
+            throw new IllegalArgumentException("An escalation, source step, and target step are required to create an Escalate now link");
+        }
+
+        String rawToken = newRawToken();
+        Instant now = clock.instant();
+        EscalationAcknowledgementToken token = new EscalationAcknowledgementToken();
+        token.setEscalationId(escalation.getId());
+        token.setExecutionStepId(sourceStep.getId());
+        token.setExpectedTargetStepId(targetStep.getId());
+        token.setRecipientEmail(sourceStep.getUserEmail().trim());
+        token.setTokenHash(hash(rawToken));
+        token.setCreatedAt(now);
+        token.setExpiresAt(now.plus(tokenLifetime));
+        token.setCapability(EscalationActionCapability.ESCALATE_NOW);
+        tokenRepository.save(token);
+
+        return uiBaseUrl + "/escalate?token=" + rawToken;
+    }
+
     @Transactional(readOnly = true)
+    // Previews an acknowledgement without changing the escalation.
     public EscalationAcknowledgementResponse preview(String rawToken) {
         EscalationAcknowledgementToken token = findToken(rawToken);
+        requireAcknowledgementCapability(token);
         Escalation escalation = escalationRepository.findById(token.getEscalationId())
                 .orElseThrow(() -> invalidToken());
         validateTokenStep(token, escalation);
@@ -118,6 +155,7 @@ public class EscalationAcknowledgementService {
     // Records an acknowledgement after validating token, ownership, and timeout.
     public EscalationAcknowledgementResponse acknowledge(String rawToken) {
         EscalationAcknowledgementToken token = findToken(rawToken);
+        requireAcknowledgementCapability(token);
         Escalation escalation = escalationRepository.findByIdForUpdate(token.getEscalationId())
                 .orElseThrow(() -> invalidToken());
         FlowExecutionState executionStep = validateTokenStep(token, escalation);
@@ -144,6 +182,13 @@ public class EscalationAcknowledgementService {
         }
         return tokenRepository.findByTokenHash(hash(rawToken))
                 .orElseThrow(() -> invalidToken());
+    }
+
+    // Prevents an Escalate now token from authorizing acknowledgement.
+    private void requireAcknowledgementCapability(EscalationAcknowledgementToken token) {
+        if (token.getCapability() != EscalationActionCapability.ACKNOWLEDGE) {
+            throw invalidToken();
+        }
     }
 
     private void validateTokenAndRun(

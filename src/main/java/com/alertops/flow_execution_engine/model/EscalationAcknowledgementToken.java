@@ -7,6 +7,8 @@ import org.hibernate.annotations.UuidGenerator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -36,6 +38,13 @@ public class EscalationAcknowledgementToken {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "capability", nullable = false, length = 32)
+    private EscalationActionCapability capability = EscalationActionCapability.ACKNOWLEDGE;
+
+    @Column(name = "expected_target_step_id")
+    private UUID expectedTargetStepId;
 
     public UUID getId() {
         return id;
@@ -87,5 +96,25 @@ public class EscalationAcknowledgementToken {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    // Returns the permission carried by this recipient token.
+    public EscalationActionCapability getCapability() {
+        return capability;
+    }
+
+    // Sets the permission carried by this recipient token.
+    public void setCapability(EscalationActionCapability capability) {
+        this.capability = capability;
+    }
+
+    // Returns the exact next step this token was created to advance.
+    public UUID getExpectedTargetStepId() {
+        return expectedTargetStepId;
+    }
+
+    // Sets the exact next step this token was created to advance.
+    public void setExpectedTargetStepId(UUID expectedTargetStepId) {
+        this.expectedTargetStepId = expectedTargetStepId;
     }
 }

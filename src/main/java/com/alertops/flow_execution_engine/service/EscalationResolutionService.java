@@ -29,6 +29,7 @@ import com.alertops.flow_execution_engine.dto.EscalationResolutionResponse;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationAcknowledgementToken;
+import com.alertops.flow_execution_engine.model.EscalationActionCapability;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
@@ -91,8 +92,12 @@ public class EscalationResolutionService {
     }
 
     @Transactional
+    // Resolves an acknowledged escalation using its recipient-scoped token.
     public EscalationResolutionResponse resolveAsRecipient(String rawToken) {
         EscalationAcknowledgementToken token = findToken(rawToken);
+        if (token.getCapability() != EscalationActionCapability.ACKNOWLEDGE) {
+            throw invalidToken();
+        }
         Escalation escalation = findLockedEscalation(token.getEscalationId());
         validateRecipientTokenShape(token);
 

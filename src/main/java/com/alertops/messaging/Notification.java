@@ -39,7 +39,11 @@ public class Notification {
         this.fromAddress = fromAddress == null ? "" : fromAddress.trim();
     }
 
-    public boolean sendEmail(FlowExecutionState flowExecutionState, String acknowledgementUrl) {
+    // Sends an alert with acknowledgement and optional immediate-escalation actions.
+    public boolean sendEmail(
+            FlowExecutionState flowExecutionState,
+            String acknowledgementUrl,
+            String escalateNowUrl) {
         if (flowExecutionState == null || isBlank(flowExecutionState.getUserEmail())) {
             logger.warn("Email notification skipped because the recipient address is missing");
             return false;
@@ -76,7 +80,8 @@ public class Notification {
                 subjectDetails = subjectDetails.substring(0, 97) + "...";
             }
 
-            String markdown = buildMarkdown(flowExecutionState, taskName, taskSource, taskDetails, acknowledgementUrl);
+            String markdown = buildMarkdown(
+                    flowExecutionState, taskName, taskSource, taskDetails, acknowledgementUrl, escalateNowUrl);
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(
                     message,
@@ -92,7 +97,9 @@ public class Notification {
             alternative.addBodyPart(plainPart);
 
             var htmlPart = new MimeBodyPart();
-            htmlPart.setContent(buildHtml(markdown, acknowledgementUrl), "text/html; charset=" + StandardCharsets.UTF_8.name());
+            htmlPart.setContent(
+                    buildHtml(markdown, acknowledgementUrl, escalateNowUrl),
+                    "text/html; charset=" + StandardCharsets.UTF_8.name());
             alternative.addBodyPart(htmlPart);
             message.setContent(alternative);
 
@@ -184,11 +191,20 @@ public class Notification {
         }
     }
 
-    private String buildMarkdown(FlowExecutionState state, String taskName, String taskSource,
-                                 String taskDetails, String acknowledgementUrl) {
+    // Builds the plain-text action content for one alert email.
+    private String buildMarkdown(
+            FlowExecutionState state,
+            String taskName,
+            String taskSource,
+            String taskDetails,
+            String acknowledgementUrl,
+            String escalateNowUrl) {
         String details = taskDetails.isBlank() ? "No task details were provided." : taskDetails;
         String recipient = Objects.toString(state.getUserEmail(), "unknown");
         String escalationId = Objects.toString(state.getProcessId(), "unknown");
+        String escalateNowAction = isBlank(escalateNowUrl)
+                ? ""
+                : "[Escalate now and notify the next person](%s)\n".formatted(escalateNowUrl);
         return """
                 # A response needs your attention
 
@@ -208,16 +224,19 @@ public class Notification {
 
                 [Review and acknowledge this escalation](%s)
 
+                %s
+
                 Review this task and follow your team's response procedure.
 
                 ---
 
                 *Automated notification from AlertOps. Replies may not be monitored.*
                 """.formatted(taskName.isBlank() ? "Response needed" : taskName, taskSource, details,
-                        escalationId, recipient, acknowledgementUrl);
+                        escalationId, recipient, acknowledgementUrl, escalateNowAction);
     }
 
-    private String buildHtml(String markdown, String acknowledgementUrl) {
+    // Builds the safe HTML action content for one alert email.
+    private String buildHtml(String markdown, String acknowledgementUrl, String escalateNowUrl) {
         String renderedMarkdown = HTML_RENDERER.render(MARKDOWN_PARSER.parse(markdown))
                 .replace("<h1>", "<h1 style=\"margin:0 0 14px;color:#14283f;font-size:26px;line-height:1.25;\">")
                 .replace("<h2>", "<h2 style=\"margin:26px 0 8px;color:#14283f;font-size:16px;line-height:1.4;\">")
@@ -259,6 +278,7 @@ public class Notification {
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;"><tr><td bgcolor="#4b18f5" style="border-radius:8px;background:#4b18f5;">
                             <a href="{{ACKNOWLEDGEMENT_URL}}" style="display:inline-block;padding:14px 22px;border-radius:8px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Acknowledge escalation</a>
                           </td></tr></table>
+                          {{ESCALATE_NOW_ACTION}}
                         </td></tr>
                         <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;line-height:1.5;">
                           Sent automatically by AlertOps. Please use your team's usual incident response channel.
@@ -270,7 +290,18 @@ public class Notification {
                 </body>
                 </html>
                 """.replace("{{ACKNOWLEDGEMENT_URL}}", HtmlUtils.htmlEscape(acknowledgementUrl))
+                .replace("{{ESCALATE_NOW_ACTION}}", buildEscalateNowHtmlAction(escalateNowUrl))
                 .replace("{{MARKDOWN_HTML}}", renderedMarkdown);
+    }
+
+    // Builds the optional HTML action without emitting an unusable empty link.
+    private String buildEscalateNowHtmlAction(String escalateNowUrl) {
+        if (isBlank(escalateNowUrl)) {
+            return "";
+        }
+        return "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:12px;\"><tr><td style=\"padding:10px 0;\"><a href=\""
+                + HtmlUtils.htmlEscape(escalateNowUrl)
+                + "\" style=\"color:#4b18f5;font-size:14px;font-weight:700;text-decoration:underline;\">Escalate now and notify the next person</a></td></tr></table>";
     }
 
     private boolean isBlank(String value) {

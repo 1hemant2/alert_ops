@@ -55,6 +55,7 @@ public class SecurityConfig {
         return new JwtAuthenticationFilter(jwtUtil, teamMemberRepository, userRepository);
     }
 
+    // Builds the stateless API security rules and public action endpoints.
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
@@ -74,6 +75,8 @@ public class SecurityConfig {
                                 "/api/v1/webhooks/*/events",
                                 "/api/v1/escalation/acknowledgement/preview",
                                 "/api/v1/escalation/acknowledgement/confirm",
+                                "/api/v1/escalation/escalate-now/preview",
+                                "/api/v1/escalation/escalate-now/confirm",
                                 "/api/v1/escalation/resolution/confirm").permitAll()
                         .requestMatchers("/api/v1/auth/**", "/actuator/health/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/team/join").permitAll()
