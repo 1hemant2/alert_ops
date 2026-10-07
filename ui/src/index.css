@@ -229,6 +229,7 @@ td { padding: 12px 8px; border-top: 1px solid #f0f2ed; color: #66746a; font-size
 .task-context-meta strong { color: #344054; font-size: 13px; letter-spacing: 0; text-transform: none; }
 .task-context-meta strong a { color: #345cf5; }
 .task-context-summary > small { color: #98a2b3; font-size: 11px; line-height: 1.45; }
+.webhook-event-controls { margin-top: 5px; }
 .webhook-event-list { margin-top: 10px; display: grid; gap: 6px; }
 .webhook-event-list details { border: 1px solid #e7ece8; border-radius: 8px; padding: 7px 9px; background: #fbfcfb; }
 .webhook-event-list summary { cursor: pointer; color: #52645a; font-size: 12px; }
