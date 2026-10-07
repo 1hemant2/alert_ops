@@ -1,7 +1,7 @@
 # Escalation lifecycle: resolution timeout, manual actions, and activity timeline
 
 Created: 2026-10-05
-Status: In progress — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; tasks 6 and 7 are implemented locally and later tasks remain pending.
+Status: In progress — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; tasks 6 through 8 are implemented locally and later tasks remain pending.
 Release priorities: [scheduled starts](product-launch-readiness.md#1-scheduled-escalation-start),
 [resolution timeout](product-launch-readiness.md#3-resolution-timeout-after-acknowledgement), and
 [Escalate now](product-launch-readiness.md#4-escalate-now), and
@@ -278,8 +278,9 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 8. Implement deadline expiry and recovery
 
-- [ ] Persist the acknowledgement wait after a successful send instead of immediate final-send exhaustion. Use shared deadline handling with current-owner validation, running-process retry, startup recovery, and the advance-or-exhaust branch; reuse durable publication machinery.
+- [x] Persist the acknowledgement wait after a successful send instead of immediate final-send exhaustion. Use shared deadline handling with current-owner validation, running-process retry, startup recovery, and the advance-or-exhaust branch; reuse durable publication machinery.
 - Acceptance: acknowledgement expiry continues or exhausts under the agreed timing mapping; resolution expiry makes the next step due immediately in all original-due-time comparisons or exhausts if none exists. No extra last-node logic, fresh wait after restart, automatic resend, or duplicate transition; failed publication remains recoverable.
+- **Local implementation evidence (2026-10-07):** Successful sends persist the next step's `dueAt` as the current acknowledgement boundary; final sends persist their node wait and register a recoverable deadline. POST acknowledgement validates that boundary, cancels the final acknowledgement wake-up after commit, and schedules the saved resolution deadline. Expiry reloads and locks the run/step, exhausts final acknowledgement or resolution waits, and reopens a paused/pending next step with `dueAt=now` for earlier, equal, and later original due times. Deadline wake-ups recover saved final/resolution boundaries after restart, while durable publication recovery handles broker/database failures. Focused expiry/wake-up-scheduler/consumer/acknowledgement tests and the full local suite (190 tests, 0 failures/errors, 17 environment-gated skips) pass; PostgreSQL/deployed concurrency, rollback, and restart checks remain environment-gated, and no independent read-only subagent was available in this session.
 
 ### 9. Implement Escalate now
 
@@ -365,14 +366,15 @@ transition/audit event and no additional send.
 This document specifies the agreed lifecycle and tracks implementation. Manual
 start now accepts same-team `IDLE` and `SCHEDULED` runs, while automatic scheduled
 start remains due-gated. Execution steps use the single persisted
-`FlowExecutionStepStatus` enum. Runtime snapshots, acknowledgement pause, and
-explicit resolution are implemented locally; deadline expiry/recovery, Escalate
-now, and the activity timeline remain unimplemented.
+`FlowExecutionStepStatus` enum. Runtime snapshots, acknowledgement pause,
+explicit resolution, and deadline expiry/recovery are implemented locally;
+Escalate now and the activity timeline remain unimplemented.
 Audit actions cover scheduling, rescheduling, start, cancellation, start failure,
-acknowledgement, and resolution; the detail-page execution timeline shows current
-step rows rather than event history. No deadline expiry/recovery, Escalate now, or
+acknowledgement, resolution, and timeout expiry; the detail-page execution
+timeline shows current step rows rather than event history. No Escalate now or
 full activity-timeline implementation/test success is claimed here. Start now,
-acknowledgement pause, and explicit resolution have local implementation and
-focused-test evidence only; PostgreSQL/deployed verification is pending.
+acknowledgement pause, explicit resolution, and deadline expiry/recovery have
+local implementation and focused-test evidence only; PostgreSQL/deployed
+verification is pending.
 
 Relevant entry points: [flow model](../src/main/java/com/alertops/flow/model/Flow.java), [node model](../src/main/java/com/alertops/flow/model/Node.java), [start service](../src/main/java/com/alertops/flow_execution_engine/service/FlowExecutionStateService.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), and [step scheduling service](../src/main/java/com/alertops/messaging/StepSchedulingService.java).

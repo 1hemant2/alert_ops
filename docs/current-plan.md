@@ -1,39 +1,47 @@
 # Current task plan
 
-## Task: Implement explicit resolution
+## Task: Make naming guidance business-focused
 
 Started: 2026-10-07
 Status: Complete locally; PostgreSQL/deployed verification pending
 
 ### Goal and scope
 
-Implement task 7 in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#7-implement-explicit-resolution): add an explicit resolve operation for authenticated same-team members and the current acknowledging email recipient. Transition an enabled run from `ACKNOWLEDGED` to `RESOLVED`, persist the resolving actor/time, skip remaining unsent steps, audit the change, and cancel paused wake-ups after commit. Do not implement deadline expiry/recovery, Escalate now, or the related UI here.
+Update `AGENTS.md` so names describe the business responsibility or user-visible
+outcome before the implementation mechanism. Preserve the current timeout
+implementation and all existing naming examples unless this guidance requires
+an explicit correction.
 
-### Binding decisions
+### Decision-compliance note
 
-- `RESOLVED` is the self-describing terminal lifecycle state; `resolutionType` remains null and active acknowledgement ownership is cleared.
-- Team resolution requires an authenticated member of the escalation's selected team. Email resolution requires the exact saved acknowledgement token, recipient, and acknowledged execution step.
-- Resolution is allowed strictly before the saved UTC resolution deadline. A repeated resolution by the same actor returns the saved result without changing state; other actors receive a conflict.
-- Skip all remaining `PENDING`, `SCHEDULED`, or `PAUSED` steps and cancel their in-memory wake-ups only after the transaction commits. Persist the transition, resolving actor/time, and audit event atomically; retain the acknowledged step/source/token-hash facts in safe audit metadata.
+- This is documentation-only; no database field, API, timer, or lifecycle
+  behavior changes.
+- Keep the existing rule for concise names, while adding business meaning as
+  the first naming criterion and using mechanism terms only when necessary.
 
 ### Acceptance criteria
 
-- Authenticated same-team and current acknowledging recipient resolution both succeed before the deadline.
-- Resolution stores actor/time, changes `ACKNOWLEDGED → RESOLVED`, clears active acknowledgement ownership, and skips unsent steps.
-- Repeated same-actor resolution is idempotent; foreign-team, obsolete-owner, late, and terminal requests do not change state.
-- A concurrent resolution/timeout or delivery callback has one winner and cannot produce duplicate audit or delivery work.
+- `AGENTS.md` explains business-focused naming with concise examples.
+- Existing naming guidance remains internally consistent.
+- Documentation/diff checks and the normal backend build pass.
 
 ### Steps
 
-- [x] Inspect the resolution model, acknowledgement token flow, team authorization, repositories, scheduler, audit, controllers, and tests.
-- [x] Implement locked team/token resolution, status/actor fields, deadline and owner checks, step skipping, audit, and post-commit wake-up cancellation.
-- [x] Add focused tests for authorization, deadline boundaries, idempotency, stale ownership, terminal states, audit metadata, and post-commit cancellation; rely on PostgreSQL integration coverage for concurrency/rollback when available.
-- [x] Run focused tests, full Maven tests, package/UI builds, documentation checks, and independent read-only verification.
+- [x] Add business-focused naming guidance and examples to `AGENTS.md`.
+- [x] Check the guidance against the current timeout names and existing rules.
+- [x] Run documentation/diff checks and the normal backend build.
+- [x] Update the changelog and record verification limits.
 
 ### Intended verification and limitations
 
-Verification: focused resolution/security tests pass; full `mvn -q test` passes with 177 tests, 0 failures/errors, and 17 environment-gated skips; backend package, UI build, `git diff --check`, plan-length, and redundant-field checks pass. Independent read-only verifier verdict: **Inconclusive** only for PostgreSQL-backed migration/rollback/concurrency because PostgreSQL/RabbitMQ/Redis integrations are skipped and Docker is unavailable. The verifier found no local implementation or test regression.
+`AGENTS.md` guidance review, `git diff --check`, plan-length check, and
+`mvn -q -DskipTests compile` passed. No runtime behavior changed, so the full
+test suite was not rerun for this documentation-only task. PostgreSQL/RabbitMQ/
+Redis and deployed checks remain environment-gated. No independent read-only
+verifier mechanism was available in this session, so the task is not claimed as
+independently verified.
 
 ### Resume note
 
-After this task, continue with [deadline expiry and recovery](resolution-timeout-implementation-plan.md#8-implement-deadline-expiry-and-recovery). Preserve the agreed snapshot, shared `dueAt`, and active-owner semantics.
+The current timeout naming refactor and earlier staged/unstaged changes remain
+in the working tree. Preserve them while updating only the naming guidance.

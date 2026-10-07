@@ -13,6 +13,23 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 ## Changes
 
 - Use clear, descriptive names for variables, methods, and classes.
+- Name types and methods for the business responsibility or user-visible
+  outcome first, not for the internal mechanism. Prefer names such as
+  `EscalationTimeoutService` and `scheduleResolutionTimeout` that explain what
+  the escalation is waiting for, rather than names such as
+  `EscalationDeadlineTransitionService` or `registerDeadlineWakeUp` that focus
+  on implementation details. If an infrastructure role must be named, put the
+  domain subject first and keep the mechanism secondary; explain the mechanics
+  in a comment or class description.
+- Name methods with concise verb-object phrases, normally two to five words.
+  Prefer precise domain terms such as `rescheduleTimeoutWakeUp` over vague
+  names such as `rearm`, `handle`, `process`, or `doWork`; do not chain clauses
+  until a method name reads like a sentence or paragraph. Split a method when
+  one concise name cannot describe a single responsibility.
+- Add a one-line `//` purpose comment immediately above every new or modified
+  method, including private helpers, lifecycle callbacks, and test methods.
+  Keep the comment behavior-focused and on one line; do not use a long block
+  comment to compensate for an unclear method name.
 - Choose the simplest solution that meets the request. Keep the change focused and reuse existing code where practical.
 - Add files, abstractions, or dependencies only when they are needed and can be justified.
 - When one operation supports materially different business modes, do not encode the mode with overloaded method signatures or boolean flags. Use one clear method with a specific enum/request object, or separate methods with distinct names when the operations truly differ. Keep the mode values finite and explicit, and add focused coverage for each mode.
@@ -59,7 +76,7 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 - Persist real-world moments as `Instant`/UTC and inject `Clock` into business services instead of calling `Instant.now()` directly; this keeps comparisons deterministic and tests controllable.
 - Accept a local date/time plus an IANA timezone at the boundary, resolve it to one UTC `Instant`, and retain the submitted timezone when the product needs to display or reschedule the value.
 - Treat in-memory timers as wake-up handles only. Timer callbacks must reload current state from PostgreSQL and tolerate cancellation, replacement, restart recovery, and duplicate callbacks.
-- Add concise comments around calendar/timezone conversion, retry timing, and concurrency code when the reason is not obvious from the syntax. Do not comment routine getters, setters, or self-explanatory code.
+- Add concise comments around calendar/timezone conversion, retry timing, and concurrency code when the reason is not obvious from the syntax. The one-line comment rule applies to every new or modified method; unchanged routine getters and setters do not need retroactive comments.
 
 ## Verification and handoff
 

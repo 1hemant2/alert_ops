@@ -4,6 +4,34 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-07 — Make naming guidance business-focused
+
+- Update `AGENTS.md` to prioritize business responsibilities and user-visible outcomes over implementation mechanisms when naming classes and methods, with concise timeout examples.
+- Verification: naming-guidance review, `git diff --check`, plan-length check, and backend compile pass; no runtime behavior changed, so the full test suite was not rerun.
+
+## 2026-10-07 — Use clear timeout terminology for escalation waits
+
+- Replace internal `deadline` component names with `EscalationTimeoutService`, `EscalationTimeoutScheduler`, and related timeout messages; explain that acknowledgement timeout exhausts an open escalation while resolution timeout resumes the next step or exhausts the run.
+- Preserve the canonical persisted `resolutionDeadline` field and `dueAt` boundary; only internal names, comments, and audit detail labels changed.
+- Verification: focused timeout, acknowledgement, and resolution tests; full Maven suite (190 tests, 0 failures/errors, 17 environment-gated skips); backend package; UI build; compile; and diff/name checks pass. PostgreSQL/deployed verification remains pending, and no independent read-only verifier was available.
+
+## 2026-10-07 — Clarify previous deadline component naming
+
+- Rename the durable deadline transition component to `EscalationDeadlineTransitionService` and the in-memory timer owner to `EscalationDeadlineWakeUpScheduler`; clarify their class documentation and dependency names without changing lifecycle behavior.
+- Verification: focused deadline, acknowledgement, and resolution tests; full Maven suite (190 tests, 0 failures/errors, 17 environment-gated skips); backend package; UI build; and diff/name checks pass. PostgreSQL/deployed verification remains pending, and no independent read-only verifier was available.
+
+## 2026-10-07 — Clarify method names and comments in deadline handling
+
+- Add concise explicit naming and one-line method-comment rules to `AGENTS.md`.
+- Rename deadline recovery, wake-up, delivery, and scheduling methods to state their purpose; replace `rearm` terminology with `rescheduleDeadlineWakeUp` and update related tests/docs without changing lifecycle behavior.
+- Verification: focused tests, full Maven suite (190 tests, 0 failures/errors, 17 environment-gated skips), backend package, UI build, and diff/document checks pass. PostgreSQL/deployed verification remains pending.
+
+## 2026-10-07 — Implement deadline expiry and recovery
+
+- Persist shared acknowledgement boundaries after successful sends, recover final acknowledgement/resolution deadlines after restart, and safely expire or resume/exhaust runs under the database lock.
+- Enforce acknowledgement deadlines on POST and record automatic acknowledgement/resolution expiry audit events without adding parallel timing fields.
+- Verification: full Maven tests (190 tests, 0 failures/errors, 17 environment-gated skips), backend package, UI build, focused expiry/recovery tests, and documentation checks pass. PostgreSQL/deployed concurrency, rollback, and restart verification remains pending.
+
 ## 2026-10-07 — Implement explicit resolution
 
 - Add locked team-member and recipient-token resolution from `ACKNOWLEDGED` to `RESOLVED`, with actor/time persistence, active-owner clearing, unsent-step skipping, audit history, and post-commit wake-up cancellation.
