@@ -1,7 +1,11 @@
 package com.alertops.messaging;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
+import java.time.temporal.ChronoUnit;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
@@ -23,23 +27,31 @@ public class MessageConsumer {
    private final EscalationRepository escalationRepository;
    private final StepSchedulingService stepSchedulingService;
    private final EscalationAcknowledgementService acknowledgementService;
+   private final EscalationTimeoutService timeoutService;
+   private final Clock clock;
 
 
+    // Creates the RabbitMQ consumer that delivers scheduled escalation steps.
     public MessageConsumer(FlowExecutionStateRepository flowExecutionStateRepository, EscalationRepository escalationRepository,
         Notification notification, StepSchedulingService stepSchedulingService,
-        EscalationAcknowledgementService acknowledgementService
+        EscalationAcknowledgementService acknowledgementService,
+        EscalationTimeoutService timeoutService,
+        Clock clock
     ) {
         this.flowExecutionStateRepository = flowExecutionStateRepository;
         this.escalationRepository = escalationRepository;
         this.notification = notification;
         this.stepSchedulingService = stepSchedulingService;
         this.acknowledgementService = acknowledgementService;
+        this.timeoutService = timeoutService;
+        this.clock = clock;
     }
 
 
     @RabbitListener(queues = RabbitMqConfig.ESCALATION_STEP_READY_QUEUE)
     @Transactional
-    public void onMessage(EscalationStepReadyMessage readyMessage) {
+    // Claims and delivers one ready escalation step.
+    public void deliverReadyStep(EscalationStepReadyMessage readyMessage) {
         if (readyMessage == null || readyMessage.stepId() == null || readyMessage.dueAt() == null) {
             return;
         }
@@ -59,7 +71,7 @@ public class MessageConsumer {
             return;
         }
 
-        if (currentState.getDueAt().isAfter(Instant.now())) {
+        if (currentState.getDueAt().isAfter(clock.instant())) {
             // Do not send an early or legacy message; schedule it for the saved due time.
             stepSchedulingService.rescheduleStepAtDueTime(currentState);
             return;
@@ -74,11 +86,12 @@ public class MessageConsumer {
         // The bulk update bypasses the persistence context, so keep the managed copy aligned.
         currentState.setStatus(FlowExecutionStepStatus.SENDING);
         currentState.setPublicationPending(false);
-        consume(currentState, escalation);
+        deliverStepNotification(currentState, escalation);
     }
 
 
-    private void consume(FlowExecutionState flowExecutionState, Escalation escalation) {
+    // Sends one step notification and applies its delivery outcome.
+    private void deliverStepNotification(FlowExecutionState flowExecutionState, Escalation escalation) {
         boolean retryOnFailureEnabled = flowExecutionState.isRetryOnFailureEnabled();
         int maxRetryAttempts = flowExecutionState.getMaxRetryAttempts();
         int sendAttemptCount = flowExecutionState.getSendAttemptCount();
@@ -93,16 +106,24 @@ public class MessageConsumer {
         flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
         if (mailSent) {
             flowExecutionState.setStatus(FlowExecutionStepStatus.SENT);
-            flowExecutionStateRepository.save(flowExecutionState);
             if (nextNode == null) {
-                // A successful final notification remains open for its response window.
-                // Deadline expiry will complete an unacknowledged final run later.
+                Instant acknowledgementTimeoutAt = calculateAcknowledgementTimeoutAt(
+                        flowExecutionState.getDuration());
+                flowExecutionState.setDueAt(acknowledgementTimeoutAt);
+                flowExecutionStateRepository.save(flowExecutionState);
+                timeoutService.scheduleAcknowledgementTimeout(
+                        escalation.getId(), flowExecutionState.getId(), acknowledgementTimeoutAt);
             } else {
-                stepSchedulingService.schedule(nextNode);
+                FlowExecutionState scheduledNextNode = Objects.requireNonNull(
+                        stepSchedulingService.scheduleStep(nextNode), "Scheduled next response step is required");
+                // The next step's durable dueAt is also this sent step's acknowledgement boundary.
+                flowExecutionState.setDueAt(Objects.requireNonNull(
+                        scheduledNextNode.getDueAt(), "Scheduled next response step requires a due time"));
+                flowExecutionStateRepository.save(flowExecutionState);
             }
         } else if (retryOnFailureEnabled && sendAttemptCount < maxRetryAttempts) {
             flowExecutionStateRepository.save(flowExecutionState);
-            stepSchedulingService.schedule(flowExecutionState);
+            stepSchedulingService.scheduleStep(flowExecutionState);
         } else {
             flowExecutionState.setStatus(FlowExecutionStepStatus.FAILED);
             flowExecutionStateRepository.save(flowExecutionState);
@@ -111,8 +132,16 @@ public class MessageConsumer {
                 escalation.setResolutionType(EscalationResolutionType.EXHAUSTED);
                 escalationRepository.save(escalation);
             } else {
-                stepSchedulingService.schedule(nextNode);
+                stepSchedulingService.scheduleStep(nextNode);
             }
         }
+    }
+
+    // Calculates when the final step acknowledgement wait ends.
+    private Instant calculateAcknowledgementTimeoutAt(Duration waitDuration) {
+        if (waitDuration == null || waitDuration.isNegative()) {
+            throw new IllegalStateException("A sent response step requires a nonnegative acknowledgement wait");
+        }
+        return clock.instant().plus(waitDuration).truncatedTo(ChronoUnit.MICROS);
     }
 }

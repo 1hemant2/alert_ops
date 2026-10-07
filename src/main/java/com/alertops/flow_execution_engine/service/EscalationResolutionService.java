@@ -36,6 +36,7 @@ import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTo
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepTimerRegistry;
+import com.alertops.messaging.EscalationTimeoutService;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 
@@ -49,8 +50,10 @@ public class EscalationResolutionService {
     private final AuditEventRepository auditEventRepository;
     private final AuditService auditService;
     private final StepTimerRegistry stepTimerRegistry;
+    private final EscalationTimeoutService timeoutService;
     private final Clock clock;
 
+    // Creates the service that resolves acknowledged escalations.
     public EscalationResolutionService(
             EscalationRepository escalationRepository,
             FlowExecutionStateRepository flowExecutionStateRepository,
@@ -58,6 +61,7 @@ public class EscalationResolutionService {
             AuditEventRepository auditEventRepository,
             AuditService auditService,
             StepTimerRegistry stepTimerRegistry,
+            EscalationTimeoutService timeoutService,
             Clock clock) {
         this.escalationRepository = Objects.requireNonNull(escalationRepository, "escalationRepository");
         this.flowExecutionStateRepository = Objects.requireNonNull(
@@ -66,6 +70,7 @@ public class EscalationResolutionService {
         this.auditEventRepository = Objects.requireNonNull(auditEventRepository, "auditEventRepository");
         this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.stepTimerRegistry = Objects.requireNonNull(stepTimerRegistry, "stepTimerRegistry");
+        this.timeoutService = Objects.requireNonNull(timeoutService, "timeoutService");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -106,6 +111,7 @@ public class EscalationResolutionService {
                 ResolutionSource.RECIPIENT_TOKEN);
     }
 
+    // Applies one locked resolution transition and cancels its timeout wake-up.
     private EscalationResolutionResponse resolveLocked(
             Escalation escalation,
             UUID actorId,
@@ -130,9 +136,9 @@ public class EscalationResolutionService {
         }
 
         Instant now = clock.instant();
-        Instant resolutionDeadline = escalation.getResolutionDeadline();
-        if (resolutionDeadline == null || !now.isBefore(resolutionDeadline)) {
-            throw EscalationException.transitionConflict("The resolution deadline has passed.");
+        Instant resolutionTimeoutAt = escalation.getResolutionDeadline();
+        if (resolutionTimeoutAt == null || !now.isBefore(resolutionTimeoutAt)) {
+            throw EscalationException.transitionConflict("The resolution timeout has passed.");
         }
         UUID acknowledgedStepId = escalation.getAcknowledgedStepId();
 
@@ -174,6 +180,7 @@ public class EscalationResolutionService {
                 null,
                 "acknowledgedStepId=" + acknowledgedStepId + ";source=" + source.name()
                         + ";tokenHash=" + (expectedTokenHash == null ? "none" : expectedTokenHash)));
+        timeoutService.cancelResolutionTimeout(escalation.getId());
         cancelTimersAfterCommit(timerStepIds);
         return response(escalation, false);
     }

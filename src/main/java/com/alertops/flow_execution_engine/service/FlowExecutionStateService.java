@@ -44,6 +44,7 @@ public class FlowExecutionStateService {
     }
 
     @Transactional
+    // Creates execution snapshots and schedules the first runtime step.
     public String startFlowExecution(
             Task task,
             Flow flow,
@@ -104,7 +105,7 @@ public class FlowExecutionStateService {
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             FlowExecutionState flowExecutionState = flowExecutionStateRepository.findTopByProcessIdOrderByPositionAsc(escalationId);
-            stepSchedulingService.schedule(flowExecutionState);
+            stepSchedulingService.scheduleStep(flowExecutionState);
             return "Started Flow Execution for escalationId: " + escalationId;
         } catch (RuntimeException e) {
             throw e;

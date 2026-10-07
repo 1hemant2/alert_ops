@@ -38,6 +38,7 @@ import com.alertops.flow_execution_engine.repository.EscalationAcknowledgementTo
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepTimerRegistry;
+import com.alertops.messaging.EscalationTimeoutService;
 
 @Service
 public class EscalationAcknowledgementService {
@@ -49,16 +50,19 @@ public class EscalationAcknowledgementService {
     private final FlowExecutionStateRepository flowExecutionStateRepository;
     private final AuditService auditService;
     private final StepTimerRegistry stepTimerRegistry;
+    private final EscalationTimeoutService timeoutService;
     private final Clock clock;
     private final Duration tokenLifetime;
     private final String uiBaseUrl;
 
+    // Creates the service that validates and records acknowledgement actions.
     public EscalationAcknowledgementService(
             EscalationAcknowledgementTokenRepository tokenRepository,
             EscalationRepository escalationRepository,
             FlowExecutionStateRepository flowExecutionStateRepository,
             AuditService auditService,
             StepTimerRegistry stepTimerRegistry,
+            EscalationTimeoutService timeoutService,
             Clock clock,
             @Value("${alertops.escalation.acknowledgement-ttl:72h}") Duration tokenLifetime,
             @Value("${alertops.ui.base-url:http://localhost:5173}") String uiBaseUrl) {
@@ -67,6 +71,7 @@ public class EscalationAcknowledgementService {
         this.flowExecutionStateRepository = flowExecutionStateRepository;
         this.auditService = auditService;
         this.stepTimerRegistry = stepTimerRegistry;
+        this.timeoutService = timeoutService;
         this.clock = clock;
         this.tokenLifetime = tokenLifetime;
         this.uiBaseUrl = uiBaseUrl == null ? "" : uiBaseUrl.replaceAll("/+$", "");
@@ -110,6 +115,7 @@ public class EscalationAcknowledgementService {
     }
 
     @Transactional
+    // Records an acknowledgement after validating token, ownership, and timeout.
     public EscalationAcknowledgementResponse acknowledge(String rawToken) {
         EscalationAcknowledgementToken token = findToken(rawToken);
         Escalation escalation = escalationRepository.findByIdForUpdate(token.getEscalationId())
@@ -120,6 +126,7 @@ public class EscalationAcknowledgementService {
         validateTokenAndRun(token, escalation, alreadyAcknowledged);
 
         if (!alreadyAcknowledged) {
+            validateAcknowledgementTimeout(executionStep);
             Instant acknowledgedAt = clock.instant();
             if (executionStep.isResolutionTimeoutEnabled()) {
                 acknowledgeWithResolutionTimeout(escalation, token, executionStep, acknowledgedAt);
@@ -202,6 +209,7 @@ public class EscalationAcknowledgementService {
         }
     }
 
+    // Completes acknowledgement when no resolution timeout is configured.
     private void completeWithoutResolutionTimeout(
             Escalation escalation,
             EscalationAcknowledgementToken token,
@@ -215,8 +223,10 @@ public class EscalationAcknowledgementService {
         flowExecutionStateRepository.markUnsentStepsSkipped(escalation.getId());
         escalationRepository.save(escalation);
         recordAcknowledgementAudit(escalation, token, acknowledgedAt, EscalationStatus.COMPLETED, null);
+        timeoutService.cancelAcknowledgementTimeout(escalation.getId());
     }
 
+    // Pauses the next step and starts the saved resolution timeout.
     private void acknowledgeWithResolutionTimeout(
             Escalation escalation,
             EscalationAcknowledgementToken token,
@@ -241,16 +251,19 @@ public class EscalationAcknowledgementService {
             pausedStepId = savedNextStep.getId();
         }
 
-        Instant resolutionDeadline = acknowledgedAt.plus(resolutionTimeout);
+        Instant resolutionTimeoutAt = acknowledgedAt.plus(resolutionTimeout);
         escalation.setStatus(EscalationStatus.ACKNOWLEDGED);
         escalation.setResolutionType(null);
         escalation.setIssueSolvedBy(token.getRecipientEmail());
         escalation.setAcknowledgedAt(acknowledgedAt);
         escalation.setAcknowledgedStepId(executionStep.getId());
-        escalation.setResolutionDeadline(resolutionDeadline);
+        escalation.setResolutionDeadline(resolutionTimeoutAt);
         escalationRepository.save(escalation);
         recordAcknowledgementAudit(
-                escalation, token, acknowledgedAt, EscalationStatus.ACKNOWLEDGED, resolutionDeadline);
+                escalation, token, acknowledgedAt, EscalationStatus.ACKNOWLEDGED, resolutionTimeoutAt);
+        timeoutService.cancelAcknowledgementTimeout(escalation.getId());
+        timeoutService.scheduleResolutionTimeout(
+                escalation.getId(), executionStep.getId(), resolutionTimeoutAt);
 
         if (pausedStepId != null) {
             cancelTimerAfterCommit(pausedStepId);
@@ -262,9 +275,9 @@ public class EscalationAcknowledgementService {
             EscalationAcknowledgementToken token,
             Instant acknowledgedAt,
             EscalationStatus newStatus,
-            Instant resolutionDeadline) {
+            Instant resolutionTimeoutAt) {
         String metadata = "executionStepId=" + token.getExecutionStepId()
-                + ";resolutionDeadline=" + (resolutionDeadline == null ? "none" : resolutionDeadline);
+                + ";resolutionTimeoutAt=" + (resolutionTimeoutAt == null ? "none" : resolutionTimeoutAt);
         auditService.record(new AuditEvent(
                 AuditEntityType.ESCALATION,
                 escalation.getId(),
@@ -290,6 +303,14 @@ public class EscalationAcknowledgementService {
                 cancellation.run();
             }
         });
+    }
+
+    // Rejects acknowledgement after the shared step timeout has passed.
+    private void validateAcknowledgementTimeout(FlowExecutionState executionStep) {
+        Instant acknowledgementTimeoutAt = executionStep.getDueAt();
+        if (acknowledgementTimeoutAt == null || !clock.instant().isBefore(acknowledgementTimeoutAt)) {
+            throw new ResponseStatusException(HttpStatus.GONE, "The acknowledgement window has expired.");
+        }
     }
 
     private EscalationAcknowledgementResponse response(

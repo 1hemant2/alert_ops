@@ -2,6 +2,7 @@ package com.alertops.flow_execution_engine.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,11 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
 
    FlowExecutionState findFirstByProcessIdAndStatusOrderByPositionAsc(
            UUID processId, FlowExecutionStepStatus status);
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   @Query("select state from FlowExecutionState state where state.id = :id")
+   // Locks one execution step so timeout transitions use current durable state.
+   Optional<FlowExecutionState> findByIdForUpdate(@Param("id") UUID id);
 
    @Lock(LockModeType.PESSIMISTIC_WRITE)
    FlowExecutionState findTopByProcessIdAndStatusOrderByPositionDesc(
@@ -61,6 +67,25 @@ public interface FlowExecutionStateRepository extends JpaRepository<FlowExecutio
            ORDER BY state.dueAt ASC, state.id ASC
            """)
    List<FlowExecutionState> findPendingPublications(Pageable pageable);
+
+   @Query("""
+           SELECT state FROM FlowExecutionState state
+           WHERE state.status = com.alertops.flow_execution_engine.model.FlowExecutionStepStatus.SENT
+             AND state.dueAt IS NOT NULL
+             AND NOT EXISTS (
+                 SELECT later.id FROM FlowExecutionState later
+                 WHERE later.processId = state.processId
+                   AND later.position > state.position
+             )
+             AND EXISTS (
+                 SELECT escalation.id FROM Escalation escalation
+                 WHERE escalation.id = state.processId
+                   AND escalation.status = com.alertops.flow_execution_engine.model.EscalationStatus.OPEN
+             )
+           ORDER BY state.dueAt ASC, state.id ASC
+           """)
+   // Finds open final sent steps whose acknowledgement timeout can be recovered.
+   List<FlowExecutionState> findOpenFinalAcknowledgementSteps(Pageable pageable);
 
    @Query("""
            SELECT COUNT(state) FROM FlowExecutionState state

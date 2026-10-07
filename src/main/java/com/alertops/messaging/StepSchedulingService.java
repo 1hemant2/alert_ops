@@ -1,6 +1,7 @@
 package com.alertops.messaging;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -25,17 +26,21 @@ public class StepSchedulingService {
     private final FlowExecutionStateRepository stateRepository;
     private final EscalationRepository escalationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
     private final int recoveryBatchSize;
 
+    // Creates the service that persists scheduled steps and publishes wake-up events.
     public StepSchedulingService(
             FlowExecutionStateRepository stateRepository,
             EscalationRepository escalationRepository,
             ApplicationEventPublisher eventPublisher,
+            Clock clock,
             @Value("${alertops.scheduler.recovery-batch-size:10000}") int recoveryBatchSize
     ) {
         this.stateRepository = Objects.requireNonNull(stateRepository, "stateRepository");
         this.escalationRepository = Objects.requireNonNull(escalationRepository, "escalationRepository");
         this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
+        this.clock = Objects.requireNonNull(clock, "clock");
         if (recoveryBatchSize < 1) {
             throw new IllegalArgumentException("Recovery batch size must be positive");
         }
@@ -43,7 +48,8 @@ public class StepSchedulingService {
     }
 
     @Transactional
-    public void schedule(FlowExecutionState state) {
+    // Schedules a step using its configured delivery delay.
+    public FlowExecutionState scheduleStep(FlowExecutionState state) {
         if (state == null) {
             throw new IllegalArgumentException("A response step is required");
         }
@@ -53,14 +59,35 @@ public class StepSchedulingService {
         }
 
         state.setStatus(FlowExecutionStepStatus.SCHEDULED);
-        state.setDueAt(Instant.now().plus(duration).truncatedTo(ChronoUnit.MICROS));
+        state.setDueAt(clock.instant().plus(duration).truncatedTo(ChronoUnit.MICROS));
         state.setPublicationPending(true);
         FlowExecutionState saved = Objects.requireNonNull(stateRepository.save(state), "Saved response step is required");
         // The listener adds the timer only after this database save commits.
         eventPublisher.publishEvent(toSchedule(saved));
+        return saved;
+    }
+
+    @Transactional
+    // Schedules a step for the supplied immediate due time.
+    public FlowExecutionState scheduleStepImmediately(FlowExecutionState state, Instant dueAt) {
+        if (state == null) {
+            throw new IllegalArgumentException("A response step is required");
+        }
+        if (dueAt == null) {
+            throw new IllegalArgumentException("An immediate response step requires a due time");
+        }
+
+        state.setStatus(FlowExecutionStepStatus.SCHEDULED);
+        state.setDueAt(dueAt.truncatedTo(ChronoUnit.MICROS));
+        state.setPublicationPending(true);
+        FlowExecutionState saved = Objects.requireNonNull(stateRepository.save(state), "Saved response step is required");
+        // The listener adds the immediate timer only after this database save commits.
+        eventPublisher.publishEvent(toSchedule(saved));
+        return saved;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    // Loads durable step schedules that still need publication.
     public List<EscalationStepSchedule> recoverPendingSchedules() {
         List<FlowExecutionState> pending = stateRepository.findPendingPublications(
                 PageRequest.of(0, recoveryBatchSize));
@@ -74,6 +101,7 @@ public class StepSchedulingService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    // Marks one exact step attempt as published after broker acceptance.
     public void markPublished(EscalationStepSchedule step) {
         if (step == null) {
             return;
@@ -88,6 +116,7 @@ public class StepSchedulingService {
     }
 
     @Transactional
+    // Re-registers a saved step wake-up when a callback arrived too early.
     public void rescheduleStepAtDueTime(FlowExecutionState state) {
         if (state == null) {
             return;
@@ -121,8 +150,8 @@ public class StepSchedulingService {
         eventPublisher.publishEvent(toSchedule(saved));
     }
 
-    // Checks that this exact step attempt is still pending before scheduling its timer.
     @Transactional(readOnly = true)
+    // Checks whether this exact step attempt still needs publication.
     public boolean isStepStillPendingForPublication(EscalationStepSchedule schedule) {
         if (schedule == null) {
             return false;
@@ -150,16 +179,19 @@ public class StepSchedulingService {
     }
 
     @Transactional(readOnly = true)
+    // Counts durable step schedules awaiting publication.
     public long countPendingSchedules() {
         return stateRepository.countPendingPublications();
     }
 
+    // Converts a persisted step into its wake-up event payload.
     private EscalationStepSchedule toSchedule(FlowExecutionState state) {
         FlowExecutionState nonNullState = Objects.requireNonNull(state, "Response step is required");
         return new EscalationStepSchedule(
                 nonNullState.getId(), nonNullState.getSendAttemptCount(), nonNullState.getDueAt());
     }
 
+    // Checks whether an escalation can still receive delivery work.
     private boolean isActive(com.alertops.flow_execution_engine.model.Escalation escalation) {
         return escalation != null
                 && escalation.getStatus() == EscalationStatus.OPEN;
