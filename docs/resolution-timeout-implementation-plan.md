@@ -292,7 +292,8 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 10. Complete escalation/email UI
 
-- [ ] Show acknowledgement ownership and deadline, provide the agreed resolve action, explain paused/skipped steps, and keep valid recipient previews viewable with deadline-specific unavailable-action messages. Handle invalid tokens and email Escalate now source-window restrictions clearly.
+- [x] Show acknowledgement ownership and deadline, provide the agreed resolve action, explain paused/skipped steps, and keep valid recipient previews viewable with deadline-specific unavailable-action messages. Handle invalid tokens and email Escalate now source-window restrictions clearly.
+- **Local implementation evidence (2026-10-08):** The team detail page shows the current acknowledgement owner/deadline and resolves `ACKNOWLEDGED` runs through the existing same-team endpoint. The recipient acknowledgement page now distinguishes acknowledgement, active resolution, and resolved outcomes, uses the existing scoped resolution endpoint, and displays the saved resolution deadline. Saved step rows explain waiting, paused, sent, failed, and skipped states; Escalate now preview/action errors explain stale, expired, and unavailable-window cases.
 - Acceptance: UI distinguishes acknowledgement from resolution only for enabled runs and always displays saved server state.
 
 ### 11. Extend audit event coverage

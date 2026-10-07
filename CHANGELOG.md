@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Complete escalation and email UI
+
+- Add team and recipient resolution controls, saved resolution-deadline display, lifecycle-aware acknowledgement messaging, and readable paused/sent/failed/skipped step explanations.
+- Improve Escalate now stale, expired, and unavailable-action messaging and expose the existing resolution API through the UI.
+- Verification: UI production build, focused acknowledgement/resolution tests, and backend package build pass; PostgreSQL/deployed verification remains pending.
+
 ## 2026-10-08 — Simplify manual Escalate now code
 
 - Remove four redundant helper methods and rename the remaining internal helpers to explicit business names while preserving authorization, locking, deadline, token, audit, and idempotency behavior.

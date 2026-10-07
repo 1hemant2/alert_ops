@@ -1,42 +1,44 @@
 # Current task plan
 
-## Task: Simplify manual Escalate now service
+## Task: Complete escalation and email UI
 
 Started: 2026-10-08
-Status: Complete locally
+Status: In progress
 
 ### Goal and scope
 
-Remove redundant helpers from `EscalationManualActionService`, preserve its
-authorization, locking, lifecycle, token, audit, and preview behavior, and add
-concise guidance to `AGENTS.md` for minimal readable code.
+Complete the agreed acknowledgement/resolution experience in the team detail
+page and recipient email page. Reuse the existing resolution endpoints and
+server lifecycle state; keep deployment out of scope.
 
 ### Decision-compliance note
 
-- Keep PostgreSQL-backed escalation/step state and existing source/target
-  validation as the canonical lifecycle decision.
-- Preserve recipient-token scope, response-window checks, idempotent audit
-  handling, and the existing public endpoints.
-- Do not split the service into more classes or add a generic framework for a
-  small set of manual-action paths.
+- `Escalation.status`, `resolutionDeadline`, `issueSolvedBy`, and
+  `acknowledgedStepId` remain the server-owned source of truth.
+- Only `ACKNOWLEDGED` runs expose resolution controls; disabled resolution
+  remains the existing terminal acknowledgement behavior.
+- Recipient tokens remain scoped to the current acknowledgement and cannot
+  grant team history or change lifecycle state through the UI.
 
 ### Acceptance criteria
 
-- Remove only helpers that add no meaningful business clarity or protection.
-- Keep all meaningful security, concurrency, null-safety, and lifecycle checks.
-- `AGENTS.md` requires the smallest readable and reviewable implementation.
-- Focused tests, package build, and whitespace checks pass.
+- Team members can see acknowledgement ownership/deadline and resolve an
+  acknowledged run from the detail page.
+- The recipient link distinguishes acknowledgement, active resolution, and
+  resolved/completed outcomes with clear errors and deadline messaging.
+- Step progress explains paused, skipped, sent, and failed states without
+  inventing history from editable flow data.
+- Escalate now preview/action restrictions remain visible and understandable.
 
 ### Steps
 
-- [x] Simplify the service and update its tests if behavior-focused coverage needs clarification.
-- [x] Update `AGENTS.md`, plan, and changelog.
-- [x] Run verification and review the final diff.
+- [x] Add resolution API/types and saved deadline to recipient preview data.
+- [x] Add team and recipient resolve controls and clear lifecycle messages.
+- [x] Explain step states and improve stale/expired action messaging.
+- [x] Run UI/backend verification, update readiness/changelog, and commit.
 
 ### Intended verification and limitations
 
-The service had no unreachable private method; four low-value helpers were
-removed and generic helpers were renamed to explicit Escalate now names.
-Manual-action/security tests, the backend package build, and `git diff --check`
-pass. PostgreSQL/deployed behavior remains environment-gated; no usable
-independent read-only verifier is available in this environment.
+`npm run build`, focused acknowledgement/resolution security and service tests,
+the backend package build, and `git diff --check` pass. PostgreSQL/deployed
+verification remains pending; no independent read-only verifier is available.
