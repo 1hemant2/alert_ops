@@ -104,13 +104,14 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 ### 5. Incident activity timeline
 
 - [x] **Requirements agreed**
-- [ ] **Implementation complete locally**
+- [x] **Implementation complete locally**
 - [ ] **Implemented and verified in PostgreSQL/deployed flow**
 - **Requested behavior:** The escalation detail page shows saved chronological history of both user actions and automatic events, with the time, actor/system, and affected step/recipient. Terminal escalations retain history. Viewing history does not introduce or change lifecycle states.
 - **Events:** Creation, scheduling, rescheduling, start (including early start), cancellation, notification send acceptance/failure/retries, acknowledgement and resolution deadline, resolution timeout, Escalate now from UI/email, resolution, completion/exhaustion, and start failure.
 - **Agreed usability:** Show important milestones by default with plain wording. Group repeated failures/retries for the same step into a short summary with expandable attempt details and accurate retry counts; retain the full individual event history underneath. Keep timer housekeeping, stack traces, secrets, and raw tokens out of the timeline. Distinguish historical activity from the current step-progress display.
 - **Audit/API plan:** Reuse the generic audit service; save each event with its owning domain change. Preserve event context despite later flow edits, avoid duplicate successful events from repeated requests/callbacks, and expose a safe, paginated, same-team history API. Email action tokens do not grant access to full team history.
-- **Current state:** The audit service stores creation, scheduling, start, cancellation, notification acceptance/failure/retry, acknowledgement/deadline, manual escalation, resolution/timeout, start failure, and final exhaustion events. The same-team paginated history API now exposes safe saved activity rows; the existing UI's “Execution timeline” still shows current step rows, so the readable history timeline remains planned.
+- **Current state:** The audit service stores creation, scheduling, start, cancellation, notification acceptance/failure/retry, acknowledgement/deadline, manual escalation, resolution/timeout, start failure, and final exhaustion events. The same-team paginated history API exposes safe saved activity rows, and the escalation detail page now shows readable milestone history separately from current step progress, with grouped expandable retries and load-more support. PostgreSQL/deployed verification remains pending.
+- **Local verification:** Focused audit/history coverage, UI build/lint, full Maven packaging, and diff checks pass. UI lint retains two pre-existing warnings in the flow detail page; browser/deployed verification and independent read-only verification remain unavailable.
 - **Plan:** [Shared activity timeline design and tasks](resolution-timeout-implementation-plan.md#agreed-incident-activity-timeline).
 - **Verification needed:** Event coverage and rollback atomicity, email/system actors, repeated/stale operation safety, stable chronology, grouping/counts across pages, readable messages, safe metadata, flow-edit history preservation, authorization/team isolation, loading/empty/error/refresh states, and terminal history. Deployed verification stays deferred.
 
