@@ -4,6 +4,13 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Fix Spring Boot 4 Redis test imports
+
+- Update integration-test Redis auto-configuration exclusions to the Spring Boot
+  4 package and `DataRedis*` class names, restoring CI test compilation.
+- Verification: test compilation, full `./mvnw -q package`, and
+  `git diff --check` pass.
+
 ## 2026-10-08 — Complete webhook event history UI
 
 - Add expandable webhook event history and link each event to its specific task

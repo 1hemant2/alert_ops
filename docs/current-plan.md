@@ -1,49 +1,43 @@
 # Current task plan
 
-## Task: Complete webhook event history navigation
+## Task: Fix Spring Boot 4 Redis test imports
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Finish the remaining webhook UI implementation item: let team members reveal
-all saved events for a webhook and open the exact task created by an event.
-Reuse the existing event-list API and task-detail route. Do not change backend
-event storage, pagination contracts, webhook configuration, or deployment
-verification.
+Restore CI test compilation after the Spring Boot 4 upgrade by using the
+current Redis auto-configuration package and class names in integration-test
+configuration. Keep production behavior and dependency versions unchanged.
 
-Previous task: task detail/editing and saved run context UI is complete in
-commits `89abc0d` and `d8cc188`.
+Previous task: webhook event history navigation is complete in commits
+`1b56267` and `be4c40b`.
 
 ### Decision-compliance note
 
-- The existing team-scoped `GET /api/v1/team/webhooks/{id}/events` response is
-  the source of truth; do not add a second history endpoint or client store.
-- Event task links must use the existing `/app/:teamId/tasks/:taskId` route,
-  preserving team-scoped access and the task detail editor.
-- Keep the current recent-event view compact and make older events explicitly
-  available through a clear user action.
+- Use the auto-configuration classes supplied by the pinned Spring Boot 4.0.8
+  dependency; do not add compatibility dependencies or duplicate Redis config.
+- Change only the two test configurations that explicitly exclude Redis
+  auto-configuration.
 
 ### Acceptance criteria
 
-- A webhook with more than three events provides an obvious way to show and
-  hide the complete event history.
-- Each event links to its specific task detail page and existing run detail.
-- Empty, loading, and error states remain understandable.
-- UI typecheck, lint, production build, and diff checks pass.
-- The launch checklist and changelog record the completed UI item.
+- Test sources compile in the Spring Boot 4.0.8 build.
+- The affected integration-test configurations still exclude Redis startup.
+- Focused test compilation and the normal Maven package pass.
+- The changelog records the compatibility fix.
 
 ### Steps
 
-- [x] Add expandable full-history navigation and specific task links.
-- [x] Run UI verification and update launch documentation/changelog.
+- [x] Update the two Redis auto-configuration imports and exclusions.
+- [x] Run focused compilation/tests, full package, and diff checks.
+- [x] Update this plan and the changelog with verification results.
 
 ### Verification and limitations
 
-`npm run typecheck` and `npm run build` pass. `npm run lint` passes with two
-pre-existing warnings in `FlowDetailPage.tsx`; the webhook UI adds no warnings.
-`git diff --check` passes. No focused UI test script is available. PostgreSQL,
-Redis, browser, and deployed verification remain separate release checks.
-Independent read-only verification was skipped because no usable subagent
-mechanism was available.
+`./mvnw -q -DskipTests test-compile`, `./mvnw -q package`, and
+`git diff --check` pass. Environment-gated PostgreSQL/RabbitMQ integration
+tests may remain skipped when their services are unavailable. Independent
+read-only verification was skipped because no usable subagent mechanism was
+available.
