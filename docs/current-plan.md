@@ -1,44 +1,45 @@
 # Current task plan
 
-## Task: Fix Spring Boot 4 integration-test imports
+## Task: Fix CI container image build
 
 Started: 2026-10-08
-Status: Complete
+Status: In progress
 
 ### Goal and scope
 
-Restore clean CI test compilation after the Spring Boot 4 upgrade by using the
-current auto-configuration package and class names in the two integration-test
-configurations. Keep production behavior and dependency versions unchanged.
+Restore the full CI pipeline after Maven verification succeeds but the Docker
+image build fails. Keep the pinned base image and install the current patched
+Jammy OpenSSL packages without depending on an unavailable repository version.
 
 Previous task: webhook event history navigation is complete in commits
-`1b56267` and `be4c40b`. The first compatibility fix is in `2e8f807` and
-`c44ce71`; CI run `37684294945` found additional old Boot 3 imports.
+`1b56267` and `be4c40b`. Spring Boot 4 test-import fixes are in `2e8f807`,
+`c44ce71`, `63e8c7d`, and `6bc0f06`. CI run `37684605184` passed Maven but
+failed during `Build commit image`.
 
 ### Decision-compliance note
 
-- Use the auto-configuration classes supplied by the pinned Spring Boot 4.0.8
-  dependencies; do not add compatibility dependencies or duplicate config.
-- Change only the imports and exclusions in the two affected integration tests.
+- Keep the existing pinned container base; change only the package installation
+  that currently prevents the image from building.
+- Install named patched packages from the current Jammy repository and retain
+  the image vulnerability scan as the release gate.
 
 ### Acceptance criteria
 
-- Clean test sources compile in the Spring Boot 4.0.8 build.
-- The integration-test configurations still exclude Redis, JDBC, JPA, and
-  RabbitMQ startup where intended.
-- Clean Maven verification passes in CI.
+- The Docker image builds successfully in CI.
+- Trivy reports no unfixed HIGH or CRITICAL vulnerabilities.
+- Maven verification remains green and the complete CI workflow passes.
 - The changelog records the compatibility fix.
 
 ### Steps
 
-- [x] Update the Redis auto-configuration imports and exclusions.
-- [x] Update the JDBC, JPA, AMQP, and entity-scan imports and exclusions.
-- [x] Run clean test compilation, full package, and diff checks.
-- [x] Update this plan and the existing changelog entry with verification.
+- [ ] Update the Dockerfile package installation.
+- [ ] Run the local diff checks and push the fix.
+- [ ] Monitor CI through Maven, image build, and Trivy completion.
+- [ ] Update the changelog with the final CI result.
 
 ### Verification and limitations
 
-`./mvnw clean test-compile`, `./mvnw --batch-mode --no-transfer-progress clean
-verify`, and `git diff --check` pass. The clean verification ran 238 tests with
-0 failures/errors and 17 environment-gated skips. Independent read-only
-verification was skipped because no usable subagent mechanism was available.
+The prior clean Maven verification ran 238 tests with 0 failures/errors and
+17 environment-gated skips. Docker is unavailable locally, so image build and
+Trivy verification must be confirmed by GitHub Actions. Independent read-only
+verification will be skipped if no usable subagent mechanism is available.
