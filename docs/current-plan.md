@@ -1,47 +1,42 @@
 # Current task plan
 
-## Task: Make naming guidance business-focused
+## Task: Simplify manual Escalate now service
 
-Started: 2026-10-07
-Status: Complete locally; PostgreSQL/deployed verification pending
+Started: 2026-10-08
+Status: Complete locally
 
 ### Goal and scope
 
-Update `AGENTS.md` so names describe the business responsibility or user-visible
-outcome before the implementation mechanism. Preserve the current timeout
-implementation and all existing naming examples unless this guidance requires
-an explicit correction.
+Remove redundant helpers from `EscalationManualActionService`, preserve its
+authorization, locking, lifecycle, token, audit, and preview behavior, and add
+concise guidance to `AGENTS.md` for minimal readable code.
 
 ### Decision-compliance note
 
-- This is documentation-only; no database field, API, timer, or lifecycle
-  behavior changes.
-- Keep the existing rule for concise names, while adding business meaning as
-  the first naming criterion and using mechanism terms only when necessary.
+- Keep PostgreSQL-backed escalation/step state and existing source/target
+  validation as the canonical lifecycle decision.
+- Preserve recipient-token scope, response-window checks, idempotent audit
+  handling, and the existing public endpoints.
+- Do not split the service into more classes or add a generic framework for a
+  small set of manual-action paths.
 
 ### Acceptance criteria
 
-- `AGENTS.md` explains business-focused naming with concise examples.
-- Existing naming guidance remains internally consistent.
-- Documentation/diff checks and the normal backend build pass.
+- Remove only helpers that add no meaningful business clarity or protection.
+- Keep all meaningful security, concurrency, null-safety, and lifecycle checks.
+- `AGENTS.md` requires the smallest readable and reviewable implementation.
+- Focused tests, package build, and whitespace checks pass.
 
 ### Steps
 
-- [x] Add business-focused naming guidance and examples to `AGENTS.md`.
-- [x] Check the guidance against the current timeout names and existing rules.
-- [x] Run documentation/diff checks and the normal backend build.
-- [x] Update the changelog and record verification limits.
+- [x] Simplify the service and update its tests if behavior-focused coverage needs clarification.
+- [x] Update `AGENTS.md`, plan, and changelog.
+- [x] Run verification and review the final diff.
 
 ### Intended verification and limitations
 
-`AGENTS.md` guidance review, `git diff --check`, plan-length check, and
-`mvn -q -DskipTests compile` passed. No runtime behavior changed, so the full
-test suite was not rerun for this documentation-only task. PostgreSQL/RabbitMQ/
-Redis and deployed checks remain environment-gated. No independent read-only
-verifier mechanism was available in this session, so the task is not claimed as
-independently verified.
-
-### Resume note
-
-The current timeout naming refactor and earlier staged/unstaged changes remain
-in the working tree. Preserve them while updating only the naming guidance.
+The service had no unreachable private method; four low-value helpers were
+removed and generic helpers were renamed to explicit Escalate now names.
+Manual-action/security tests, the backend package build, and `git diff --check`
+pass. PostgreSQL/deployed behavior remains environment-gated; no usable
+independent read-only verifier is available in this environment.

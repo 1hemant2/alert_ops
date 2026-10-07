@@ -30,8 +30,18 @@ Build AlertOps into a production-ready alerting and escalation product for real 
   method, including private helpers, lifecycle callbacks, and test methods.
   Keep the comment behavior-focused and on one line; do not use a long block
   comment to compensate for an unclear method name.
-- Choose the simplest solution that meets the request. Keep the change focused and reuse existing code where practical.
-- Add files, abstractions, or dependencies only when they are needed and can be justified.
+- Prefer the smallest readable implementation that meets the request. Keep the
+  normal path easy to follow from validation to state change; avoid speculative
+  abstractions, wrappers, and defensive branches that do not protect a real
+  boundary.
+- Remove helpers that only forward arguments, rename a one-line expression, or
+  duplicate a check. Keep a helper when it names a business rule, protects a
+  security/concurrency invariant, handles a nullable boundary, or makes a
+  repeated operation easier to review.
+- Add files, abstractions, or dependencies only when they reduce real
+  complexity or are required by the product behavior. Before handoff, review
+  the diff for dead methods, duplicate logic, and code that can be made clear
+  with a local variable or a focused method.
 - When one operation supports materially different business modes, do not encode the mode with overloaded method signatures or boolean flags. Use one clear method with a specific enum/request object, or separate methods with distinct names when the operations truly differ. Keep the mode values finite and explicit, and add focused coverage for each mode.
 - Treat decisions recorded as agreed behavior, core decisions, final storage decisions, canonical mappings, or acceptance rules in the linked product checklist and feature plans as binding implementation requirements. Before changing a model, schema, API, or lifecycle transition, read those sections and record the relevant canonical source of truth in the current plan.
 - Do not add a second field, column, timer, or API property for a concept already represented by an agreed canonical field or timing boundary. Search the code and plans for domain synonyms first; if reuse is insufficient, document the reason and resolve the conflict before coding.

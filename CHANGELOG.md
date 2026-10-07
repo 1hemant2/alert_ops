@@ -4,6 +4,23 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Simplify manual Escalate now code
+
+- Remove four redundant helper methods and rename the remaining internal helpers to explicit business names while preserving authorization, locking, deadline, token, audit, and idempotency behavior.
+- Update `AGENTS.md` to prefer the smallest readable implementation and to remove wrappers or abstractions that do not protect a real boundary.
+- Verification: focused manual-action/security tests, backend package build, and `git diff --check` pass; PostgreSQL/deployed verification remains pending.
+
+## 2026-10-08 — Clarify Escalate now transition naming
+
+- Rename the private manual-action helper from `applyLocked` to `applyEscalateNowTransition` so its business responsibility is explicit while preserving behavior.
+- Verification: focused manual-action tests, backend package build, and `git diff --check` pass.
+
+## 2026-10-08 — Implement Escalate now
+
+- Add authenticated same-team and recipient-token Escalate now actions for OPEN and ACKNOWLEDGED runs, with expected-step validation, immediate durable scheduling, resolution-wait cancellation, explicit token capability, and actor/source/target audit details.
+- Add signed-in and email preview/confirmation UI plus an Escalate now email action for non-final notifications; stale, terminal, expired, and repeated actions remain scoped and idempotent.
+- Verification: focused manual-action, acknowledgement, notification, consumer, and security tests; full Maven suite (224 tests, 0 failures/errors, 17 environment-gated skips); backend package; UI build; and diff checks pass. PostgreSQL/RabbitMQ/Redis and deployed verification remain pending; no independent read-only verifier was available.
+
 ## 2026-10-07 — Make naming guidance business-focused
 
 - Update `AGENTS.md` to prioritize business responsibilities and user-visible outcomes over implementation mechanisms when naming classes and methods, with concise timeout examples.

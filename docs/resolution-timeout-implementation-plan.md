@@ -284,9 +284,10 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 9. Implement Escalate now
 
-- [ ] Add immediate-due scheduling shared with deadline expiry, a same-team manual action with expected-step validation, atomic audit, durable publication, and deadline invalidation.
-- [ ] Add the UI action for waiting/paused steps, confirmation for acknowledged runs, and clear unavailable/conflict responses.
-- [ ] Add the email button, anonymous recipient-token preview/POST confirmation, explicit token capability, and recipient-email actor audit using the same business operation.
+- [x] Add immediate-due scheduling shared with deadline expiry, a same-team manual action with expected-step validation, atomic audit, durable publication, and deadline invalidation.
+- [x] Add the UI action for waiting/paused steps, confirmation for acknowledged runs, and clear unavailable/conflict responses.
+- [x] Add the email button, anonymous recipient-token preview/POST confirmation, explicit token capability, and recipient-email actor audit using the same business operation.
+- **Local implementation evidence (2026-10-08):** OPEN and ACKNOWLEDGED Escalate now transitions lock the run, validate expected source/target steps and relevant deadlines, reuse immediate scheduling, clear resolution ownership when needed, and record actor/source/target audit metadata. Email action tokens use the existing hash storage with an explicit capability and expected target; preview remains read-only while POST rechecks scope under the run lock. Focused tests and the full local suite (224 tests, 0 failures/errors, 17 environment-gated skips) pass; PostgreSQL/deployed concurrency, rollback, restart, and broker checks remain environment-gated.
 - Acceptance: OPEN and ACKNOWLEDGED cases both make only the intended next step due immediately from UI or email. Email eligibility uses the current source's acknowledgement/resolution window and is revalidated on POST; expired windows make the action unavailable without hiding the scoped preview. No next step means no change; sent/terminal steps cannot be reopened. Opening/scanning the link is read-only. Invalid/foreign/stale tokens, repeated confirmations, changed preview targets, concurrent resolution/timeout/send, publication failure, and restart do not skip or resend steps or duplicate action audit events.
 
 ### 10. Complete escalation/email UI
