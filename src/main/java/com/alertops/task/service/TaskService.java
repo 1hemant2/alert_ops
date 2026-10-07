@@ -23,6 +23,12 @@ import org.springframework.data.domain.Page;
 @Service
 public class TaskService {
     private static final Pattern HTTP_URL = Pattern.compile("https?://[^\\s]+", Pattern.CASE_INSENSITIVE);
+    public static final int MAX_TASK_NAME_LENGTH = 120;
+    public static final int MAX_TASK_DESCRIPTION_LENGTH = 1000;
+    public static final int MAX_TASK_SOURCE_LENGTH = 120;
+    public static final int MAX_TASK_PRIORITY_LENGTH = 20;
+    public static final int MAX_TASK_CATEGORY_LENGTH = 80;
+    public static final int MAX_TASK_REFERENCE_URL_LENGTH = 2048;
     private final TaskRepository taskRepository;
 
     public TaskService(TaskRepository taskRepository) {
@@ -30,6 +36,7 @@ public class TaskService {
     }
 
 
+    // Creates a manually submitted task after validating every user-editable field.
     @Transactional
     public Task createTask(String name, String description, String source, String priority,
                            String category, String referenceUrl) {
@@ -38,7 +45,7 @@ public class TaskService {
             if(authContext.getTeamId() == null) {
                 throw TaskException.creationFailed(new RuntimeException("User not part of any team"));
             }
-            validateTaskFields(name, source, priority, category, referenceUrl);
+            validateTaskFields(name, description, source, priority, category, referenceUrl);
             Task task = new Task();
             task.setName(name);
             task.setDescription(description);
@@ -105,11 +112,13 @@ public class TaskService {
         }
     }
 
+    // Updates a task name only when the replacement satisfies the task name rules.
     @Transactional
     public TaskResponseDto updateTaskName(UUID taskId, String updatedName) {
         try {
             AuthContext authContext = AuthContextHolder.get();
             UUID teamId = authContext.getTeamId();
+            validateTaskFields(updatedName, null, null, null, null, null);
             taskRepository.updateTaskName(taskId, updatedName, teamId);
             return  getTaskById(taskId);
         } catch(Exception e) {
@@ -118,11 +127,13 @@ public class TaskService {
         }
     }
 
+    // Updates a task description only when it remains within the shared size limit.
     @Transactional
     public TaskResponseDto updateTaskDescription(UUID taskId, String updatedDescription) {
         try {
             AuthContext authContext = AuthContextHolder.get();
             UUID teamId = authContext.getTeamId();
+            validateTaskFields("valid", updatedDescription, null, null, null, null);
             taskRepository.updateTaskDescription(taskId, updatedDescription, teamId);
             return  getTaskById(taskId);
         } catch(Exception e) {
@@ -131,12 +142,13 @@ public class TaskService {
         }
     }
 
+    // Updates task metadata after applying the same limits used during task creation.
     @Transactional
     public TaskResponseDto updateTaskDetails(UUID taskId, String source, String priority,
                                              String category, String referenceUrl) {
         try {
             AuthContext authContext = AuthContextHolder.get();
-            validateTaskFields("valid", source, priority, category, referenceUrl);
+            validateTaskFields("valid", null, source, priority, category, referenceUrl);
             taskRepository.updateTaskDetails(taskId, blank(source) ? "Manual" : source.trim(),
                     trimToNull(priority), trimToNull(category), trimToNull(referenceUrl),
                     authContext.getTeamId());
@@ -146,18 +158,27 @@ public class TaskService {
         }
     }
 
-    private void validateTaskFields(String name, String source, String priority, String category,
-                                    String referenceUrl) {
-        if (blank(name) || name.trim().length() > 120) {
-            throw new IllegalArgumentException("Task title is required and must be 120 characters or fewer");
+    // Validates the shared task field limits used by manual and webhook creation paths.
+    private void validateTaskFields(String name, String description, String source, String priority,
+                                    String category, String referenceUrl) {
+        if (blank(name) || name.trim().length() > MAX_TASK_NAME_LENGTH) {
+            throw new IllegalArgumentException("Task title is required and must be "
+                    + MAX_TASK_NAME_LENGTH + " characters or fewer");
         }
-        if (!blank(source) && source.trim().length() > 120) {
-            throw new IllegalArgumentException("Source must be 120 characters or fewer");
+        if (!blank(description) && description.trim().length() > MAX_TASK_DESCRIPTION_LENGTH) {
+            throw new IllegalArgumentException("Description must be "
+                    + MAX_TASK_DESCRIPTION_LENGTH + " characters or fewer");
         }
-        if (!blank(category) && category.trim().length() > 80) {
-            throw new IllegalArgumentException("Category must be 80 characters or fewer");
+        if (!blank(source) && source.trim().length() > MAX_TASK_SOURCE_LENGTH) {
+            throw new IllegalArgumentException("Source must be " + MAX_TASK_SOURCE_LENGTH + " characters or fewer");
         }
-        if (!blank(referenceUrl) && (referenceUrl.trim().length() > 2048
+        if (!blank(priority) && priority.trim().length() > MAX_TASK_PRIORITY_LENGTH) {
+            throw new IllegalArgumentException("Priority must be " + MAX_TASK_PRIORITY_LENGTH + " characters or fewer");
+        }
+        if (!blank(category) && category.trim().length() > MAX_TASK_CATEGORY_LENGTH) {
+            throw new IllegalArgumentException("Category must be " + MAX_TASK_CATEGORY_LENGTH + " characters or fewer");
+        }
+        if (!blank(referenceUrl) && (referenceUrl.trim().length() > MAX_TASK_REFERENCE_URL_LENGTH
                 || !HTTP_URL.matcher(referenceUrl.trim()).matches())) {
             throw new IllegalArgumentException("Reference URL must be a valid HTTP(S) URL");
         }
