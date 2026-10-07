@@ -1,46 +1,48 @@
 # Current task plan
 
-## Task: Extend escalation audit event coverage
+## Task: Add the escalation activity history read API
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Record the missing user-visible escalation lifecycle events at the operation
-that owns each state change. Keep the generic audit model, avoid a timeline
-read API or UI in this task, and do not commit the changes.
+Expose the saved escalation audit history to authorized team members. Reuse the
+existing audit table and lifecycle metadata; keep this task read-only, avoid
+the timeline UI, and do not commit the changes.
 
 ### Decision-compliance note
 
-- Audit rows remain append-only and join the owning lifecycle transaction.
-- PostgreSQL domain state remains canonical; audit metadata preserves step and
-  recipient facts without reconstructing history from current flow definitions.
-- Do not add an outbox, second event store, or duplicate status/timestamp fields.
-- Retry and duplicate paths must record meaningful attempts without inventing
-  duplicate successful lifecycle events.
+- The audit table is the canonical history source; the API must not rebuild
+  history from current escalation or flow state.
+- Access is authorized through the existing authenticated team context and the
+  escalation's owning team; recipient tokens do not grant history access.
+- Do not add a second event store, duplicate lifecycle fields, or raw token,
+  secret, diagnostic, or stack-trace output.
+- Preserve the audit row's stable ordering and safe metadata while allowing
+  pagination over the existing append-only records.
 
 ### Acceptance criteria
 
-- Creation, send acceptance/failure/retry, acknowledgement/deadline, manual
-  escalation, resolution/timeout, scheduling, start, cancellation, completion,
-  exhaustion, and start failure have safe audit coverage.
-- Events include actor/system, affected step or recipient where applicable, and
-  stable safe metadata; raw tokens and diagnostics stay out of history.
-- Existing idempotency and transaction behavior remains unchanged.
-- Focused tests, package build, and whitespace checks pass.
+- An authenticated member can read one escalation's history only when it
+  belongs to the selected team.
+- Results are safely mapped, ordered by occurred time and audit id, and paged
+  without leaking raw tokens, secrets, or diagnostics.
+- Anonymous, token-only, missing, and foreign-team requests are rejected using
+  existing access behavior; reads do not create state or audit events.
+- Focused API/service tests, package build, and whitespace checks pass.
 
 ### Steps
 
-- [x] Inventory existing event ownership and add only missing actions/calls.
-- [x] Add focused audit assertions for new meaningful events.
+- [x] Design the smallest safe repository query, DTO, service, and endpoint.
+- [x] Add authorization, pagination, mapping, and leakage tests.
 - [x] Run verification and update readiness/changelog without committing.
 
 ### Verification and limitations
 
-- Focused lifecycle, consumer, acknowledgement, resolution, timeout, manual
-  escalation, start-failure, and audit tests passed.
-- `./mvnw -q package` and `git diff --check` passed. PostgreSQL/RabbitMQ/Redis
-  integration tests remain environment-gated and deployed verification is still
-  pending.
-- No independent read-only verifier was available; no commit was created.
+- Focused history service/controller tests passed for authorization, pagination,
+  stable ordering, actor mapping, and sensitive-detail removal.
+- `./mvnw -q package` passed: 232 tests, 0 failures/errors, and 17
+  environment-gated skips. `git diff --check` passed.
+- PostgreSQL/deployed verification and independent read-only verification remain
+  unavailable; no commit was created.

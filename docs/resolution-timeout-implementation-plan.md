@@ -304,7 +304,8 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 12. Add the activity history read API
 
-- [ ] Add same-team access checks, safe timeline DTOs, stable ordering, pagination, and grouped-attempt detail support using the existing audit repository.
+- [x] Add same-team access checks, safe timeline DTOs, stable ordering, pagination, and grouped-attempt detail support using the existing audit repository.
+- **Local implementation evidence (2026-10-08):** `GET /api/v1/escalation/{escalationId}/history` verifies the selected team before querying audit rows, returns stable `occurredAt`/`id` pages, classifies user/system actors, structures safe step and retry details, and removes token-like metadata. Focused history tests and the full Maven package pass; PostgreSQL/deployed verification remains pending.
 - Acceptance: foreign-team/anonymous/token-only access cannot expose history; event order and retry counts remain correct across pages; raw diagnostics and secrets are excluded.
 
 ### 13. Build the readable activity timeline

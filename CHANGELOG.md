@@ -4,6 +4,11 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Add escalation activity history API
+
+- Add a read-only, same-team paginated escalation history endpoint with stable ordering, explicit user/system actors, structured safe details, and removal of token-like metadata.
+- Verification: focused history tests, full Maven package (232 tests, 0 failures/errors, 17 environment-gated skips), and diff checks pass; PostgreSQL/deployed verification remains pending. Changes are intentionally uncommitted.
+
 ## 2026-10-08 — Extend escalation audit event coverage
 
 - Add creation, notification acceptance/failure/retry, and final exhaustion events with safe step, recipient, attempt, deadline, and system/actor context; preserve existing acknowledgement, manual escalation, resolution, timeout, scheduling, start, cancellation, and start-failure events.
