@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Complete incident lifecycle test coverage
+
+- Add focused authorization and lifecycle-boundary tests for anonymous access, foreign-team starts, early scheduled starts, and preserving scheduler wake-ups when a start fails; retain the existing race, idempotency, acknowledgement, resolution, and timeout coverage.
+- Mark incident lifecycle implementation complete locally while keeping PostgreSQL and deployed verification open.
+- Verification: lifecycle-focused tests, full Maven package, and diff checks pass; PostgreSQL/deployed integration and independent read-only verification remain unavailable. Changes are intentionally uncommitted.
+
 ## 2026-10-08 — Add escalation activity timeline UI
 
 - Add a read-only escalation activity section backed by the paginated history API, with plain milestone wording, actor/time/details, retry grouping, expandable attempts, empty/error/loading states, refresh, and load-more behavior.
