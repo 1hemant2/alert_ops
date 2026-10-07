@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Add escalation activity timeline UI
+
+- Add a read-only escalation activity section backed by the paginated history API, with plain milestone wording, actor/time/details, retry grouping, expandable attempts, empty/error/loading states, refresh, and load-more behavior.
+- Keep current saved step progress separate and invalidate activity history after lifecycle actions; token-like and raw metadata remain excluded from the UI.
+- Verification: UI build, UI lint, full Maven package, and diff checks pass; lint has two pre-existing flow-page warnings, browser/deployed verification remains pending, and no independent read-only verifier was available. Changes are intentionally uncommitted.
+
 ## 2026-10-08 — Add escalation activity history API
 
 - Add a read-only, same-team paginated escalation history endpoint with stable ordering, explicit user/system actors, structured safe details, and removal of token-like metadata.

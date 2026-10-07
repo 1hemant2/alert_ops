@@ -1,48 +1,46 @@
 # Current task plan
 
-## Task: Add the escalation activity history read API
+## Task: Build the escalation activity timeline UI
 
 Started: 2026-10-08
 Status: Complete
 
 ### Goal and scope
 
-Expose the saved escalation audit history to authorized team members. Reuse the
-existing audit table and lifecycle metadata; keep this task read-only, avoid
-the timeline UI, and do not commit the changes.
+Show the saved escalation activity history on the escalation detail page. Reuse
+the existing history API and current step-progress display; keep this task
+read-only, keep deployment out of scope, and do not commit the changes.
 
 ### Decision-compliance note
 
-- The audit table is the canonical history source; the API must not rebuild
-  history from current escalation or flow state.
-- Access is authorized through the existing authenticated team context and the
-  escalation's owning team; recipient tokens do not grant history access.
-- Do not add a second event store, duplicate lifecycle fields, or raw token,
-  secret, diagnostic, or stack-trace output.
-- Preserve the audit row's stable ordering and safe metadata while allowing
-  pagination over the existing append-only records.
+- The history API is the canonical source for activity; the UI must not infer
+  past events from current escalation or editable flow state.
+- Keep the existing execution-step data as a separate “Step progress” view.
+- Use the API's safe actor/details fields; never render token hashes, secrets,
+  diagnostics, or raw metadata strings.
+- Preserve server pagination/order and keep history reads read-only.
 
 ### Acceptance criteria
 
-- An authenticated member can read one escalation's history only when it
-  belongs to the selected team.
-- Results are safely mapped, ordered by occurred time and audit id, and paged
-  without leaking raw tokens, secrets, or diagnostics.
-- Anonymous, token-only, missing, and foreign-team requests are rejected using
-  existing access behavior; reads do not create state or audit events.
-- Focused API/service tests, package build, and whitespace checks pass.
+- The detail page shows important milestones with plain event wording, actor,
+  time, recipient/step details, and retry counts.
+- Repeated failures/retries are grouped by execution step with expandable
+  attempt details, while all saved events remain available.
+- Loading, empty, error, refresh, and load-more states are understandable and
+  do not change escalation state.
+- UI build, focused checks, backend package, and whitespace checks pass.
 
 ### Steps
 
-- [x] Design the smallest safe repository query, DTO, service, and endpoint.
-- [x] Add authorization, pagination, mapping, and leakage tests.
+- [x] Add the API client/types and milestone/retry presentation helpers.
+- [x] Add the history section, state handling, and focused UI verification.
 - [x] Run verification and update readiness/changelog without committing.
 
 ### Verification and limitations
 
-- Focused history service/controller tests passed for authorization, pagination,
-  stable ordering, actor mapping, and sensitive-detail removal.
-- `./mvnw -q package` passed: 232 tests, 0 failures/errors, and 17
-  environment-gated skips. `git diff --check` passed.
-- PostgreSQL/deployed verification and independent read-only verification remain
-  unavailable; no commit was created.
+- `npm run build` and `npm run lint` passed; lint reported two pre-existing
+  warnings in `ui/src/features/flows/FlowDetailPage.tsx`.
+- `./mvnw -q package` and `git diff --check` passed. Browser/deployed
+  verification remains unavailable, and no independent read-only verifier was
+  available in this environment.
+- Changes remain uncommitted because the user did not request a commit.
