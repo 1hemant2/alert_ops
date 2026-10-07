@@ -68,6 +68,7 @@ public class EscalationService {
     }
 
     @Transactional
+    // Creates an idle escalation and records who or what created it.
     public Escalation createEscalationForTeam(
             String name, UUID taskId, UUID flowId, UUID teamId) {
         if (teamId == null
@@ -83,7 +84,21 @@ public class EscalationService {
         escalation.setTeamId(teamId);
         escalation.setResolutionType(null);
         escalation.setStatus(EscalationStatus.IDLE);
-        return escalationRepository.save(escalation);
+        Escalation saved = Objects.requireNonNull(
+                escalationRepository.save(escalation), "Saved escalation is required");
+        AuthContext actor = AuthContextHolder.get();
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION,
+                saved.getId(),
+                AuditAction.CREATED,
+                null,
+                EscalationStatus.IDLE.name(),
+                actor == null ? null : actor.getUserId(),
+                actor == null ? null : actor.getEmail(),
+                clock.instant(),
+                null,
+                "taskId=" + taskId + ";flowId=" + flowId));
+        return saved;
     }
 
     @Transactional

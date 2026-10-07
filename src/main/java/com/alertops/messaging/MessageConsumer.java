@@ -11,6 +11,10 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEntityType;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
@@ -28,6 +32,7 @@ public class MessageConsumer {
    private final StepSchedulingService stepSchedulingService;
    private final EscalationAcknowledgementService acknowledgementService;
    private final EscalationTimeoutService timeoutService;
+   private final AuditService auditService;
    private final Clock clock;
 
 
@@ -36,6 +41,7 @@ public class MessageConsumer {
         Notification notification, StepSchedulingService stepSchedulingService,
         EscalationAcknowledgementService acknowledgementService,
         EscalationTimeoutService timeoutService,
+        AuditService auditService,
         Clock clock
     ) {
         this.flowExecutionStateRepository = flowExecutionStateRepository;
@@ -44,6 +50,7 @@ public class MessageConsumer {
         this.stepSchedulingService = stepSchedulingService;
         this.acknowledgementService = acknowledgementService;
         this.timeoutService = timeoutService;
+        this.auditService = auditService;
         this.clock = clock;
     }
 
@@ -114,6 +121,13 @@ public class MessageConsumer {
                         flowExecutionState.getDuration());
                 flowExecutionState.setDueAt(acknowledgementTimeoutAt);
                 flowExecutionStateRepository.save(flowExecutionState);
+                recordStepAudit(
+                        escalation,
+                        AuditAction.NOTIFICATION_SENT,
+                        FlowExecutionStepStatus.SENDING,
+                        FlowExecutionStepStatus.SENT,
+                        flowExecutionState,
+                        "acknowledgementTimeoutAt=" + flowExecutionState.getDueAt());
                 timeoutService.scheduleAcknowledgementTimeout(
                         escalation.getId(), flowExecutionState.getId(), acknowledgementTimeoutAt);
             } else {
@@ -123,21 +137,88 @@ public class MessageConsumer {
                 flowExecutionState.setDueAt(Objects.requireNonNull(
                         scheduledNextNode.getDueAt(), "Scheduled next response step requires a due time"));
                 flowExecutionStateRepository.save(flowExecutionState);
+                recordStepAudit(
+                        escalation,
+                        AuditAction.NOTIFICATION_SENT,
+                        FlowExecutionStepStatus.SENDING,
+                        FlowExecutionStepStatus.SENT,
+                        flowExecutionState,
+                        "acknowledgementTimeoutAt=" + flowExecutionState.getDueAt());
             }
         } else if (retryOnFailureEnabled && sendAttemptCount < maxRetryAttempts) {
             flowExecutionStateRepository.save(flowExecutionState);
-            stepSchedulingService.scheduleStep(flowExecutionState);
+            FlowExecutionState retryState = Objects.requireNonNull(
+                    stepSchedulingService.scheduleStep(flowExecutionState),
+                    "Scheduled retry step is required");
+            recordStepAudit(
+                    escalation,
+                    AuditAction.NOTIFICATION_FAILED,
+                    FlowExecutionStepStatus.SENDING,
+                    FlowExecutionStepStatus.SCHEDULED,
+                    flowExecutionState,
+                    "failure=DELIVERY_FAILED;retryAt=" + retryState.getDueAt());
+            recordStepAudit(
+                    escalation,
+                    AuditAction.NOTIFICATION_RETRY_SCHEDULED,
+                    FlowExecutionStepStatus.SENDING,
+                    FlowExecutionStepStatus.SCHEDULED,
+                    flowExecutionState,
+                    "nextAttempt=" + flowExecutionState.getSendAttemptCount()
+                            + ";retryAt=" + retryState.getDueAt());
         } else {
             flowExecutionState.setStatus(FlowExecutionStepStatus.FAILED);
             flowExecutionStateRepository.save(flowExecutionState);
+            recordStepAudit(
+                    escalation,
+                    AuditAction.NOTIFICATION_FAILED,
+                    FlowExecutionStepStatus.SENDING,
+                    FlowExecutionStepStatus.FAILED,
+                    flowExecutionState,
+                    "failure=DELIVERY_FAILED");
             if (nextNode == null) {
                 escalation.setStatus(EscalationStatus.COMPLETED);
                 escalation.setResolutionType(EscalationResolutionType.EXHAUSTED);
                 escalationRepository.save(escalation);
+                auditService.record(new AuditEvent(
+                        AuditEntityType.ESCALATION,
+                        escalation.getId(),
+                        AuditAction.COMPLETED,
+                        EscalationStatus.OPEN.name(),
+                        EscalationStatus.COMPLETED.name(),
+                        null,
+                        null,
+                        clock.instant(),
+                        "EXHAUSTED",
+                        "failedStepId=" + flowExecutionState.getId()
+                                + ";resolutionType=" + EscalationResolutionType.EXHAUSTED.name()));
             } else {
                 stepSchedulingService.scheduleStep(nextNode);
             }
         }
+    }
+
+    // Records one automatic step-delivery event without exposing tokens or diagnostics.
+    private void recordStepAudit(
+            Escalation escalation,
+            AuditAction action,
+            FlowExecutionStepStatus previousStatus,
+            FlowExecutionStepStatus newStatus,
+            FlowExecutionState step,
+            String details) {
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION,
+                escalation.getId(),
+                action,
+                previousStatus.name(),
+                newStatus.name(),
+                null,
+                null,
+                clock.instant(),
+                null,
+                "executionStepId=" + step.getId()
+                        + ";recipientEmail=" + step.getUserEmail()
+                        + ";attempt=" + step.getSendAttemptCount()
+                        + ";" + details));
     }
 
     // Calculates when the final step acknowledgement wait ends.
