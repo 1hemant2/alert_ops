@@ -298,7 +298,8 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 11. Extend audit event coverage
 
-- [ ] Add the missing action enums and safe event details; record creation, sends/retries, acknowledgement/deadline, manual escalation, resolution/timeout, and completion events at their owning operations.
+- [x] Add the missing action enums and safe event details; record creation, sends/retries, acknowledgement/deadline, manual escalation, resolution/timeout, and completion events at their owning operations.
+- **Local implementation evidence (2026-10-08):** Creation now records the authenticated actor when available and system creation otherwise; automatic notification acceptance, failure, retry scheduling, and final exhaustion record step, recipient, attempt, and saved wait metadata without tokens or diagnostics. Existing acknowledgement events retain the resolution deadline, while existing timeout/manual/resolution events remain unchanged. Focused lifecycle and audit tests pass; normal package and deployed rollback/concurrency verification remain pending.
 - Acceptance: domain updates and audit roll back together; idempotent/stale paths do not repeat events; step context survives flow edits; email and system actors are labelled correctly. Include audit assertions with each implementation task instead of waiting until the UI is built.
 
 ### 12. Add the activity history read API
@@ -369,12 +370,13 @@ This document specifies the agreed lifecycle and tracks implementation. Manual
 start now accepts same-team `IDLE` and `SCHEDULED` runs, while automatic scheduled
 start remains due-gated. Execution steps use the single persisted
 `FlowExecutionStepStatus` enum. Runtime snapshots, acknowledgement pause,
-explicit resolution, and deadline expiry/recovery are implemented locally;
-Escalate now and the activity timeline remain unimplemented.
-Audit actions cover scheduling, rescheduling, start, cancellation, start failure,
-acknowledgement, resolution, and timeout expiry; the detail-page execution
-timeline shows current step rows rather than event history. No Escalate now or
-full activity-timeline implementation/test success is claimed here. Start now,
+explicit resolution, deadline expiry/recovery, and Escalate now are implemented
+locally; the activity timeline remains unimplemented.
+Audit actions now cover creation, scheduling, rescheduling, start, cancellation,
+start failure, notification acceptance/failure/retry, acknowledgement,
+resolution, timeout expiry, and final exhaustion; the detail-page execution
+timeline shows current step rows rather than event history. No full activity-
+timeline read API/UI implementation or test success is claimed here. Start now,
 acknowledgement pause, explicit resolution, and deadline expiry/recovery have
 local implementation and focused-test evidence only; PostgreSQL/deployed
 verification is pending.

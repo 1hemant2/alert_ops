@@ -1,44 +1,46 @@
 # Current task plan
 
-## Task: Complete escalation and email UI
+## Task: Extend escalation audit event coverage
 
 Started: 2026-10-08
-Status: In progress
+Status: Complete
 
 ### Goal and scope
 
-Complete the agreed acknowledgement/resolution experience in the team detail
-page and recipient email page. Reuse the existing resolution endpoints and
-server lifecycle state; keep deployment out of scope.
+Record the missing user-visible escalation lifecycle events at the operation
+that owns each state change. Keep the generic audit model, avoid a timeline
+read API or UI in this task, and do not commit the changes.
 
 ### Decision-compliance note
 
-- `Escalation.status`, `resolutionDeadline`, `issueSolvedBy`, and
-  `acknowledgedStepId` remain the server-owned source of truth.
-- Only `ACKNOWLEDGED` runs expose resolution controls; disabled resolution
-  remains the existing terminal acknowledgement behavior.
-- Recipient tokens remain scoped to the current acknowledgement and cannot
-  grant team history or change lifecycle state through the UI.
+- Audit rows remain append-only and join the owning lifecycle transaction.
+- PostgreSQL domain state remains canonical; audit metadata preserves step and
+  recipient facts without reconstructing history from current flow definitions.
+- Do not add an outbox, second event store, or duplicate status/timestamp fields.
+- Retry and duplicate paths must record meaningful attempts without inventing
+  duplicate successful lifecycle events.
 
 ### Acceptance criteria
 
-- Team members can see acknowledgement ownership/deadline and resolve an
-  acknowledged run from the detail page.
-- The recipient link distinguishes acknowledgement, active resolution, and
-  resolved/completed outcomes with clear errors and deadline messaging.
-- Step progress explains paused, skipped, sent, and failed states without
-  inventing history from editable flow data.
-- Escalate now preview/action restrictions remain visible and understandable.
+- Creation, send acceptance/failure/retry, acknowledgement/deadline, manual
+  escalation, resolution/timeout, scheduling, start, cancellation, completion,
+  exhaustion, and start failure have safe audit coverage.
+- Events include actor/system, affected step or recipient where applicable, and
+  stable safe metadata; raw tokens and diagnostics stay out of history.
+- Existing idempotency and transaction behavior remains unchanged.
+- Focused tests, package build, and whitespace checks pass.
 
 ### Steps
 
-- [x] Add resolution API/types and saved deadline to recipient preview data.
-- [x] Add team and recipient resolve controls and clear lifecycle messages.
-- [x] Explain step states and improve stale/expired action messaging.
-- [x] Run UI/backend verification, update readiness/changelog, and commit.
+- [x] Inventory existing event ownership and add only missing actions/calls.
+- [x] Add focused audit assertions for new meaningful events.
+- [x] Run verification and update readiness/changelog without committing.
 
-### Intended verification and limitations
+### Verification and limitations
 
-`npm run build`, focused acknowledgement/resolution security and service tests,
-the backend package build, and `git diff --check` pass. PostgreSQL/deployed
-verification remains pending; no independent read-only verifier is available.
+- Focused lifecycle, consumer, acknowledgement, resolution, timeout, manual
+  escalation, start-failure, and audit tests passed.
+- `./mvnw -q package` and `git diff --check` passed. PostgreSQL/RabbitMQ/Redis
+  integration tests remain environment-gated and deployed verification is still
+  pending.
+- No independent read-only verifier was available; no commit was created.

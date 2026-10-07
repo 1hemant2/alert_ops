@@ -4,6 +4,11 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Extend escalation audit event coverage
+
+- Add creation, notification acceptance/failure/retry, and final exhaustion events with safe step, recipient, attempt, deadline, and system/actor context; preserve existing acknowledgement, manual escalation, resolution, timeout, scheduling, start, cancellation, and start-failure events.
+- Verification: focused lifecycle/audit tests, full Maven package, and diff checks pass; infrastructure-gated and deployed verification remain pending. Changes are intentionally uncommitted.
+
 ## 2026-10-08 — Complete escalation and email UI
 
 - Add team and recipient resolution controls, saved resolution-deadline display, lifecycle-aware acknowledgement messaging, and readable paused/sent/failed/skipped step explanations.
