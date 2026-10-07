@@ -1,7 +1,7 @@
 # Escalation lifecycle: resolution timeout, manual actions, and activity timeline
 
 Created: 2026-10-05
-Status: In progress — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; task 6 is implemented locally and later tasks remain pending.
+Status: In progress — lifecycle timing, manual actions, timeline, response deadlines, email source eligibility, existing team permissions, and final storage details agreed; tasks 6 and 7 are implemented locally and later tasks remain pending.
 Release priorities: [scheduled starts](product-launch-readiness.md#1-scheduled-escalation-start),
 [resolution timeout](product-launch-readiness.md#3-resolution-timeout-after-acknowledgement), and
 [Escalate now](product-launch-readiness.md#4-escalate-now), and
@@ -272,8 +272,9 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 7. Implement explicit resolution
 
-- [ ] Add the agreed resolve action, actor/time persistence, idempotency, authorization, skipped steps, audit, and after-commit timer cancellation.
+- [x] Add the agreed resolve action, actor/time persistence, idempotency, authorization, skipped steps, audit, and after-commit timer cancellation.
 - Acceptance: authenticated same-team members and the current acknowledging email recipient can resolve before the saved deadline; another team or an obsolete email owner cannot. Terminal runs stay terminal; resolution and timeout have one winner. No new role/state is introduced.
+- **Local implementation evidence (2026-10-07):** `EscalationResolutionService` exposes separate team-member and recipient-token operations, locks the run, enforces the saved resolution deadline and current acknowledgement owner, transitions `ACKNOWLEDGED → RESOLVED`, persists resolving actor/time, clears active acknowledgement ownership, skips pending/scheduled/paused steps, records a `RESOLVED` audit event with the pre-clear step/source/token-hash facts, and cancels step wake-ups after commit. Recipient action eligibility uses the saved resolution deadline rather than token TTL; repeated recipient resolution requires the exact saved token hash plus the accepted step/source recorded in the resolution audit. Repeated same-actor resolution returns the saved result without another write; foreign-team, obsolete-token, late, terminal, and anonymous team requests are rejected. Focused service/controller/security tests pass; independent read-only review was **Inconclusive** only for PostgreSQL/deployed concurrency and rollback because those checks are environment-gated. Deadline expiry/recovery and UI remain later work.
 
 ### 8. Implement deadline expiry and recovery
 
@@ -364,14 +365,14 @@ transition/audit event and no additional send.
 This document specifies the agreed lifecycle and tracks implementation. Manual
 start now accepts same-team `IDLE` and `SCHEDULED` runs, while automatic scheduled
 start remains due-gated. Execution steps use the single persisted
-`FlowExecutionStepStatus` enum. Runtime snapshots and acknowledgement pause are
-implemented locally; explicit resolution, deadline expiry/recovery, Escalate now,
-and the activity timeline remain unimplemented.
+`FlowExecutionStepStatus` enum. Runtime snapshots, acknowledgement pause, and
+explicit resolution are implemented locally; deadline expiry/recovery, Escalate
+now, and the activity timeline remain unimplemented.
 Audit actions cover scheduling, rescheduling, start, cancellation, start failure,
-and acknowledgement; the detail-page execution timeline shows current step rows
-rather than event history. No explicit resolution, deadline expiry/recovery,
-Escalate now, or full activity-timeline implementation/test success is claimed
-here. Start now and acknowledgement pause have local implementation and
+acknowledgement, and resolution; the detail-page execution timeline shows current
+step rows rather than event history. No deadline expiry/recovery, Escalate now, or
+full activity-timeline implementation/test success is claimed here. Start now,
+acknowledgement pause, and explicit resolution have local implementation and
 focused-test evidence only; PostgreSQL/deployed verification is pending.
 
 Relevant entry points: [flow model](../src/main/java/com/alertops/flow/model/Flow.java), [node model](../src/main/java/com/alertops/flow/model/Node.java), [start service](../src/main/java/com/alertops/flow_execution_engine/service/FlowExecutionStateService.java), [acknowledgement service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationAcknowledgementService.java), [consumer](../src/main/java/com/alertops/messaging/MessageConsumer.java), and [step scheduling service](../src/main/java/com/alertops/messaging/StepSchedulingService.java).

@@ -4,6 +4,12 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-07 — Implement explicit resolution
+
+- Add locked team-member and recipient-token resolution from `ACKNOWLEDGED` to `RESOLVED`, with actor/time persistence, active-owner clearing, unsent-step skipping, audit history, and post-commit wake-up cancellation.
+- Enforce the saved resolution deadline and exact current recipient/step ownership; use the saved deadline rather than token TTL for action eligibility and require exact accepted token-hash/step/source audit evidence for idempotent recipient replays.
+- Verification: focused resolution/security tests, full Maven tests (177 tests, 0 failures/errors), backend package, UI build, and documentation checks pass. Independent read-only review was **Inconclusive** only for PostgreSQL/deployed migration, rollback, and concurrency behavior because PostgreSQL/RabbitMQ/Redis integration checks remain environment-gated.
+
 ## 2026-10-07 — Implement acknowledgement pause
 
 - Add the enabled `ACKNOWLEDGED` lifecycle transition, exact current-step validation, saved resolution owner/deadline, next-step pause, and post-commit wake-up cancellation while preserving disabled terminal acknowledgement behavior.

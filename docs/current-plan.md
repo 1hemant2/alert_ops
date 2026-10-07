@@ -1,39 +1,39 @@
 # Current task plan
 
-## Task: Implement acknowledgement pause
+## Task: Implement explicit resolution
 
-Started: 2026-10-06
-Status: Complete
+Started: 2026-10-07
+Status: Complete locally; PostgreSQL/deployed verification pending
 
 ### Goal and scope
 
-Implement task 6 in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#6-implement-acknowledgement-pause): use the saved runtime toggle and exact execution-step token to preserve disabled acknowledgement behavior, or transition enabled runs to `ACKNOWLEDGED`, claim the current owner, pause the next step, and save the resolution deadline. Do not implement explicit resolution, deadline expiry/recovery, Escalate now, or the related UI here.
+Implement task 7 in the [resolution-timeout plan](resolution-timeout-implementation-plan.md#7-implement-explicit-resolution): add an explicit resolve operation for authenticated same-team members and the current acknowledging email recipient. Transition an enabled run from `ACKNOWLEDGED` to `RESOLVED`, persist the resolving actor/time, skip remaining unsent steps, audit the change, and cancel paused wake-ups after commit. Do not implement deadline expiry/recovery, Escalate now, or the related UI here.
 
 ### Binding decisions
 
-- Disabled acknowledgement remains terminal `OPEN → COMPLETED` with `ACKNOWLEDGED`; enabled acknowledgement becomes `OPEN → ACKNOWLEDGED`.
-- Validate the exact sent step and recipient token under the run lock. The acknowledgement owner is the saved execution-step/recipient context.
-- For enabled runs, pause the next scheduled step if present, retain later steps as pending, and save the UTC resolution deadline from that step's snapshotted timeout.
-- Persist the lifecycle transition and audit facts atomically; cancel or replace wake-ups only after commit. Repeated acknowledgement must not extend the deadline.
+- `RESOLVED` is the self-describing terminal lifecycle state; `resolutionType` remains null and active acknowledgement ownership is cleared.
+- Team resolution requires an authenticated member of the escalation's selected team. Email resolution requires the exact saved acknowledgement token, recipient, and acknowledged execution step.
+- Resolution is allowed strictly before the saved UTC resolution deadline. A repeated resolution by the same actor returns the saved result without changing state; other actors receive a conflict.
+- Skip all remaining `PENDING`, `SCHEDULED`, or `PAUSED` steps and cancel their in-memory wake-ups only after the transaction commits. Persist the transition, resolving actor/time, and audit event atomically; retain the acknowledged step/source/token-hash facts in safe audit metadata.
 
 ### Acceptance criteria
 
-- Disabled acknowledgement still completes as before.
-- Enabled acknowledgement pauses progression, including on the final node, and records one resolution deadline and owner.
-- Duplicate/repeated acknowledgement is idempotent and does not extend the deadline.
-- A stale send or callback cannot bypass the pause.
+- Authenticated same-team and current acknowledging recipient resolution both succeed before the deadline.
+- Resolution stores actor/time, changes `ACKNOWLEDGED → RESOLVED`, clears active acknowledgement ownership, and skips unsent steps.
+- Repeated same-actor resolution is idempotent; foreign-team, obsolete-owner, late, and terminal requests do not change state.
+- A concurrent resolution/timeout or delivery callback has one winner and cannot produce duplicate audit or delivery work.
 
 ### Steps
 
-- [x] Inspect the acknowledgement service, run/step repositories, scheduler callbacks, audit service, and existing tests.
-- [x] Implement the locked transition, exact-step validation, pause, deadline, ownership, and post-commit wake-up handling.
-- [x] Add focused tests for disabled/enabled/final/repeated/stale and in-flight-send paths.
+- [x] Inspect the resolution model, acknowledgement token flow, team authorization, repositories, scheduler, audit, controllers, and tests.
+- [x] Implement locked team/token resolution, status/actor fields, deadline and owner checks, step skipping, audit, and post-commit wake-up cancellation.
+- [x] Add focused tests for authorization, deadline boundaries, idempotency, stale ownership, terminal states, audit metadata, and post-commit cancellation; rely on PostgreSQL integration coverage for concurrency/rollback when available.
 - [x] Run focused tests, full Maven tests, package/UI builds, documentation checks, and independent read-only verification.
 
 ### Intended verification and limitations
 
-Verification: focused acknowledgement, message-consumer, and timer tests pass (33 tests); full `mvn -q test` passes (160 tests, 17 expected integration skips); `mvn -q -DskipTests package`, `npm run build`, `git diff --check`, and the 60-line plan check pass. Independent read-only verifier verdict: **Achieved**. PostgreSQL (13), RabbitMQ (3), and Redis (1) tests remain environment-gated; migration/concurrency/deployed checks were not available.
+Verification: focused resolution/security tests pass; full `mvn -q test` passes with 177 tests, 0 failures/errors, and 17 environment-gated skips; backend package, UI build, `git diff --check`, plan-length, and redundant-field checks pass. Independent read-only verifier verdict: **Inconclusive** only for PostgreSQL-backed migration/rollback/concurrency because PostgreSQL/RabbitMQ/Redis integrations are skipped and Docker is unavailable. The verifier found no local implementation or test regression.
 
 ### Resume note
 
-After this task, continue with [explicit resolution](resolution-timeout-implementation-plan.md#7-implement-explicit-resolution). Preserve the agreed snapshot and shared `dueAt` timing decisions.
+After this task, continue with [deadline expiry and recovery](resolution-timeout-implementation-plan.md#8-implement-deadline-expiry-and-recovery). Preserve the agreed snapshot, shared `dueAt`, and active-owner semantics.
