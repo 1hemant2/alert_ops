@@ -53,7 +53,10 @@ class NotificationTest {
 
         String markdown = parts.getBodyPart(0).getContent().toString();
         String html = parts.getBodyPart(1).getContent().toString();
+        assertTrue(mimeMessage.getSubject().startsWith("ReplyTrail · "));
         assertTrue(markdown.contains("## Task"));
+        assertTrue(markdown.contains("ReplyTrail has activated a response workflow."));
+        assertTrue(markdown.contains("Automated notification from ReplyTrail."));
         assertTrue(markdown.contains("**backlog**"));
         assertTrue(markdown.contains("P1"));
         assertTrue(markdown.contains("Platform <on-call>"));
@@ -66,6 +69,8 @@ class NotificationTest {
         assertTrue(html.contains("Platform &lt;on-call&gt;"));
         assertTrue(html.contains("https://example.com/requests/123?view=full&amp;tab=alerts"));
         assertTrue(html.contains("ESCALATION NOTIFICATION"));
+        assertTrue(html.contains("REPLYTRAIL"));
+        assertTrue(html.contains("Sent automatically by ReplyTrail."));
         assertTrue(html.contains("Acknowledge escalation"));
         assertTrue(html.contains("href=\"https://alerts.example.com/acknowledge?token=sample-token\""));
         assertTrue(html.contains("Escalate now and notify the next person"));
