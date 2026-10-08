@@ -295,7 +295,7 @@ public class Notification {
                           Sent automatically by ReplyTrail. Please use your team's usual incident response channel.
                         </td></tr>
                       </table>
-                      <div style="padding:16px 8px;color:#8491a2;font-size:11px;">Reliable escalation, made explicit.</div>
+                      <div style="padding:16px 8px;color:#8491a2;font-size:11px;">Keep every response on track.</div>
                     </td></tr>
                   </table>
                 </body>

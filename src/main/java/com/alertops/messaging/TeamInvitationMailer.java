@@ -71,7 +71,7 @@ public class TeamInvitationMailer {
                                       </p>
                                       <p style="color:#718196;font-size:13px;line-height:1.6;">This invitation expires on %s UTC. If you weren't expecting it, you can ignore this email.</p>
                                     </td></tr>
-                                    <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;">Reliable escalation, made explicit.</td></tr>
+                                    <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;">Keep every response on track.</td></tr>
                                   </table>
                                 </td></tr>
                               </table>
