@@ -19,7 +19,8 @@ public interface FlowRepository extends JpaRepository<Flow, UUID> {
 
         @Modifying
         @Query("""
-                UPDATE Flow f SET f.name = :#{#flow.name}, f.updatedBy = :#{#flow.updatedBy}, f.updatedAt = :#{#flow.updatedAt}
+                UPDATE Flow f SET f.name = :#{#flow.name}, f.updatedBy = :#{#flow.updatedBy}, f.updatedAt = :#{#flow.updatedAt},
+                    f.resolutionTimeoutEnabled = :#{#flow.resolutionTimeoutEnabled}
                 WHERE f.id = :#{#flow.id} AND f.teamId = :#{#flow.teamId}
                 """
         )

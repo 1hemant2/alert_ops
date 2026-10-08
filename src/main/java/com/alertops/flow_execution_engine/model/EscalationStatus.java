@@ -5,6 +5,8 @@ public enum EscalationStatus {
     IDLE,
     SCHEDULED,
     OPEN,
+    ACKNOWLEDGED,
+    RESOLVED,
     COMPLETED,
     CANCELLED,
     START_FAILED

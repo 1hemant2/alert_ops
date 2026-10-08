@@ -18,6 +18,7 @@ import com.alertops.flow.application.CreateFlowNodeUseCase;
 import com.alertops.flow.dto.CreateNodeDto;
 import com.alertops.flow.dto.ReorderNodeDto;
 import com.alertops.flow.dto.UpdateNodeDto;
+import com.alertops.flow.dto.UpdateFlowTimingDto;
 import com.alertops.flow.service.FlowService;
 
 @RestController
@@ -68,7 +69,14 @@ public class FlowController {
                 updateNodeDto.getNodeName(),
                 updateNodeDto.getDurationInMinutes(),
                 updateNodeDto.getEmail(),
+                updateNodeDto.getResolutionTimeoutInMinutes(),
                 updateNodeDto.getVersion()));
+    }
+
+    @PutMapping("/{flowId}/timing")
+    public ResponseEntity<?> updateTiming(@PathVariable java.util.UUID flowId,
+                                          @RequestBody UpdateFlowTimingDto updateFlowTimingDto) {
+        return ResponseEntity.ok(flowService.updateTiming(flowId, updateFlowTimingDto));
     }
 
     @DeleteMapping("/node/{nodeId}")

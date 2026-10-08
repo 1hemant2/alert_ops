@@ -1,16 +1,24 @@
 package com.alertops.messaging;
 
+import com.alertops.audit.model.AuditAction;
+import com.alertops.audit.model.AuditEvent;
+import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.Escalation;
+import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.flow_execution_engine.service.EscalationAcknowledgementService;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+
+import org.mockito.ArgumentCaptor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,112 +40,260 @@ class MessageConsumerTest {
     private final Notification notification = mock(Notification.class);
     private final StepSchedulingService stepSchedulingService = mock(StepSchedulingService.class);
     private final EscalationAcknowledgementService acknowledgementService = mock(EscalationAcknowledgementService.class);
+    private final EscalationTimeoutService timeoutService = mock(EscalationTimeoutService.class);
+    private final AuditService auditService = mock(AuditService.class);
     private final MessageConsumer consumer = new MessageConsumer(
-            stateRepository, escalationRepository, notification, stepSchedulingService, acknowledgementService);
+            stateRepository, escalationRepository, notification, stepSchedulingService,
+            acknowledgementService, timeoutService, auditService, Clock.systemUTC());
 
     @Test
+    // Verifies that an older send attempt is ignored.
     void ignoresMessageFromOlderSendAttempt() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 1);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 1);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
 
-        consumer.onMessage(queuedState);
+        consumer.deliverReadyStep(queuedState);
 
         verify(stateRepository, never()).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
         verifyNoInteractions(notification, escalationRepository, stepSchedulingService);
     }
 
     @Test
+    // Verifies that a previously claimed step is not delivered twice.
     void ignoresDeliveryWhenAnotherConsumerHasAlreadyClaimedTheStep() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(0);
 
-        consumer.onMessage(queuedState);
+        consumer.deliverReadyStep(queuedState);
 
         verifyNoInteractions(notification, stepSchedulingService);
         verify(stateRepository, never()).save(currentState);
     }
 
     @Test
+    // Verifies that duplicate ready messages produce one notification.
     void sendsOnlyOnceWhenTheSameMessageArrivesAfterTheStepFinished() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
-        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token")).thenReturn(true);
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null)).thenReturn(true);
 
-        consumer.onMessage(queuedState);
-        consumer.onMessage(queuedState);
+        consumer.deliverReadyStep(queuedState);
+        consumer.deliverReadyStep(queuedState);
 
-        verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token");
+        verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null);
         verify(stateRepository, times(1)).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
-        assertEquals("TERMINAL", currentState.getExecutionState());
-        assertEquals("SENT", currentState.getNotificationState());
+        assertEquals(FlowExecutionStepStatus.SENT, currentState.getStatus());
         assertEquals(1, currentState.getSendAttemptCount());
     }
 
     @Test
+    // Verifies that a successful final send waits for acknowledgement.
+    void successfulFinalSendWaitsForAcknowledgement() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+                .thenReturn(true);
+
+        consumer.deliverReadyStep(queuedState);
+
+        assertEquals(FlowExecutionStepStatus.SENT, currentState.getStatus());
+        verify(timeoutService).scheduleAcknowledgementTimeout(
+                eq(ESCALATION_ID), eq(STEP_ID), eq(currentState.getDueAt()));
+        verify(escalationRepository, never()).save(any(Escalation.class));
+        verify(stepSchedulingService, never()).scheduleStep(any(FlowExecutionState.class));
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(audit.capture());
+        assertEquals(AuditAction.NOTIFICATION_SENT, audit.getValue().action());
+        assertEquals(FlowExecutionStepStatus.SENDING.name(), audit.getValue().previousState());
+        assertEquals(FlowExecutionStepStatus.SENT.name(), audit.getValue().newState());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                audit.getValue().metadata().contains("executionStepId=" + STEP_ID));
+    }
+
+    @Test
+    // Verifies that a non-final send uses the next step due time as its boundary.
+    void nonFinalSendUsesNextStepDueAtForAcknowledgement() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        FlowExecutionState nextState = currentState(
+                FlowExecutionStepStatus.PENDING, 0);
+        nextState.setId(UUID.fromString("51000000-0000-0000-0000-000000000003"));
+        Instant nextDueAt = Instant.parse("2026-10-07T12:05:00Z");
+        nextState.setDueAt(nextDueAt);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(stateRepository.findFirstByProcessIdAndStatusOrderByPositionAsc(
+                ESCALATION_ID, FlowExecutionStepStatus.PENDING)).thenReturn(nextState);
+        when(stepSchedulingService.scheduleStep(nextState)).thenReturn(nextState);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(acknowledgementService.createEscalateNowUrl(any(Escalation.class), eq(currentState), eq(nextState)))
+                .thenReturn("https://alerts.example.com/escalate?token=escalate-token");
+        when(notification.sendEmail(
+                currentState,
+                "https://alerts.example.com/acknowledge?token=test-token",
+                "https://alerts.example.com/escalate?token=escalate-token"))
+                .thenReturn(true);
+
+        consumer.deliverReadyStep(queuedState);
+
+        assertEquals(nextDueAt, currentState.getDueAt());
+        verify(stepSchedulingService).scheduleStep(nextState);
+        verify(acknowledgementService).createEscalateNowUrl(any(Escalation.class), eq(currentState), eq(nextState));
+        verify(notification).sendEmail(
+                currentState,
+                "https://alerts.example.com/acknowledge?token=test-token",
+                "https://alerts.example.com/escalate?token=escalate-token");
+        verify(timeoutService, never()).scheduleAcknowledgementTimeout(any(), any(), any());
+    }
+
+    @Test
+    // Verifies that a failed send records both the failure and scheduled retry.
+    void failedNotificationSchedulesRetryAndRecordsAuditEvents() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        currentState.setRetryOnFailureEnabled(true);
+        currentState.setMaxRetryAttempts(1);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+                .thenReturn(false);
+        when(stepSchedulingService.scheduleStep(currentState)).thenAnswer(invocation -> {
+            currentState.setStatus(FlowExecutionStepStatus.SCHEDULED);
+            currentState.setDueAt(Instant.parse("2026-10-08T12:01:00Z"));
+            return currentState;
+        });
+
+        consumer.deliverReadyStep(queuedState);
+
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService, times(2)).record(audit.capture());
+        assertEquals(AuditAction.NOTIFICATION_FAILED, audit.getAllValues().get(0).action());
+        assertEquals(AuditAction.NOTIFICATION_RETRY_SCHEDULED, audit.getAllValues().get(1).action());
+        assertEquals(FlowExecutionStepStatus.SCHEDULED, currentState.getStatus());
+    }
+
+    @Test
+    // Verifies that an exhausted final send completes the escalation once.
+    void failedFinalNotificationCompletesEscalationAndRecordsExhaustion() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        Escalation escalation = runningEscalation();
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(escalation));
+        when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
+                .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+                .thenReturn(false);
+
+        consumer.deliverReadyStep(queuedState);
+
+        assertEquals(FlowExecutionStepStatus.FAILED, currentState.getStatus());
+        assertEquals(EscalationStatus.COMPLETED, escalation.getStatus());
+        assertEquals(EscalationResolutionType.EXHAUSTED, escalation.getResolutionType());
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService, times(2)).record(audit.capture());
+        assertEquals(AuditAction.NOTIFICATION_FAILED, audit.getAllValues().get(0).action());
+        assertEquals(AuditAction.COMPLETED, audit.getAllValues().get(1).action());
+        assertEquals("EXHAUSTED", audit.getAllValues().get(1).reason());
+    }
+
+    @Test
+    // Verifies that paused acknowledgement steps ignore ready callbacks.
+    void ignoresAReadyCallbackAfterAcknowledgementPause() {
+        EscalationStepReadyMessage queuedState = queuedState(0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        Escalation acknowledgedEscalation = runningEscalation();
+        acknowledgedEscalation.setStatus(EscalationStatus.ACKNOWLEDGED);
+        when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
+        when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(acknowledgedEscalation));
+
+        consumer.deliverReadyStep(queuedState);
+
+        verify(stateRepository, never()).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
+        verifyNoInteractions(notification, stepSchedulingService);
+    }
+
+    @Test
+    // Verifies that unexpected delivery errors escape for broker retry.
     void letsUnexpectedProcessingErrorsEscapeSoRabbitCanRetry() {
         EscalationStepReadyMessage queuedState = queuedState(0);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
-        FlowExecutionState nextState = currentState("PENDING", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
+        FlowExecutionState nextState = currentState(FlowExecutionStepStatus.PENDING, 0);
         nextState.setId(UUID.fromString("51000000-0000-0000-0000-000000000003"));
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
-        when(stateRepository.findFirstByProcessIdAndExecutionStateOrderByPositionAsc(ESCALATION_ID, "PENDING"))
+        when(stateRepository.findFirstByProcessIdAndStatusOrderByPositionAsc(
+                ESCALATION_ID, FlowExecutionStepStatus.PENDING))
                 .thenReturn(nextState, nextState);
-        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), eq("oncall@example.com")))
+        when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token"))
+        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
                 .thenThrow(new RuntimeException("unexpected processing error"));
 
-        assertThrows(RuntimeException.class, () -> consumer.onMessage(queuedState));
+        assertThrows(RuntimeException.class, () -> consumer.deliverReadyStep(queuedState));
 
-        assertEquals("PROCESSING", currentState.getExecutionState());
-        assertEquals("NOT_SENT", currentState.getNotificationState());
-        verify(stepSchedulingService, never()).schedule(nextState);
+        assertEquals(FlowExecutionStepStatus.SENDING, currentState.getStatus());
+        verify(stepSchedulingService, never()).scheduleStep(nextState);
         verify(escalationRepository, never()).save(any(Escalation.class));
     }
 
     @Test
-    void earlyReadyMessageRearmsSavedDueTimeWithoutClaimingOrSending() {
+    // Verifies that an early ready message reschedules the saved due time.
+    void earlyReadyMessageReschedulesSavedDueTime() {
         Instant dueAt = Instant.now().plusSeconds(60);
         EscalationStepReadyMessage earlyMessage = new EscalationStepReadyMessage(STEP_ID, 0, dueAt);
-        FlowExecutionState currentState = currentState("ACTIVE", "NOT_SENT", 0);
+        FlowExecutionState currentState = currentState(FlowExecutionStepStatus.SCHEDULED, 0);
         currentState.setDueAt(dueAt);
         when(stateRepository.findById(STEP_ID)).thenReturn(Optional.of(currentState));
         when(escalationRepository.findByIdForUpdate(ESCALATION_ID)).thenReturn(Optional.of(runningEscalation()));
 
-        consumer.onMessage(earlyMessage);
+        consumer.deliverReadyStep(earlyMessage);
 
         verify(stepSchedulingService).rescheduleStepAtDueTime(currentState);
         verify(stateRepository, never()).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
         verifyNoInteractions(notification);
     }
 
+    // Builds a ready-message payload for one send attempt.
     private EscalationStepReadyMessage queuedState(int sendAttemptCount) {
         return new EscalationStepReadyMessage(STEP_ID, sendAttemptCount, Instant.EPOCH);
     }
 
-    private FlowExecutionState currentState(String executionState, String notificationState, int sendAttemptCount) {
+    // Builds an execution step with the requested delivery status.
+    private FlowExecutionState currentState(FlowExecutionStepStatus status, int sendAttemptCount) {
         FlowExecutionState state = new FlowExecutionState();
         state.setId(STEP_ID);
         state.setProcessId(ESCALATION_ID);
-        state.setExecutionState(executionState);
-        state.setNotificationState(notificationState);
+        state.setStatus(status);
         state.setSendAttemptCount(sendAttemptCount);
         state.setDueAt(Instant.EPOCH);
+        state.setDuration(java.time.Duration.ZERO);
         state.setUserEmail("oncall@example.com");
         return state;
     }
 
+    // Builds an open escalation for delivery tests.
     private Escalation runningEscalation() {
         Escalation escalation = new Escalation();
         escalation.setId(ESCALATION_ID);

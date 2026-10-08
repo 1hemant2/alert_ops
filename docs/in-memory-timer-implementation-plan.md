@@ -113,7 +113,7 @@ Late confirmations must never clear the flag of a newer attempt. Broker acceptan
 - [x] Deduplicate registration, ignore obsolete state, and cancel superseded entries without letting an old callback remove a newer entry.
 - [x] Schedule future work for its remaining delay; dispatch overdue work promptly.
 - [x] Keep callbacks short: submit to a bounded publication executor. Do not send email or wait for broker confirms on timer threads.
-- [x] Handle executor saturation by preserving the durable pending state and rearming a retry.
+- [x] Handle executor saturation by preserving the durable pending state and scheduling a retry wake-up.
 - [x] Keep an entry tracked while its publication is in flight to prevent parallel local callbacks for the same step.
 - [x] Remove completed and cancelled entries and enable removal of cancelled tasks from the executor queue.
 - [x] Enforce a configurable timer-count limit. Schedules that cannot enter memory remain durable in PostgreSQL and are registered as a slot frees; they can run late while capacity is full. Do not keep an unbounded retry list in memory.
@@ -130,7 +130,7 @@ Late confirmations must never clear the flag of a newer attempt. Broker acceptan
 - [x] Publish directly to the ready exchange/queue without TTL or delayed routing.
 - [x] Use persistent delivery, correlated confirms, mandatory routing, and bounded confirmation timeouts.
 - [x] Clear `publicationPending` only after broker acceptance, conditional on the same attempt and due time.
-- [x] On failure, rearm a bounded retry without changing the business due time or consuming an SMTP retry attempt.
+- [x] On failure, schedule a bounded retry wake-up without changing the business due time or consuming an SMTP retry attempt.
 - [x] Keep the consumer's atomic delivery claim, state validation, next-step selection, and SMTP retry policy.
 - [x] Add a due-time guard to ready delivery. An early message restores pending state and registers its timer after commit without claiming or sending the step.
 - [x] Make successful advancement, terminal SMTP failure, and SMTP retries use the same scheduling service.

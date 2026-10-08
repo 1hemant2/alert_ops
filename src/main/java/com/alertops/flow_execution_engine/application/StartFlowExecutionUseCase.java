@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.alertops.flow.repository.NodeRepository;
+import com.alertops.flow.repository.FlowRepository;
+import com.alertops.flow.model.Flow;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
@@ -23,13 +25,16 @@ import com.alertops.flow.model.Node;
 public class StartFlowExecutionUseCase {
 
     NodeRepository  nodeRepository;
+    FlowRepository flowRepository;
     EscalationRepository escalationRepository;
     TaskRepository taskRepository;
 
-    StartFlowExecutionUseCase(NodeRepository nodeRepository, EscalationRepository escalationRepository,  TaskRepository taskRepository){
+    StartFlowExecutionUseCase(NodeRepository nodeRepository, EscalationRepository escalationRepository,
+                              TaskRepository taskRepository, FlowRepository flowRepository){
         this.nodeRepository = nodeRepository;
         this.escalationRepository = escalationRepository;
         this.taskRepository = taskRepository;
+        this.flowRepository = flowRepository;
     }
 
     public String  execute(FlowExecutionStateService flowExecutionStateService, UUID escalationId) {
@@ -67,9 +72,13 @@ public class StartFlowExecutionUseCase {
         }
         
         UUID flowId = escalation.getFlowId();
+        Flow flow = flowRepository.findByIdAndTeamId(flowId, teamId);
+        if (flow == null) {
+            throw EscalationException.invalidRequest("The escalation flow is not available in this team.");
+        }
         List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
 
-        if(nodes.size() == 0) {
+        if (nodes == null || nodes.isEmpty()) {
             throw EscalationException.invalidRequest("The escalation flow must contain at least one step.");
         }
 
@@ -83,7 +92,7 @@ public class StartFlowExecutionUseCase {
                 ? FlowExecutionStartMode.IDLE
                 : FlowExecutionStartMode.SCHEDULED_EARLY;
         return flowExecutionStateService.startFlowExecution(
-                task, nodes, escalationId, teamId, startMode);
+                task, flow, nodes, escalationId, teamId, startMode);
     }
 
     public String executeScheduled(
@@ -111,8 +120,12 @@ public class StartFlowExecutionUseCase {
         if (teamId == null) {
             throw EscalationException.forbidden("Select a team before starting an escalation.");
         }
+        Flow flow = flowRepository.findByIdAndTeamId(escalation.getFlowId(), teamId);
+        if (flow == null) {
+            throw EscalationException.invalidRequest("The escalation flow is not available in this team.");
+        }
         List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(escalation.getFlowId());
-        if (nodes.isEmpty()) {
+        if (nodes == null || nodes.isEmpty()) {
             throw EscalationException.invalidRequest("The escalation flow must contain at least one step.");
         }
         Task task = taskRepository.findTaskByIdAndTeamId(escalation.getTaskId(), teamId);
@@ -120,6 +133,6 @@ public class StartFlowExecutionUseCase {
             throw EscalationException.invalidRequest("The escalation task is not available in this team.");
         }
         return flowExecutionStateService.startFlowExecution(
-                task, nodes, escalation.getId(), teamId, startMode);
+                task, flow, nodes, escalation.getId(), teamId, startMode);
     }
 }

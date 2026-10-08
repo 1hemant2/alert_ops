@@ -3,6 +3,8 @@ package com.alertops.flow.application;
 import com.alertops.auth.model.User;
 import com.alertops.auth.repository.UserRepository;
 import com.alertops.flow.dto.CreateNodeDto;
+import com.alertops.flow.exception.FlowException;
+import com.alertops.flow.model.Flow;
 import com.alertops.flow.model.Node;
 import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow.repository.NodeRepository;
@@ -54,6 +56,36 @@ class CreateFlowNodeUseCaseTest {
         assertThrows(RuntimeException.class, () -> useCase.execute(request, mock(FlowService.class)));
 
         verify(flowRepository).findByIdAndTeamId(flowId, teamId);
+        verify(nodeRepository, never()).save(any(Node.class));
+    }
+
+    @Test
+    void nodeTimingValidationRemainsAClientError() {
+        UUID teamId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+
+        User recipient = mock(User.class);
+        when(recipient.getId()).thenReturn(userId);
+        when(recipient.getEmail()).thenReturn("recipient@example.com");
+        when(userRepository.findByEmail("recipient@example.com")).thenReturn(recipient);
+        TeamMember membership = new TeamMember();
+        membership.setTeamId(teamId);
+        when(teamMemberRepository.findTeamMemeber(userId, teamId)).thenReturn(membership);
+        Flow flow = mock(Flow.class);
+        when(flow.getId()).thenReturn(flowId);
+        when(flow.getTeamId()).thenReturn(teamId);
+        when(flowRepository.findByIdAndTeamId(flowId, teamId)).thenReturn(flow);
+        FlowService flowService = mock(FlowService.class);
+        when(flowService.createNode(any(), any(), anyInt(), any(), any(), any(), any()))
+                .thenThrow(FlowException.invalid("Resolution timeout must be positive."));
+
+        CreateNodeDto request = new CreateNodeDto();
+        request.setFlowId(flowId);
+        request.setEmail("recipient@example.com");
+
+        assertThrows(FlowException.class, () -> useCase.execute(request, flowService));
         verify(nodeRepository, never()).save(any(Node.class));
     }
 }

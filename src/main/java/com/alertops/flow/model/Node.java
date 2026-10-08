@@ -36,6 +36,8 @@ public class Node {
     @Column(nullable = false)
     private Duration duration;
 
+    private Duration resolutionTimeout;
+
     private String email;
 
     public UUID getId() {
@@ -89,6 +91,14 @@ public class Node {
 
     public void setDuration(Duration duration) {
         this.duration = duration;
+    }
+
+    public Duration getResolutionTimeout() {
+        return resolutionTimeout;
+    }
+
+    public void setResolutionTimeout(Duration resolutionTimeout) {
+        this.resolutionTimeout = resolutionTimeout;
     }
 
     public String getEmail() {

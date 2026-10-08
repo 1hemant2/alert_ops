@@ -8,6 +8,7 @@ public class CreateNodeDto {
     private UUID flowId;
     private String nodeName;
     private int durationInMinutes;
+    private Integer resolutionTimeoutInMinutes;
     private String email;
     private BigInteger position;
 
@@ -16,10 +17,16 @@ public class CreateNodeDto {
     
 
     public CreateNodeDto(UUID id, UUID flowId, String nodeName, int durationInMinutes, String email, BigInteger position) {
+        this(id, flowId, nodeName, durationInMinutes, null, email, position);
+    }
+
+    public CreateNodeDto(UUID id, UUID flowId, String nodeName, int durationInMinutes,
+                         Integer resolutionTimeoutInMinutes, String email, BigInteger position) {
         this.id = id;
         this.flowId = flowId;
         this.nodeName = nodeName;
         this.durationInMinutes = durationInMinutes;
+        this.resolutionTimeoutInMinutes = resolutionTimeoutInMinutes;
         this.email = email;
         this.position = position;
     }
@@ -42,6 +49,14 @@ public class CreateNodeDto {
 
     public void setDurationInMinutes(int durationInMinutes) {
         this.durationInMinutes = durationInMinutes;
+    }
+
+    public Integer getResolutionTimeoutInMinutes() {
+        return resolutionTimeoutInMinutes;
+    }
+
+    public void setResolutionTimeoutInMinutes(Integer resolutionTimeoutInMinutes) {
+        this.resolutionTimeoutInMinutes = resolutionTimeoutInMinutes;
     }
 
     public String getEmail() {

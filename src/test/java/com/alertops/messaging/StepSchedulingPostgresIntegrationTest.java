@@ -31,6 +31,7 @@ import com.alertops.audit.model.AuditEntityType;
 import com.alertops.flow_execution_engine.model.EscalationResolutionType;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.audit.repository.AuditEventRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
@@ -50,10 +51,10 @@ import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -131,6 +132,7 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @BeforeEach
+    // Resets durable rows, broker mocks, and captured timer callbacks.
     void resetDataAndBroker() {
         TIMER_CALLS.clear();
         CLOCK.set(Instant.now());
@@ -143,6 +145,7 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @AfterEach
+    // Clears durable rows before the next Spring context starts.
     void clearRowsBeforeTheNextSpringContextStarts() {
         states.deleteAll();
         acknowledgementTokens.deleteAll();
@@ -151,21 +154,22 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
+    // Verifies that zero-delay delivery begins only after its save commits.
     void zeroDelayStepPublishesOnlyAfterItsDatabaseCommit() throws Exception {
-        when(notification.sendEmail(any(), anyString())).thenReturn(true);
+        when(notification.sendEmail(any(), anyString(), any())).thenReturn(true);
         CountDownLatch delivered = new CountDownLatch(1);
         doAnswer(invocation -> {
             EscalationStepReadyMessage payload = invocation.getArgument(2);
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement query = connection.prepareStatement(
-                         "SELECT execution_state FROM flow_execution_state WHERE id = ?")) {
+                         "SELECT status FROM flow_execution_state WHERE id = ?")) {
                 query.setObject(1, payload.stepId());
                 try (ResultSet row = query.executeQuery()) {
                     assertThat(row.next()).isTrue();
-                    assertThat(row.getString(1)).isEqualTo("ACTIVE");
+                    assertThat(row.getString(1)).isEqualTo(FlowExecutionStepStatus.SCHEDULED.name());
                 }
             }
-            consumer.onMessage(payload);
+            consumer.deliverReadyStep(payload);
             acknowledge(invocation.getArgument(4));
             delivered.countDown();
             return null;
@@ -173,8 +177,8 @@ class StepSchedulingPostgresIntegrationTest {
                 any(CorrelationData.class));
 
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ZERO, false, null);
-            scheduling.schedule(step);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ZERO, false, null);
+            scheduling.scheduleStep(step);
             verifyNoInteractions(rabbit);
             return step.getId();
         });
@@ -185,17 +189,17 @@ class StepSchedulingPostgresIntegrationTest {
         assertThat(delivered.await(3, TimeUnit.SECONDS)).isTrue();
 
         FlowExecutionState saved = states.findById(stepId).orElseThrow();
-        assertThat(saved.getExecutionState()).isEqualTo("TERMINAL");
-        assertThat(saved.getNotificationState()).isEqualTo("SENT");
+        assertThat(saved.getStatus()).isEqualTo(FlowExecutionStepStatus.SENT);
         assertThat(saved.isPublicationPending()).isFalse();
-        verify(notification, times(1)).sendEmail(any(), anyString());
+        verify(notification, times(1)).sendEmail(any(), anyString(), any());
     }
 
     @Test
+    // Verifies that rolled-back scheduling creates no timer or publication.
     void rolledBackSchedulingDoesNotRegisterATimerOrPublish() {
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ofMinutes(5), false, null);
-            scheduling.schedule(step);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ofMinutes(5), false, null);
+            scheduling.scheduleStep(step);
             status.setRollbackOnly();
             return step.getId();
         });
@@ -207,10 +211,11 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
-    void committedScheduleKeepsItsPendingFlagUntilReadyWorkIsConfirmed() throws Exception {
+    // Verifies that a committed schedule stays pending until confirmation.
+    void committedScheduleStaysPendingUntilConfirmation() throws Exception {
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ofMinutes(5), false, null);
-            scheduling.schedule(step);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ofMinutes(5), false, null);
+            scheduling.scheduleStep(step);
             assertThat(step.isPublicationPending()).isTrue();
             verifyNoInteractions(rabbit);
             return step.getId();
@@ -218,21 +223,22 @@ class StepSchedulingPostgresIntegrationTest {
 
         TimerCall timer = takeTimer();
         FlowExecutionState saved = states.findById(stepId).orElseThrow();
-        assertThat(saved.getExecutionState()).isEqualTo("ACTIVE");
+        assertThat(saved.getStatus()).isEqualTo(FlowExecutionStepStatus.SCHEDULED);
         assertThat(saved.getDueAt()).isEqualTo(timer.dueAt());
         assertThat(saved.isPublicationPending()).isTrue();
         verifyNoInteractions(rabbit);
     }
 
     @Test
+    // Verifies that broker failure retries without changing the business due time.
     void brokerFailureRetriesWithoutChangingTheBusinessDueTime() throws Exception {
         doThrow(new IllegalStateException("Broker unavailable"))
                 .when(rabbit).convertAndSend(anyString(), anyString(), any(), any(MessagePostProcessor.class),
                         any(CorrelationData.class));
 
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ZERO, false, null);
-            scheduling.schedule(step);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ZERO, false, null);
+            scheduling.scheduleStep(step);
             return step.getId();
         });
         Instant originalDueAt = states.findById(stepId).orElseThrow().getDueAt();
@@ -254,10 +260,11 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
+    // Verifies that startup recovery loads more than one recovery page.
     void startupRecoveryPagesPastOneHundredSavedSchedules() throws Exception {
         transaction().executeWithoutResult(status -> {
             for (int index = 0; index < 205; index++) {
-                createStep("ACTIVE", Duration.ZERO, true, Instant.now().plusSeconds(3600L + index));
+                createStep(FlowExecutionStepStatus.SCHEDULED, Duration.ZERO, true, Instant.now().plusSeconds(3600L + index));
             }
         });
 
@@ -269,10 +276,11 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
-    void startupRecoveryRestoresACommittedScheduleThatWasNeverRegistered() throws Exception {
+    // Verifies that startup recovery restores an unregistered durable schedule.
+    void startupRecoveryRestoresUnregisteredSchedule() throws Exception {
         Instant dueAt = Instant.now().plus(Duration.ofMinutes(5)).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         FlowExecutionState saved = transaction().execute(
-                status -> createStep("ACTIVE", Duration.ZERO, true, dueAt));
+                status -> createStep(FlowExecutionStepStatus.SCHEDULED, Duration.ZERO, true, dueAt));
         Instant persistedDueAt = states.findById(saved.getId()).orElseThrow().getDueAt();
         assertThat(timers.activeTimerCount()).isZero();
 
@@ -285,10 +293,11 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
-    void aNewTimerRegistryRebuildsRegisteredWorkWithItsOriginalDueTime() throws Exception {
+    // Verifies that a new timer registry preserves the original due time.
+    void timerRegistryRestoresOriginalDueTime() throws Exception {
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("PENDING", Duration.ofMinutes(5), false, null);
-            scheduling.schedule(step);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.PENDING, Duration.ofMinutes(5), false, null);
+            scheduling.scheduleStep(step);
             return step.getId();
         });
         takeTimer();
@@ -317,25 +326,27 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
-    void earlyReadyMessageIsScheduledAgainWithoutClaimingIt() {
+    // Verifies that an early ready message is rescheduled without claiming.
+    void earlyReadyMessageReschedulesWithoutClaiming() {
         Instant dueAt = Instant.now().plus(Duration.ofMinutes(5));
-        FlowExecutionState step = transaction().execute(status -> createStep("ACTIVE", Duration.ZERO, false, dueAt));
+        FlowExecutionState step = transaction().execute(status -> createStep(FlowExecutionStepStatus.SCHEDULED, Duration.ZERO, false, dueAt));
         Instant persistedDueAt = states.findById(step.getId()).orElseThrow().getDueAt();
 
-        consumer.onMessage(new EscalationStepReadyMessage(step.getId(), 0, persistedDueAt));
+        consumer.deliverReadyStep(new EscalationStepReadyMessage(step.getId(), 0, persistedDueAt));
 
         FlowExecutionState waiting = states.findById(step.getId()).orElseThrow();
-        assertThat(waiting.getExecutionState()).isEqualTo("ACTIVE");
+        assertThat(waiting.getStatus()).isEqualTo(FlowExecutionStepStatus.SCHEDULED);
         assertThat(waiting.isPublicationPending()).isTrue();
         assertThat(timers.activeTimerCount()).isEqualTo(1);
         verifyNoInteractions(notification, rabbit);
     }
 
     @Test
-    void staleConfirmationCannotClearANewerAttemptOrDifferentDueTime() {
+    // Verifies that stale publication confirmation cannot clear newer work.
+    void staleConfirmationCannotClearNewerWork() {
         Instant dueAt = Instant.now().plus(Duration.ofMinutes(5));
         UUID stepId = transaction().execute(status -> {
-            FlowExecutionState step = createStep("ACTIVE", Duration.ofMinutes(5), true, dueAt);
+            FlowExecutionState step = createStep(FlowExecutionStepStatus.SCHEDULED, Duration.ofMinutes(5), true, dueAt);
             step.setSendAttemptCount(1);
             return states.save(step).getId();
         });
@@ -349,9 +360,10 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
-    void concurrentReadyMessagesCanClaimTheSameAttemptOnlyOnce() throws Exception {
+    // Verifies that concurrent consumers claim one delivery attempt only once.
+    void concurrentReadyMessagesClaimOnce() throws Exception {
         FlowExecutionState step = transaction().execute(status -> createStep(
-                "ACTIVE", Duration.ZERO, true, Instant.now().minusSeconds(1)));
+                FlowExecutionStepStatus.SCHEDULED, Duration.ZERO, true, Instant.now().minusSeconds(1)));
         ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
             var first = java.util.concurrent.CompletableFuture.supplyAsync(
@@ -366,15 +378,16 @@ class StepSchedulingPostgresIntegrationTest {
             workers.shutdownNow();
         }
         FlowExecutionState claimed = states.findById(step.getId()).orElseThrow();
-        assertThat(claimed.getExecutionState()).isEqualTo("PROCESSING");
+        assertThat(claimed.getStatus()).isEqualTo(FlowExecutionStepStatus.SENDING);
         assertThat(claimed.isPublicationPending()).isFalse();
     }
 
     @Test
-    void acknowledgementWaitsForAnInFlightEmailAndStopsTheNextStep() throws Exception {
+    // Verifies that acknowledgement waits for delivery and pauses the next step.
+    void acknowledgementWaitsForDeliveryAndPausesNextStep() throws Exception {
         CountDownLatch emailStarted = new CountDownLatch(1);
         CountDownLatch finishEmail = new CountDownLatch(1);
-        when(notification.sendEmail(any(), anyString())).thenAnswer(invocation -> {
+        when(notification.sendEmail(any(), anyString(), any())).thenAnswer(invocation -> {
             emailStarted.countDown();
             assertThat(finishEmail.await(10, TimeUnit.SECONDS)).isTrue();
             return true;
@@ -382,24 +395,23 @@ class StepSchedulingPostgresIntegrationTest {
 
         Instant dueAt = Instant.now().minusSeconds(2).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         FlowExecutionState activeStep = transaction().execute(
-                status -> createStep("ACTIVE", Duration.ZERO, false, dueAt));
+                status -> createStep(FlowExecutionStepStatus.SCHEDULED, Duration.ZERO, false, dueAt));
         FlowExecutionState nextStep = transaction().execute(status -> {
             FlowExecutionState step = new FlowExecutionState();
             step.setProcessId(activeStep.getProcessId());
-            step.setExecutionState("PENDING");
-            step.setNotificationState("NOT_SENT");
+            step.setStatus(FlowExecutionStepStatus.PENDING);
             step.setDuration(Duration.ZERO);
             step.setUserEmail("recipient@example.test");
             return states.save(step);
         });
         String link = transaction().execute(status -> acknowledgementService.createAcknowledgementUrl(
-                escalations.findById(activeStep.getProcessId()).orElseThrow(), "recipient@example.test"));
+                escalations.findById(activeStep.getProcessId()).orElseThrow(), activeStep));
         String rawToken = link.substring(link.indexOf("token=") + "token=".length());
 
         CountDownLatch acknowledgementStarted = new CountDownLatch(1);
         ExecutorService workers = java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
-            Future<?> delivery = workers.submit(() -> consumer.onMessage(
+            Future<?> delivery = workers.submit(() -> consumer.deliverReadyStep(
                     new EscalationStepReadyMessage(activeStep.getId(), 0, dueAt)));
             assertThat(emailStarted.await(10, TimeUnit.SECONDS)).isTrue();
 
@@ -428,20 +440,17 @@ class StepSchedulingPostgresIntegrationTest {
         assertThat(acknowledged.getStatus()).isEqualTo(EscalationStatus.COMPLETED);
         assertThat(acknowledged.getResolutionType()).isEqualTo(EscalationResolutionType.ACKNOWLEDGED);
         assertThat(acknowledged.getIssueSolvedBy()).isEqualTo("recipient@example.test");
+        assertThat(states.findById(nextStep.getId()).orElseThrow().getStatus())
+                .isEqualTo(FlowExecutionStepStatus.SKIPPED);
 
         Instant lateDueAt = Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
-        transaction().executeWithoutResult(status -> {
-            FlowExecutionState queuedNextStep = states.findById(nextStep.getId()).orElseThrow();
-            queuedNextStep.setExecutionState("ACTIVE");
-            queuedNextStep.setDueAt(lateDueAt);
-            states.save(queuedNextStep);
-        });
-        consumer.onMessage(new EscalationStepReadyMessage(nextStep.getId(), 0, lateDueAt));
+        consumer.deliverReadyStep(new EscalationStepReadyMessage(nextStep.getId(), 0, lateDueAt));
 
-        verify(notification, times(1)).sendEmail(any(), anyString());
+        verify(notification, times(1)).sendEmail(any(), anyString(), any());
     }
 
     @Test
+    // Verifies that concurrent starts create one execution-state set.
     void concurrentStartsCreateOnlyOneSetOfExecutionStates() throws Exception {
         UUID teamId = UUID.randomUUID();
         Escalation escalation = new Escalation();
@@ -489,6 +498,7 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Test
+    // Verifies that the database rejects unsupported lifecycle values.
     void databaseRejectsUnknownEscalationLifecycleValues() {
         Escalation escalation = new Escalation();
         escalation.setStatus(EscalationStatus.IDLE);
@@ -498,6 +508,11 @@ class StepSchedulingPostgresIntegrationTest {
                 .isInstanceOf(SQLException.class);
         assertThatThrownBy(() -> updateEscalationColumn(escalationId, "resolution_type", "NOT_A_RESOLUTION"))
                 .isInstanceOf(SQLException.class);
+
+        FlowExecutionState step = transaction().execute(
+                status -> createStep(FlowExecutionStepStatus.PENDING, Duration.ZERO, false, null));
+        assertThatThrownBy(() -> updateExecutionStateColumn(step.getId(), "status", "NOT_A_STEP_STATUS"))
+                .isInstanceOf(SQLException.class);
     }
 
     private void updateEscalationColumn(UUID escalationId, String column, String value) throws SQLException {
@@ -506,6 +521,16 @@ class StepSchedulingPostgresIntegrationTest {
                 PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, value);
             statement.setObject(2, escalationId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void updateExecutionStateColumn(UUID stepId, String column, String value) throws SQLException {
+        String sql = "UPDATE " + SCHEMA + ".flow_execution_state SET " + column + " = ? WHERE id = ?";
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, value);
+            statement.setObject(2, stepId);
             statement.executeUpdate();
         }
     }
@@ -524,7 +549,7 @@ class StepSchedulingPostgresIntegrationTest {
             start.await();
             try {
                 flowExecutionStateService.startFlowExecution(
-                        task, nodes, escalationId, teamId, FlowExecutionStartMode.IDLE);
+                        task, new com.alertops.flow.model.Flow(), nodes, escalationId, teamId, FlowExecutionStartMode.IDLE);
                 return null;
             } catch (Throwable failure) {
                 return failure;
@@ -540,14 +565,13 @@ class StepSchedulingPostgresIntegrationTest {
         return node;
     }
 
-    private FlowExecutionState createStep(String executionState, Duration duration, boolean pending, Instant dueAt) {
+    private FlowExecutionState createStep(FlowExecutionStepStatus status, Duration duration, boolean pending, Instant dueAt) {
         Escalation escalation = new Escalation();
         escalation.setStatus(EscalationStatus.OPEN);
         escalations.save(escalation);
         FlowExecutionState step = new FlowExecutionState();
         step.setProcessId(escalation.getId());
-        step.setExecutionState(executionState);
-        step.setNotificationState("NOT_SENT");
+        step.setStatus(status);
         step.setDuration(duration);
         step.setDueAt(dueAt);
         step.setPublicationPending(pending);
@@ -562,8 +586,8 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     private void awaitPendingFlag(UUID stepId, boolean expected) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
-        while (System.nanoTime() < deadline) {
+        long timeoutAtNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (System.nanoTime() < timeoutAtNanos) {
             if (states.findById(stepId).orElseThrow().isPublicationPending() == expected) {
                 return;
             }
@@ -605,13 +629,13 @@ class StepSchedulingPostgresIntegrationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class, RedisAutoConfiguration.class,
-            RedisRepositoriesAutoConfiguration.class})
+    @EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class, DataRedisAutoConfiguration.class,
+            DataRedisRepositoriesAutoConfiguration.class})
     @EntityScan(basePackageClasses = {FlowExecutionState.class, AuditEventEntity.class})
     @EnableJpaRepositories(basePackageClasses = {FlowExecutionStateRepository.class, AuditEventRepository.class})
     @Import({StepSchedulingService.class, StepTimerRegistry.class, ReconcilerService.class,
             MessagePublisher.class, MessageConsumer.class, FlowExecutionStateService.class,
-            EscalationAcknowledgementService.class, AuditService.class})
+            EscalationAcknowledgementService.class, EscalationTimeoutService.class, AuditService.class})
     static class Config {
         @Bean RabbitTemplate rabbitTemplate() { return mock(RabbitTemplate.class); }
 

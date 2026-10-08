@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFlowNode, deleteFlowNode, getFlow, getFlowNodes, nodeDelayMinutes, nodeName, reorderFlowNode, updateFlowNode } from '../../api/flows'
+import { createFlowNode, deleteFlowNode, getFlow, getFlowNodes, nodeDelayMinutes, nodeName, nodeResolutionTimeoutMinutes, reorderFlowNode, updateFlowNode, updateFlowTiming } from '../../api/flows'
 import type { FlowNode } from '../../api/types'
 import { Button, Card, ErrorState, Field, InlineNotice, LoadingRows, PageHeader } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
@@ -14,6 +14,10 @@ export function FlowDetailPage() {
   const [nodeNameValue, setNodeNameValue] = useState('')
   const [email, setEmail] = useState('')
   const [delay, setDelay] = useState('5')
+  const [resolutionDelay, setResolutionDelay] = useState('10')
+  const [resolutionTimeoutEnabled, setResolutionTimeoutEnabled] = useState(false)
+  const [resolutionTimeouts, setResolutionTimeouts] = useState<Record<string, string>>({})
+  const [timingLoadKey, setTimingLoadKey] = useState('')
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FlowNode | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -33,6 +37,7 @@ export function FlowDetailPage() {
       flowId,
       nodeName: nodeNameValue.trim(),
       durationInMinutes: Number(delay),
+      resolutionTimeoutInMinutes: flow.data?.resolutionTimeoutEnabled ? Number(resolutionDelay) : null,
       email: email.trim(),
     }),
     onSuccess: async () => {
@@ -44,6 +49,7 @@ export function FlowDetailPage() {
     mutationFn: () => updateFlowNode(editingNodeId!, {
       nodeName: nodeNameValue.trim(),
       durationInMinutes: Number(delay),
+      resolutionTimeoutInMinutes: flow.data?.resolutionTimeoutEnabled ? Number(resolutionDelay) : null,
       email: email.trim(),
       version: flow.data?.version ?? 0,
     }),
@@ -79,7 +85,21 @@ export function FlowDetailPage() {
       ])
     },
   })
-  const stepWritePending = create.isPending || update.isPending || remove.isPending || reorder.isPending
+  const timing = useMutation({
+    mutationFn: () => updateFlowTiming(flowId, {
+      resolutionTimeoutEnabled,
+      nodeTimings: resolutionTimeoutEnabled
+        ? (nodes.data ?? []).map(node => ({
+          nodeId: node.id,
+          resolutionTimeoutInMinutes: Number(resolutionTimeouts[node.id] ?? 0),
+        }))
+        : [],
+      version: flow.data?.version ?? 0,
+    }),
+    onSuccess: refreshFlow,
+    onError: refreshFlow,
+  })
+  const stepWritePending = create.isPending || update.isPending || remove.isPending || reorder.isPending || timing.isPending
 
   function refreshFlow() {
     return Promise.all([
@@ -92,11 +112,24 @@ export function FlowDetailPage() {
     setNodeNameValue('')
     setEmail('')
     setDelay('5')
+    setResolutionDelay('10')
     setEditingNodeId(null)
     setAddStepOpen(false)
     create.reset()
     update.reset()
   }
+
+  useEffect(() => {
+    if (!flow.data || !nodes.data) return
+    const key = `${flow.data.id}:${flow.data.version}:${nodes.data.map(node => node.id).join(',')}`
+    if (key === timingLoadKey) return
+    setResolutionTimeoutEnabled(Boolean(flow.data.resolutionTimeoutEnabled))
+    setResolutionTimeouts(Object.fromEntries(nodes.data.map(node => [
+      node.id,
+      String(nodeResolutionTimeoutMinutes(node) ?? 10),
+    ])))
+    setTimingLoadKey(key)
+  }, [flow.data?.id, flow.data?.version, flow.data?.resolutionTimeoutEnabled, nodes.data, timingLoadKey])
 
   useEffect(() => {
     if (addStepOpen) addStepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -174,6 +207,7 @@ export function FlowDetailPage() {
     setNodeNameValue(nodeName(node))
     setEmail(node.email)
     setDelay(String(nodeDelayMinutes(node)))
+    setResolutionDelay(String(nodeResolutionTimeoutMinutes(node) ?? 10))
     setAddStepOpen(true)
   }
 
@@ -256,6 +290,15 @@ export function FlowDetailPage() {
     <div className="back-link-row"><Link to={`/app/${teamId}/flows`}>Back to escalation paths</Link><span> / </span><span>{flow.data.name}</span></div>
     <PageHeader eyebrow="ESCALATION PATH / BUILDER" title={flow.data.name} description="Choose who gets contacted, then arrange each handoff in order." action={<div className="path-page-actions"><span className="version-pill">VERSION&nbsp; {flow.data.version ?? 0}</span><Button variant="secondary" disabled={stepWritePending} onClick={() => addStepOpen ? closeStepForm() : startAddingStep()}><span>{addStepOpen ? '×' : '＋'}</span>{addStepOpen ? 'Close form' : 'Add response step'}</Button></div>} />
     <InlineNotice tone="neutral">Follow the arrows through the path. Rows alternate direction so each handoff stays connected. Drag the grip to reorder; on a keyboard, focus a grip and use the arrow keys.</InlineNotice>
+    <Card className="path-timing-card">
+      <div className="card-heading"><div><span className="eyebrow">RESPONSE TIMING</span><h2>Resolution timeout</h2><p>Require a resolution after acknowledgement, with one timeout for every step.</p></div><span className="count-pill">{resolutionTimeoutEnabled ? 'ENABLED' : 'DISABLED'}</span></div>
+      <label className="checkbox-field"><input type="checkbox" checked={resolutionTimeoutEnabled} disabled={stepWritePending} onChange={event => setResolutionTimeoutEnabled(event.target.checked)} /><span>Enable resolution timeout for this path</span></label>
+      {resolutionTimeoutEnabled && <div className="path-timing-grid">
+        {(nodes.data ?? []).map((node, index) => <Field key={node.id} label={`Step ${String(index + 1).padStart(2, '0')} · ${nodeName(node)}`} hint="Time allowed after acknowledgement."><div className="input-with-suffix"><input required type="number" min="1" max="10080" value={resolutionTimeouts[node.id] ?? ''} disabled={stepWritePending} onChange={event => setResolutionTimeouts(current => ({ ...current, [node.id]: event.target.value }))} /><span>minutes</span></div></Field>)}
+      </div>}
+      <div className="path-timing-actions"><Button variant="secondary" disabled={stepWritePending || !flow.data || !nodes.data} onClick={() => timing.mutate()}>{timing.isPending ? 'Saving timing…' : 'Save timing settings'}</Button></div>
+      {timing.error && <div className="form-error path-form-error" role="alert">{timing.error.message} The latest path has been loaded; review the timing settings before trying again.</div>}
+    </Card>
     {addStepOpen && <div id="add-path-step" className="path-add-panel" ref={addStepRef}><Card className="path-add-card">
       <div className="card-heading"><div><span className="eyebrow">BUILD THIS PATH</span><h2>{editingNodeId ? 'Edit response step' : 'Add a response step'}</h2></div><Button variant="quiet" disabled={stepWritePending} onClick={closeStepForm}>Close&nbsp; ×</Button></div>
       <p className="form-intro">Choose an existing team member, name their step, and set the wait time before contact.</p>
@@ -263,6 +306,7 @@ export function FlowDetailPage() {
         <Field label="Step name"><input required maxLength={100} value={nodeNameValue} onChange={event => setNodeNameValue(event.target.value)} placeholder="Notify primary on-call" /></Field>
         <Field label="Team member email"><input required type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="oncall@company.com" /></Field>
         <Field label="Wait before contact" hint="The first step starts after this wait time too."><div className="input-with-suffix"><input required type="number" min="0" max="10080" value={delay} onChange={event => setDelay(event.target.value)} /><span>minutes</span></div></Field>
+        {flow.data.resolutionTimeoutEnabled && <Field label="Resolution timeout" hint="Time allowed after this step is acknowledged."><div className="input-with-suffix"><input required type="number" min="1" max="10080" value={resolutionDelay} onChange={event => setResolutionDelay(event.target.value)} /><span>minutes</span></div></Field>}
         <Button disabled={stepWritePending || !flow.data}>{create.isPending ? 'Adding step…' : update.isPending ? 'Saving changes…' : editingNodeId ? 'Save changes' : 'Add to path'}</Button>
       </form>
       {(create.error || update.error) && <div className="form-error path-form-error" role="alert">{(create.error ?? update.error)?.message}</div>}
@@ -337,6 +381,7 @@ export function FlowDetailPage() {
                       <span className="step-order-label">{index === 0 ? 'FIRST STEP' : `AFTER STEP ${String(index).padStart(2, '0')}`}</span>
                       <h3 title={nodeName(node)}>{nodeName(node)}</h3>
                       <div className="path-delay-block"><span>WAIT BEFORE CONTACT</span><strong>{nodeDelayMinutes(node)} <small>min</small></strong></div>
+                      {flow.data.resolutionTimeoutEnabled && <div className="path-delay-block"><span>RESOLUTION WINDOW</span><strong>{nodeResolutionTimeoutMinutes(node) ?? '—'} <small>min</small></strong></div>}
                       <div className="path-card-recipient"><span className="path-recipient-mark">{node.email.charAt(0).toUpperCase()}</span><div><small>CONTACT</small><strong title={node.email}>{node.email}</strong></div></div>
                       {isSequenceEnd && hasNextRow
                         ? <span className="path-step-connector path-step-connector-wrap" aria-hidden="true"><svg viewBox="0 0 20 40"><path d="M10 2v31M4 27l6 6 6-6" /></svg></span>

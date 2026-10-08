@@ -9,4 +9,5 @@ public record EscalationAcknowledgementResponse(
         Instant expiresAt,
         Instant acknowledgedAt,
         String acknowledgedBy,
-        boolean alreadyAcknowledged) {}
+        boolean alreadyAcknowledged,
+        Instant resolutionDeadline) {}

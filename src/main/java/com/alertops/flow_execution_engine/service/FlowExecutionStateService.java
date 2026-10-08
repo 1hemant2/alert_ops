@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alertops.flow.model.Node;
+import com.alertops.flow.model.Flow;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
 import com.alertops.audit.model.AuditAction;
@@ -16,6 +17,7 @@ import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.model.AuditEvent;
 import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
+import com.alertops.flow_execution_engine.model.FlowExecutionStepStatus;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.messaging.StepSchedulingService;
@@ -42,8 +44,10 @@ public class FlowExecutionStateService {
     }
 
     @Transactional
+    // Creates execution snapshots and schedules the first runtime step.
     public String startFlowExecution(
             Task task,
+            Flow flow,
             List<Node> nodes,
             UUID escalationId,
             UUID teamId,
@@ -66,23 +70,45 @@ public class FlowExecutionStateService {
                     AuditEntityType.ESCALATION, escalationId, AuditAction.STARTED, fromStatus.name(),
                     EscalationStatus.OPEN.name(), actorId, actorEmail, Instant.now(), null, null));
 
-            for(Node node : nodes) {
+            if (flow == null) {
+                throw EscalationException.invalidRequest("The escalation flow is not available.");
+            }
+            if (nodes == null || nodes.isEmpty()) {
+                throw EscalationException.invalidRequest("The escalation flow must contain at least one step.");
+            }
+
+            for (Node node : nodes) {
+                if (node == null || (flow.isResolutionTimeoutEnabled() && node.getResolutionTimeout() == null)) {
+                    throw EscalationException.invalidRequest(
+                            "Every node requires a positive resolution timeout when the flow is enabled.");
+                }
+                if (flow.isResolutionTimeoutEnabled()
+                        && (node.getResolutionTimeout().isZero() || node.getResolutionTimeout().isNegative())) {
+                    throw EscalationException.invalidRequest(
+                            "Every node requires a positive resolution timeout when the flow is enabled.");
+                }
                 FlowExecutionState flowExecutionState = new FlowExecutionState();
-                flowExecutionState.setExecutionState("PENDING");
-                flowExecutionState.setNotificationState("NOT_SENT");
+                flowExecutionState.setStatus(FlowExecutionStepStatus.PENDING);
                 flowExecutionState.setTaskDetails(task.getDescription());
                 flowExecutionState.setTaskName(task.getName());
                 flowExecutionState.setTaskSource(task.getSource());
+                flowExecutionState.setTaskPriority(task.getPriority());
+                flowExecutionState.setTaskCategory(task.getCategory());
+                flowExecutionState.setTaskReferenceUrl(task.getReferenceUrl());
                 flowExecutionState.setNodeId(node.getId());
                 flowExecutionState.setUserEmail(node.getEmail());
                 flowExecutionState.setDuration(node.getDuration());
                 flowExecutionState.setPosition(node.getPosition());
                 flowExecutionState.setProcessId(escalationId);
                 flowExecutionState.setTaskId(task.getId());
+                flowExecutionState.setResolutionTimeoutEnabled(flow.isResolutionTimeoutEnabled());
+                flowExecutionState.setResolutionTimeout(flow.isResolutionTimeoutEnabled()
+                        ? node.getResolutionTimeout()
+                        : null);
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             FlowExecutionState flowExecutionState = flowExecutionStateRepository.findTopByProcessIdOrderByPositionAsc(escalationId);
-            stepSchedulingService.schedule(flowExecutionState);
+            stepSchedulingService.scheduleStep(flowExecutionState);
             return "Started Flow Execution for escalationId: " + escalationId;
         } catch (RuntimeException e) {
             throw e;

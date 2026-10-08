@@ -7,6 +7,8 @@ import com.alertops.auth.repository.UserRepository;
 import com.alertops.flow.model.*;
 import com.alertops.flow.repository.*;
 import com.alertops.flow.dto.CreateNodeDto;
+import com.alertops.flow.dto.NodeTimingDto;
+import com.alertops.flow.dto.UpdateFlowTimingDto;
 import com.alertops.flow.exception.FlowException;
 import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
@@ -16,6 +18,7 @@ import com.alertops.team.repository.TeamMemberRepository;
 import jakarta.transaction.Transactional;
 
 import java.math.BigInteger;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import org.springframework.data.domain.PageRequest;
@@ -100,18 +103,22 @@ public class FlowService {
         }
     }
 
-    public Node createNode(UUID flowId, String nodeName, int durationInMinutes, UUID createdBy, BigInteger position, String email) {
+    public Node createNode(Flow flow, String nodeName, int durationInMinutes, UUID createdBy,
+                           BigInteger position, String email, Integer resolutionTimeoutInMinutes) {
         try {
 
-            if(flowId == null) {
+            if (flow == null || flow.getId() == null) {
                 throw new RuntimeException("Flow ID is required");
-            }   
+            }
+
+            Duration resolutionTimeout = resolutionTimeoutFor(flow, resolutionTimeoutInMinutes);
 
             Node node = new Node();
             node.setName(nodeName);
-            node.setFlowId(flowId);
+            node.setFlowId(flow.getId());
             node.setCreatedBy(createdBy);
-            node.setDuration(java.time.Duration.ofMinutes(durationInMinutes));
+            node.setDuration(Duration.ofMinutes(durationInMinutes));
+            node.setResolutionTimeout(resolutionTimeout);
             node.setEmail(email);
 
             if(position.compareTo(BigInteger.ZERO) > 0) {
@@ -146,6 +153,43 @@ public class FlowService {
         } catch(Exception e) {
             throw e;
         }
+    }
+
+    @Transactional
+    public Flow updateTiming(UUID flowId, UpdateFlowTimingDto request) {
+        AuthContext authContext = requireAuthContext();
+        if (flowId == null || request == null || request.getResolutionTimeoutEnabled() == null) {
+            throw FlowException.invalid("Resolution-timeout settings are required.");
+        }
+
+        Flow flow = flowRepository.findByIdAndTeamId(flowId, authContext.getTeamId());
+        if (flow == null) throw FlowException.flowNotFound();
+        requireCurrentVersion(flow, request.getVersion());
+
+        List<Node> nodes = nodeRepository.findAllByFlowIdOrderByPositionAsc(flowId);
+        if (nodes == null) nodes = List.of();
+        List<NodeTimingDto> requestedTimings = request.getNodeTimings();
+        boolean enabled = request.getResolutionTimeoutEnabled();
+
+        if (!enabled) {
+            if (requestedTimings != null && !requestedTimings.isEmpty()) {
+                throw FlowException.invalid("Disabled flows must not include node resolution timeouts.");
+            }
+            for (Node node : nodes) {
+                node.setResolutionTimeout(null);
+            }
+        } else {
+            Map<UUID, Integer> timeoutByNodeId = validatedTimeouts(nodes, requestedTimings);
+            for (Node node : nodes) {
+                node.setResolutionTimeout(Duration.ofMinutes(timeoutByNodeId.get(node.getId())));
+            }
+        }
+
+        flow.setResolutionTimeoutEnabled(enabled);
+        touchFlow(flow, authContext);
+        if (!nodes.isEmpty()) nodeRepository.saveAll(nodes);
+        flowRepository.saveAndFlush(flow);
+        return flow;
     }
 
     @Transactional
@@ -216,7 +260,8 @@ public class FlowService {
     }
 
     @Transactional
-    public CreateNodeDto updateNode(UUID nodeId, String nodeName, int durationInMinutes, String email, Long version) {
+    public CreateNodeDto updateNode(UUID nodeId, String nodeName, int durationInMinutes, String email,
+                                    Integer resolutionTimeoutInMinutes, Long version) {
         AuthContext authContext = requireAuthContext();
         Node node = nodeRepository.findById(nodeId).orElse(null);
         if (node == null) throw FlowException.stepNotFound();
@@ -224,6 +269,7 @@ public class FlowService {
         if (flow == null) throw FlowException.stepNotFound();
         requireCurrentVersion(flow, version);
         validateStep(nodeName, durationInMinutes, email);
+        Duration resolutionTimeout = resolutionTimeoutFor(flow, resolutionTimeoutInMinutes);
 
         User user = userRepository.findByEmailIgnoreCase(email.trim());
         if (user == null) throw FlowException.invalid("Choose a member of this team as the contact.");
@@ -231,7 +277,8 @@ public class FlowService {
         if (member == null) throw FlowException.invalid("Choose a member of this team as the contact.");
 
         node.setName(nodeName.trim());
-        node.setDuration(java.time.Duration.ofMinutes(durationInMinutes));
+        node.setDuration(Duration.ofMinutes(durationInMinutes));
+        node.setResolutionTimeout(resolutionTimeout);
         node.setEmail(user.getEmail());
         nodeRepository.save(node);
         touchFlow(flow, authContext);
@@ -272,7 +319,44 @@ public class FlowService {
     }
 
     private void requireCurrentVersion(Flow flow, Long version) {
-        if (version == null || !flow.getVersion().equals(version)) throw FlowException.staleVersion();
+        if (version == null || !Objects.equals(flow.getVersion(), version)) throw FlowException.staleVersion();
+    }
+
+    private Duration resolutionTimeoutFor(Flow flow, Integer resolutionTimeoutInMinutes) {
+        if (!flow.isResolutionTimeoutEnabled()) {
+            if (resolutionTimeoutInMinutes != null && resolutionTimeoutInMinutes != 0) {
+                throw FlowException.invalid("Resolution timeout is only available when enabled for the flow.");
+            }
+            return null;
+        }
+        if (resolutionTimeoutInMinutes == null || resolutionTimeoutInMinutes <= 0
+                || resolutionTimeoutInMinutes > 10080) {
+            throw FlowException.invalid("Resolution timeout must be between 1 and 10,080 minutes when enabled.");
+        }
+        return Duration.ofMinutes(resolutionTimeoutInMinutes);
+    }
+
+    private Map<UUID, Integer> validatedTimeouts(List<Node> nodes, List<NodeTimingDto> requestedTimings) {
+        if (requestedTimings == null || requestedTimings.size() != nodes.size()) {
+            throw FlowException.invalid("Provide one positive resolution timeout for every node.");
+        }
+
+        Set<UUID> nodeIds = new HashSet<>();
+        for (Node node : nodes) nodeIds.add(node.getId());
+        Map<UUID, Integer> timeoutByNodeId = new HashMap<>();
+        for (NodeTimingDto timing : requestedTimings) {
+            if (timing == null || timing.getNodeId() == null || timing.getResolutionTimeoutInMinutes() == null
+                    || timing.getResolutionTimeoutInMinutes() <= 0
+                    || timing.getResolutionTimeoutInMinutes() > 10080
+                    || !nodeIds.contains(timing.getNodeId())
+                    || timeoutByNodeId.put(timing.getNodeId(), timing.getResolutionTimeoutInMinutes()) != null) {
+                throw FlowException.invalid("Provide one positive resolution timeout for every node.");
+            }
+        }
+        if (!timeoutByNodeId.keySet().equals(nodeIds)) {
+            throw FlowException.invalid("Provide one positive resolution timeout for every node.");
+        }
+        return timeoutByNodeId;
     }
 
     private void validateStep(String nodeName, int durationInMinutes, String email) {
@@ -292,7 +376,9 @@ public class FlowService {
 
     private CreateNodeDto toNodeDto(Node node) {
         return new CreateNodeDto(node.getId(), node.getFlowId(), node.getName(),
-                Math.toIntExact(node.getDuration().toMinutes()), node.getEmail(), node.getPosition());
+                Math.toIntExact(node.getDuration().toMinutes()),
+                node.getResolutionTimeout() == null ? null : Math.toIntExact(node.getResolutionTimeout().toMinutes()),
+                node.getEmail(), node.getPosition());
     }
 
 }

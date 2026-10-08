@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
@@ -29,6 +30,7 @@ import com.alertops.security.AuthContext;
 import com.alertops.security.AuthContextHolder;
 import com.alertops.task.model.Task;
 import com.alertops.task.repository.TaskRepository;
+import com.alertops.task.service.TaskService;
 import com.alertops.webhook.dto.CreateWebhookRequest;
 import com.alertops.webhook.dto.UpdateWebhookRequest;
 import com.alertops.webhook.dto.WebhookConfigurationResponse;
@@ -58,10 +60,12 @@ public class WebhookService {
     private final StartFlowExecutionUseCase startFlowExecutionUseCase;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<StringRedisTemplate> redisTemplateProvider;
+    private final Clock clock;
     private final int maxPayloadBytes;
     private final int rateLimit;
     private final ConcurrentHashMap<UUID, RequestWindow> requestWindows = new ConcurrentHashMap<>();
 
+    // Creates the webhook service with persistence, execution, rate-limit, and clock dependencies.
     public WebhookService(
             WebhookConfigurationRepository configurationRepository,
             WebhookEventRepository eventRepository,
@@ -73,6 +77,7 @@ public class WebhookService {
             StartFlowExecutionUseCase startFlowExecutionUseCase,
             ObjectMapper objectMapper,
             ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+            Clock clock,
             @Value("${alertops.webhook.max-body-bytes:65536}") int maxPayloadBytes,
             @Value("${alertops.webhook.rate-limit:120}") int rateLimit) {
         this.configurationRepository = configurationRepository;
@@ -85,6 +90,7 @@ public class WebhookService {
         this.startFlowExecutionUseCase = startFlowExecutionUseCase;
         this.objectMapper = objectMapper;
         this.redisTemplateProvider = redisTemplateProvider;
+        this.clock = clock;
         this.maxPayloadBytes = maxPayloadBytes;
         this.rateLimit = rateLimit;
     }
@@ -137,6 +143,7 @@ public class WebhookService {
         return WebhookConfigurationResponse.from(configurationRepository.save(configuration), null);
     }
 
+    // Accepts a signed webhook event and atomically creates its task, escalation, and event record.
     @Transactional
     public WebhookTriggerResponse receiveEvent(UUID webhookId, String secret, JsonNode payload) {
         if (blank(secret)) {
@@ -173,12 +180,12 @@ public class WebhookService {
                     existing.getTaskId(), existing.getEscalationId(), true);
         }
 
-        String taskName = requiredText(payload, "taskName", 120);
-        String description = requiredText(payload, "description", 10000);
-        String source = requiredText(payload, "source", 120);
-        String priority = optionalText(payload, "priority", 20);
-        String category = optionalText(payload, "category", 80);
-        String referenceUrl = optionalText(payload, "referenceUrl", 2048);
+        String taskName = requiredText(payload, "taskName", TaskService.MAX_TASK_NAME_LENGTH);
+        String description = requiredText(payload, "description", TaskService.MAX_TASK_DESCRIPTION_LENGTH);
+        String source = requiredText(payload, "source", TaskService.MAX_TASK_SOURCE_LENGTH);
+        String priority = optionalText(payload, "priority", TaskService.MAX_TASK_PRIORITY_LENGTH);
+        String category = optionalText(payload, "category", TaskService.MAX_TASK_CATEGORY_LENGTH);
+        String referenceUrl = optionalText(payload, "referenceUrl", TaskService.MAX_TASK_REFERENCE_URL_LENGTH);
         if (referenceUrl != null && !HTTP_URL.matcher(referenceUrl).matches()) {
             throw WebhookException.badRequest("Reference URL must be a valid HTTP(S) URL.");
         }
@@ -204,7 +211,7 @@ public class WebhookService {
         WebhookEvent event = new WebhookEvent();
         event.setWebhookId(webhookId);
         event.setEventId(eventId.trim());
-        event.setReceivedAt(Instant.now());
+        event.setReceivedAt(Instant.now(clock));
         event.setPayload(payload);
         event.setPayloadHash(payloadHash);
         event.setTaskId(savedTask.getId());
@@ -328,13 +335,14 @@ public class WebhookService {
         }
     }
 
+    // Enforces the per-webhook request budget using Redis or an explicit local fallback.
     private void enforceRateLimit(UUID webhookId) {
         // Use Redis so all application instances share one counter.
         StringRedisTemplate redisTemplate = redisTemplateProvider.getIfAvailable();
         if (redisTemplate != null) {
             try {
                 // Put each webhook request into its current one-minute bucket.
-                long minute = System.currentTimeMillis() / 60_000;
+                long minute = clock.millis() / 60_000;
                 String key = "alertops:webhook-rate:" + webhookId + ":" + minute;
                 // Redis increments this counter safely when requests arrive together.
                 Long count = redisTemplate.opsForValue().increment(key);
@@ -354,7 +362,7 @@ public class WebhookService {
             }
         }
         // This fallback is per application instance, so Redis is preferred in production.
-        long now = System.currentTimeMillis();
+        long now = clock.millis();
         RequestWindow window = requestWindows.compute(webhookId, (key, current) -> {
             if (current == null || now - current.startedAt > 60_000) {
                 return new RequestWindow(now, new AtomicLong(1));

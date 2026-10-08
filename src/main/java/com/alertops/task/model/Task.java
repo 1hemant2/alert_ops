@@ -2,15 +2,15 @@ package com.alertops.task.model;
 
 import jakarta.persistence.*;
 
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UuidGenerator;
-import org.hibernate.annotations.Where;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "tasks")
-@Where(clause = "deleted = false")
+@SQLRestriction("deleted = false")
 public class Task {
 
     @Id

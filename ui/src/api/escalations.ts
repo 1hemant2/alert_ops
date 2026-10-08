@@ -1,5 +1,5 @@
 import { jsonBody, request } from './client'
-import type { Escalation, EscalationAcknowledgement, ExecutionState } from './types'
+import type { Escalation, EscalationAcknowledgement, EscalationHistoryPage, EscalationManualAction, EscalationManualActionRequest, EscalationResolution, ExecutionState } from './types'
 
 export function getEscalations(): Promise<Escalation[]> {
   return request<Escalation[]>('/api/v1/escalation/all?page=0&size=100&sortBy=createdAt&sortDir=desc')
@@ -59,6 +59,11 @@ export function getExecutionStates(escalationId: string): Promise<ExecutionState
   return request<ExecutionState[]>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/execution-states`)
 }
 
+// Loads the saved lifecycle activity for one escalation page.
+export function getEscalationHistory(escalationId: string, page = 0, size = 20): Promise<EscalationHistoryPage> {
+  return request<EscalationHistoryPage>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/history?page=${page}&size=${size}`)
+}
+
 export function previewEscalationAcknowledgement(token: string): Promise<EscalationAcknowledgement> {
   return request<EscalationAcknowledgement>('/api/v1/escalation/acknowledgement/preview', {
     method: 'POST',
@@ -69,6 +74,56 @@ export function previewEscalationAcknowledgement(token: string): Promise<Escalat
 
 export function acknowledgeEscalation(token: string): Promise<EscalationAcknowledgement> {
   return request<EscalationAcknowledgement>('/api/v1/escalation/acknowledgement/confirm', {
+    method: 'POST',
+    public: true,
+    body: jsonBody({ token }),
+  })
+}
+
+export function previewEscalateNow(
+  escalationId: string,
+  input: EscalationManualActionRequest,
+): Promise<EscalationManualAction> {
+  return request<EscalationManualAction>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/escalate-now/preview`, {
+    method: 'POST',
+    body: jsonBody(input),
+  })
+}
+
+export function escalateNow(
+  escalationId: string,
+  input: EscalationManualActionRequest,
+): Promise<EscalationManualAction> {
+  return request<EscalationManualAction>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/escalate-now`, {
+    method: 'POST',
+    body: jsonBody(input),
+  })
+}
+
+export function previewRecipientEscalateNow(token: string): Promise<EscalationManualAction> {
+  return request<EscalationManualAction>('/api/v1/escalation/escalate-now/preview', {
+    method: 'POST',
+    public: true,
+    body: jsonBody({ token }),
+  })
+}
+
+export function confirmRecipientEscalateNow(token: string): Promise<EscalationManualAction> {
+  return request<EscalationManualAction>('/api/v1/escalation/escalate-now/confirm', {
+    method: 'POST',
+    public: true,
+    body: jsonBody({ token }),
+  })
+}
+
+export function resolveEscalation(escalationId: string): Promise<EscalationResolution> {
+  return request<EscalationResolution>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/resolve`, {
+    method: 'POST',
+  })
+}
+
+export function resolveEscalationAsRecipient(token: string): Promise<EscalationResolution> {
+  return request<EscalationResolution>('/api/v1/escalation/resolution/confirm', {
     method: 'POST',
     public: true,
     body: jsonBody({ token }),
