@@ -12,6 +12,7 @@ export class ApiError extends Error {
 
 type RequestOptions = RequestInit & { public?: boolean }
 
+// Sends an API request and converts common failures into safe user copy.
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { public: isPublic = false, headers, ...init } = options
   const token = isPublic ? null : sessionStorage.getItem('alertops.token')
@@ -51,7 +52,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
           ? 'This record could not be found in the current team.'
           : response.status === 400
             ? 'Check the submitted values and try again.'
-            : 'AlertOps could not complete that request. Try again.')
+            : 'ReplyTrail could not complete that request. Try again.')
     throw new ApiError(message, response.status)
   }
 

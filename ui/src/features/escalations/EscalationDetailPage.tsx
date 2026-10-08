@@ -68,7 +68,7 @@ function activityLabel(event: EscalationHistoryEvent): string {
 
 // Describes the safe actor information returned by the history endpoint.
 function activityActor(event: EscalationHistoryEvent): string {
-  return event.actorType === 'SYSTEM' ? 'AlertOps system' : event.actorEmail ?? 'Team member'
+  return event.actorType === 'SYSTEM' ? 'ReplyTrail system' : event.actorEmail ?? 'Team member'
 }
 
 // Formats safe step, recipient, attempt, and timing details without exposing raw metadata.
@@ -120,6 +120,7 @@ function taskMetadataValue(value?: string | null): string {
 }
 
 // Displays the current escalation, saved step progress, and activity history.
+// Renders the saved escalation progress and activity history.
 export function EscalationDetailPage() {
   const { teamId = '', escalationId = '' } = useParams()
   const [scheduleDate, setScheduleDate] = useState('')
@@ -268,7 +269,7 @@ export function EscalationDetailPage() {
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
     <PageHeader eyebrow={`EXECUTION / ${item.id.slice(0, 8).toUpperCase()}`} title={item.name} description="Durable progress for this team scoped escalation." action={<StatusBadge status={item.status} />} />
     <InlineNotice>Each active step emails its configured recipient with the task context. SENT means the email service accepted the message; it does not confirm delivery.</InlineNotice>
-    {item.status === 'START_FAILED' && <InlineNotice tone="error"><strong>This scheduled escalation could not start.</strong> AlertOps exhausted its start retries. A notification was queued for the scheduler owner and team administrators; undelivered notifications retry and recover after restart.</InlineNotice>}
+    {item.status === 'START_FAILED' && <InlineNotice tone="error"><strong>This scheduled escalation could not start.</strong> ReplyTrail exhausted its start retries. A notification was queued for the scheduler owner and team administrators; undelivered notifications retry and recover after restart.</InlineNotice>}
     {scheduled && item.scheduledStartAt && <Card className="schedule-management-card">
       <div className="card-heading"><div><span className="eyebrow">SCHEDULED START</span><h2>{formatDate(item.scheduledStartAt)}</h2></div><StatusBadge status="SCHEDULED" /></div>
       <p className="form-intro">Configured timezone: {item.scheduleTimezone ?? 'UTC'}. You can change or cancel this one-time start before it begins.</p>

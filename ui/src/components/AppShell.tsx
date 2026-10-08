@@ -4,6 +4,7 @@ import { useSession } from '../app/useSession'
 import { teamRoleLabel } from '../features/teams/teamRoles'
 import { NavIcon } from './NavIcon'
 
+// Renders the signed-in ReplyTrail workspace shell.
 export function AppShell() {
   const { team, logout } = useSession()
   const navigate = useNavigate()
@@ -21,7 +22,7 @@ export function AppShell() {
       <aside className="sidebar">
         <NavLink className="brand" to={base}>
           <span className="brand-icon"><b /><b /><b /></span>
-          <span>ALERT<span>OPS</span></span>
+          <span>REPLY<span>TRAIL</span></span>
         </NavLink>
         <div className="workspace-label">WORKSPACE</div>
         <button className="workspace-switch" onClick={() => navigate('/teams')}>
@@ -41,12 +42,12 @@ export function AppShell() {
         <div className="sidebar-bottom">
           <div className="sidebar-system"><span className="queue-mark"><NavIcon name="escalations" /></span><span><strong>Escalation engine</strong><small>Ordered, durable handoffs</small></span></div>
           <button className="nav-item logout-button" onClick={signOut}><span className="nav-glyph"><NavIcon name="signout" /></span>Sign out</button>
-          <div className="sidebar-version">ALERTOPS <span>WORKSPACE</span></div>
+          <div className="sidebar-version">REPLYTRAIL <span>WORKSPACE</span></div>
         </div>
       </aside>
       <main className="main-column">
         <header className="topbar">
-          <div className="topbar-crumb"><span>Workspace</span><b>/</b><strong>{team?.name ?? 'AlertOps'}</strong></div>
+          <div className="topbar-crumb"><span>Workspace</span><b>/</b><strong>{team?.name ?? 'ReplyTrail'}</strong></div>
           <div className="topbar-right"><span className="api-indicator"><i />TEAM WORKSPACE</span><button className="avatar-button" onClick={signOut} title="Sign out"><NavIcon name="signout" /></button></div>
         </header>
         <div className="page-content"><Outlet /></div>

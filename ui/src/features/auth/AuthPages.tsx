@@ -8,6 +8,7 @@ import { Button, Field, InlineNotice } from '../../components/Elements'
 
 const PENDING_VERIFICATION_EMAIL_KEY = 'alertops.pending-verification-email'
 
+// Renders the ReplyTrail sign-in form.
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -35,22 +36,23 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
-      <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
+      <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
       <div className="auth-card">
-        <span className="eyebrow">WELCOME BACK</span><h1>Sign in to AlertOps</h1><p>Pick up where your incident workflows left off.</p>
+        <span className="eyebrow">WELCOME BACK</span><h1>Sign in to ReplyTrail</h1><p>Pick up where your response workflows left off.</p>
         <form onSubmit={submit} className="form-stack">
           <Field label="Email"><input autoComplete="email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@company.com" /></Field>
           <Field label="Password"><input autoComplete="current-password" type="password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="Your password" /></Field>
           {loginMutation.error && <div role="alert" className="form-error">{loginMutation.error.message}</div>}
           <Button className="button-full" disabled={loginMutation.isPending}>{loginMutation.isPending ? 'Signing in…' : 'Sign in'} <span>→</span></Button>
         </form>
-        <div className="auth-switch">New to AlertOps? <Link to="/register">Create an account</Link></div>
+        <div className="auth-switch">New to ReplyTrail? <Link to="/register">Create an account</Link></div>
       </div>
-      <div className="auth-caption">ALERTOPS <i /> DURABLE, ORDERED ESCALATION</div>
+      <div className="auth-caption">REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK</div>
     </div>
   )
 }
 
+// Renders the ReplyTrail account registration form.
 export function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -72,7 +74,7 @@ export function RegisterPage() {
 
   return (
     <div className="auth-page">
-      <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
+      <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
       <div className="auth-card">
         <span className="eyebrow">GET STARTED</span><h1>Create your account</h1><p>Build a workspace and walk through a live escalation.</p>
         <form onSubmit={submit} className="form-stack">
@@ -84,11 +86,12 @@ export function RegisterPage() {
         </form>
         <div className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></div>
       </div>
-      <div className="auth-caption">ALERTOPS <i /> DURABLE, ORDERED ESCALATION</div>
+      <div className="auth-caption">REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK</div>
     </div>
   )
 }
 
+// Renders account email verification and resend actions.
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
@@ -124,18 +127,18 @@ export function VerifyEmailPage() {
 
   return (
     <div className="auth-page">
-      <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
+      <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
       <div className="auth-card">
         <span className="eyebrow">ACCOUNT SECURITY</span>
         <h1>{emailVerified ? 'Email verified' : 'Verify your email'}</h1>
         {emailVerified ? (
           <>
-            <p>Your AlertOps account is ready. You can now create teams and accept invitations.</p>
+            <p>Your ReplyTrail account is ready. You can now create teams and accept invitations.</p>
             <Button className="button-full" onClick={continueAfterEmailVerification}>Continue <span>→</span></Button>
           </>
         ) : verificationTokenFromUrl ? (
           <>
-            <p>Confirm this email address to unlock your AlertOps workspace.</p>
+            <p>Confirm this email address to unlock your ReplyTrail workspace.</p>
             {verifyEmailMutation.error && <div role="alert" className="form-error">{verifyEmailMutation.error.message}</div>}
             <Button className="button-full" disabled={verifyEmailMutation.isPending} onClick={() => verifyEmailMutation.mutate()}>
               {verifyEmailMutation.isPending ? 'Verifying…' : 'Verify email'} <span>→</span>
@@ -162,9 +165,9 @@ export function VerifyEmailPage() {
             </Button>
           </>
         )}
-        <div className="auth-switch"><Link to="/">Return to AlertOps</Link></div>
+        <div className="auth-switch"><Link to="/">Return to ReplyTrail</Link></div>
       </div>
-      <div className="auth-caption">ALERTOPS <i /> DURABLE, ORDERED ESCALATION</div>
+      <div className="auth-caption">REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK</div>
     </div>
   )
 }

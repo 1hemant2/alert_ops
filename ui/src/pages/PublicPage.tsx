@@ -1,6 +1,7 @@
 import { Link, Navigate } from 'react-router'
 import { useSession } from '../app/useSession'
 
+// Renders the public ReplyTrail landing page.
 export function PublicPage() {
   const { token, team } = useSession()
   if (token && team) return <Navigate to={`/app/${team.id}`} replace />
@@ -8,7 +9,7 @@ export function PublicPage() {
   return (
     <div className="public-page">
       <header className="public-header">
-        <Link className="brand brand-light" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
+        <Link className="brand brand-light" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
         <div><Link className="public-login" to="/login">Sign in</Link><Link className="button button-lime" to={token ? '/teams' : '/register'}>{token ? 'Open workspace' : 'Create account'} <span>↗</span></Link></div>
       </header>
       <main className="public-main">
@@ -42,7 +43,7 @@ export function PublicPage() {
         </div>
         <div className="delivery-note"><span>EMAIL NOTIFICATIONS</span> Each configured recipient gets a formatted escalation email. SENT means the email service accepted it; it does not confirm delivery.</div>
       </section>
-      <footer className="public-footer"><span>ALERTOPS <i /> RELIABLE INCIDENT RESPONSE.</span><span>BUILT FOR ON-CALL TEAMS</span></footer>
+      <footer className="public-footer"><span>REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK.</span><span>BUILT FOR RESPONSE TEAMS</span></footer>
     </div>
   )
 }

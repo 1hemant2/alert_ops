@@ -48,8 +48,9 @@ function HomeRedirect() {
   return <PublicPage />
 }
 
+// Renders the fallback for unknown application routes.
 function NotFound() {
-  return <main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to AlertOps</a></main>
+  return <main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to ReplyTrail</a></main>
 }
 
 function AppRoutes() {

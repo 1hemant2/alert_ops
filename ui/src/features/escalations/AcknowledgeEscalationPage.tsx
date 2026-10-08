@@ -6,21 +6,23 @@ import type { EscalationAcknowledgement, EscalationResolution } from '../../api/
 import { Button } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
 
+// Formats safe errors for the acknowledgement preview and confirmation.
 function acknowledgementError(error: Error | null): string {
   if (error instanceof ApiError) {
     if (error.status === 410) return 'This acknowledgement window has closed. Ask your team to review the escalation.'
     if (error.status === 409) return 'This escalation has moved on, or another recipient already acknowledged it.'
     if (error.status === 400) return 'This acknowledgement link is invalid. Open the link from the original email.'
   }
-  return error?.message ?? 'AlertOps could not load this acknowledgement link.'
+  return error?.message ?? 'ReplyTrail could not load this acknowledgement link.'
 }
 
+// Formats safe errors for the resolution confirmation.
 function resolutionError(error: Error | null): string {
   if (error instanceof ApiError) {
     if (error.status === 409) return 'This resolution window has closed or the escalation was already advanced.'
     if (error.status === 400) return 'This resolution link is invalid. Open the link from the original email.'
   }
-  return error?.message ?? 'AlertOps could not resolve this escalation.'
+  return error?.message ?? 'ReplyTrail could not resolve this escalation.'
 }
 
 // Explains whether acknowledgement started an active resolution window.
@@ -36,14 +38,16 @@ function AcknowledgedMessage({ result }: { result: EscalationAcknowledgement }) 
 }
 
 // Confirms that the active resolution window has ended successfully.
+// Renders the success state after an escalation is resolved.
 function ResolvedMessage({ result }: { result: EscalationResolution }) {
   return <div className="notice notice-success" role="status">
     <strong>Escalation resolved</strong>
-    <div>AlertOps stopped the remaining response steps for “{result.escalationName}”.</div>
+    <div>ReplyTrail stopped the remaining response steps for “{result.escalationName}”.</div>
     {result.resolvedAt && <small>Resolved by {result.resolvedBy ?? 'the current recipient'} at {formatDate(result.resolvedAt)}.</small>}
   </div>
 }
 
+// Renders the public acknowledgement and resolution action page.
 export function AcknowledgeEscalationPage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
@@ -107,6 +111,6 @@ export function AcknowledgeEscalationPage() {
               </>}
       <div className="acknowledgement-footnote">This link is for {preview.data?.recipientEmail ?? 'the person assigned to this step'} and expires {preview.data ? formatDate(preview.data.expiresAt) : 'after a limited time'}. {acknowledgedResult?.resolutionDeadline ? `Resolve before ${formatDate(acknowledgedResult.resolutionDeadline)}.` : ''}</div>
     </div>
-    <div className="auth-caption">ALERTOPS <i /> DURABLE, ORDERED ESCALATION</div>
+    <div className="auth-caption">REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK</div>
   </div>
 }
