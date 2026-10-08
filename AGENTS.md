@@ -12,6 +12,12 @@ Build ReplyTrail into a production-ready alerting and escalation product for rea
 
 ## Changes
 
+- Write user-facing copy as natural, complete sentences across the UI, emails,
+  notifications, templates, and user-facing documentation. Avoid comma-separated
+  slogan or headline fragments. Prefer a sentence such as “Review every handoff
+  in one timeline.” Normal grammatical commas in full prose are fine; this rule
+  targets copy that reads like a list of fragments or generic AI-generated
+  marketing text.
 - Use clear, descriptive names for variables, methods, and classes.
 - Name types and methods for the business responsibility or user-visible
   outcome first, not for the internal mechanism. Prefer names such as

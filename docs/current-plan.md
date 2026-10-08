@@ -1,47 +1,46 @@
 # Current task plan
 
-## Task: Prepare local backend and UI environment configuration
+## Task: Make response-step menu icons self-explanatory
 
-Started: 2026-10-08
-Status: In progress
+Started: 2026-10-09
+Status: Complete
 
 ### Goal and scope
 
-Make the repository runnable locally as one application: reconcile the existing
-server `.env` with Docker Compose's service variables, add the UI Vite env file,
-check required local tooling, and verify startup prerequisites. Preserve all
-existing user-provided secret values and keep ignored local env files untracked.
+Replace ambiguous Unicode action glyphs in the response-step menu with visible,
+consistent icons and clearer labels so users can immediately understand the
+available duplicate, edit, and delete actions.
+
+### Resume note
+
+This follows the completed duplicate-step action recorded in the
+[changelog](../CHANGELOG.md). Preserve the existing step mutations, menu
+behavior, route structure, and dark-mode support.
 
 ### Decision-compliance note
 
-- The [launch checklist](product-launch-readiness.md) remains the release source
-  of truth; this is local development configuration, not deployment readiness.
-- Docker Compose is the canonical local dependency stack for PostgreSQL,
-  RabbitMQ, and Redis; the Vite proxy remains the canonical local API route.
-- Never replace existing JWT, SMTP, database, or broker credentials; add only
-  missing local defaults and record any unavailable external prerequisite.
+- Keep the existing action labels and handlers as the behavioral source of
+  truth; this task changes only affordance clarity.
+- Use the existing inline SVG styling approach rather than adding an icon
+  dependency or a second icon system.
 
 ### Acceptance criteria
 
-- [ ] Root `.env` contains the Compose service variables needed for local startup.
-- [ ] `ui/.env` points the UI at the local Vite proxy without exposing secrets.
-- [ ] Existing secrets remain unchanged and env files stay ignored by Git.
-- [ ] Required tooling and configuration validation pass; full startup is tested
-  when a local container runtime is available.
+- [x] Duplicate, edit, and delete actions each show a recognizable visible
+  icon in light and dark themes.
+- [x] The three-dot trigger has a clear native tooltip and accessible label.
+- [x] Existing menu actions and keyboard accessibility remain unchanged.
+- [x] UI build, lint, whitespace checks, and browser inspection pass.
 
 ### Steps
 
-- [x] Inspect the env examples, Compose file, Spring profiles, UI proxy, and
-  installed local toolchain.
-- [ ] Add missing local Compose defaults and the UI env file without overwriting
-  user-provided credentials.
-- [ ] Validate the resolved Compose configuration and run available checks.
-- [ ] Update the changelog and complete this plan with verification results or a
-  clearly documented runtime prerequisite.
+- [x] Replace the Unicode menu glyphs with inline SVG icons and themed styles.
+- [x] Add clearer hover guidance to the action trigger and menu items.
+- [x] Verify the open menu visually in Chrome and run focused checks.
+- [x] Record the completed result in `CHANGELOG.md`.
 
-### Intended verification and limitations
+### Intended verification
 
-Validate the env key set, `docker compose config`, UI build, backend
-compilation, and full Compose health once Docker is available. Do not print or
-commit secret values. SMTP delivery and external email-provider behavior remain
-outside local configuration verification.
+Completed the UI build, lint, `git diff --check`, and Chrome inspection of the
+open response-step menu in the current dark theme. Lint retains the two
+existing `FlowDetailPage.tsx` warnings.

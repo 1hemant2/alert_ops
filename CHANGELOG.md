@@ -4,6 +4,264 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-09 — Clarify response-step action icons
+
+- Replace ambiguous Unicode glyphs with visible duplicate, edit, and delete
+  icons, and add native guidance to the three-dot step action trigger.
+- Verification: UI build, lint, `git diff --check`, and Chrome dark-theme menu
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Add response-step duplication
+
+- Add a Duplicate step action to each response-step menu; it copies the
+  recipient, wait time, and enabled timeout, then places the new step after
+  its source without requiring a trip back to the page header.
+- Verification: UI build, lint, `git diff --check`, and Chrome menu and ordered
+  duplicate inspection pass; lint retains the two existing
+  `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Focus escalation paths on response steps
+
+- Make the ordered response route the primary path-detail view, move resolution
+  timeout into a separate collapsed Path settings disclosure, and remove the
+  repeated timeout field from step cards and the step editor.
+- Verification: UI build, lint, `git diff --check`, and Chrome route, settings,
+  and step-editor inspection pass; lint retains the two existing
+  `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Label collapsed sidebar icons on hover
+
+- Add native hover titles and accessible names to sidebar navigation icons,
+  workspace switching, the escalation engine, sign-out, and the sidebar
+  toggle so the collapsed rail remains understandable.
+- Verification: UI build, lint, `git diff --check`, and Chrome collapsed and
+  expanded inspection pass; lint retains the two existing `FlowDetailPage.tsx`
+  warnings.
+
+## 2026-10-09 — Place the sidebar toggle inside the navigation rail
+
+- Move the desktop expand/collapse control beside the ReplyTrail mark and keep
+  it inside the collapsed rail beneath the mark, making the control feel owned
+  by the navigation while preserving mobile drawer access.
+- Verification: UI build, lint, `git diff --check`, and Chrome expanded,
+  collapsed, reopened, and light/dark inspection pass; lint retains the two
+  existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Restore dark-mode task detail contrast
+
+- Add dark-theme colors for the saved task description, field labels, values,
+  links, and metadata separators so task context remains readable against the
+  dark card surface.
+- Verification: UI build, lint, `git diff --check`, and Chrome light/dark task
+  detail inspection pass; lint retains the two existing `FlowDetailPage.tsx`
+  warnings.
+
+## 2026-10-09 — Modernize the sidebar toggle
+
+- Replace the text-heavy navigation control with a persistent icon-only
+  panel-and-arrow toggle whose icon and accessible label follow the sidebar
+  state; the same control expands and collapses navigation.
+- Verification: UI build, lint, `git diff --check`, and Chrome expanded,
+  collapsed, and reopened inspection pass; lint retains the two existing
+  `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Improve collapsed sidebar identity spacing
+
+- Add breathing room between the ReplyTrail mark and workspace avatar when the
+  sidebar is collapsed, making the two identity cues easier to distinguish.
+- Verification: UI build, lint, `git diff --check`, and Chrome expanded/collapsed
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Use one persistent sidebar toggle
+
+- Remove the duplicate close button from the sidebar and make the top-bar
+  toggle the single control for opening, collapsing, and closing navigation;
+  keep it visible as the workspace scrolls.
+- Verification: UI build, lint, `git diff --check`, and Chrome expanded,
+  collapsed, reopened, and scrolled inspection pass; lint retains the two
+  existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Polish team-selection theme spacing
+
+- Give the team-selection theme toggle more breathing room and anchor the page
+  to the viewport theme so dark mode no longer exposes a light strip at the top
+  after switching.
+- Verification: UI build, lint, `git diff --check`, and Chrome light/dark
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Make sidebar reopening discoverable
+
+- Add visible Menu and Open menu labels to the workspace navigation toggle so
+  the collapsed sidebar has an obvious reopen action; keep the expanded sidebar
+  branding clean and retain the accessible close control.
+- Verification: UI build, lint, `git diff --check`, and Chrome expanded,
+  collapsed, and reopened inspection pass; lint retains the two existing
+  `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Keep workspace navigation open and reachable
+
+- Open the desktop sidebar by default on each page load while retaining the
+  collapse/reopen control, and make the full navigation independently scrollable
+  so the escalation engine and Sign out controls remain reachable.
+- The existing landing and workspace copy already explains the product clearly
+  on first view and remains unchanged. Verification: UI build, lint,
+  `git diff --check`, and Chrome fresh-load, collapse/reopen, and sidebar-scroll
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Refine workspace navigation spacing
+
+- Replace one-off sidebar margins with consistent navigation groups, link
+  heights, section gaps, workspace spacing, and a separated bottom system area
+  so the expanded and collapsed menu states share the same visual rhythm.
+- Verification: UI build, lint, `git diff --check`, and Chrome expanded/collapsed
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Reorganize and dismiss the workspace navigation
+
+- Group the signed-in menu into Monitor, Configure, and Team sections, then add
+  desktop collapse behavior plus a closeable mobile navigation drawer with
+  backdrop and reopen controls.
+- Verification: UI build, lint, `git diff --check`, and Chrome interaction
+  checks pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Add date filters to the Audit trail
+
+- Add inclusive From date and To date filters to the frontend Audit trail,
+  resolved against the user's local calendar, with clear dates and invalid-range
+  feedback; the existing backend audit contract remains unchanged.
+- Verification: UI build, lint, `git diff --check`, and Chrome interaction
+  checks pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Standardize natural user-facing copy
+
+- Add repository guidance to avoid comma-separated slogan fragments in UI,
+  emails, notifications, templates, and user-facing documentation; replace the
+  Audit page heading with “Review every handoff in one timeline.”
+- Verification: targeted phrase search, UI build, lint, and `git diff --check`
+  pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Add a frontend-only audit trail page
+
+- Add a signed-in Audit trail page that aggregates all available escalation
+  history through the existing APIs, with escalation links, actor/time/state
+  context, search, event filtering, refresh, empty/error/loading states, and
+  light/dark responsive styling; no backend changes were required.
+- Verification: UI build, lint, `git diff --check`, and Chrome inspection pass;
+  lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Refine the automatic recovery badge
+
+- Turn the reliability card's recovery label into a compact icon badge that
+  stays aligned with the heading on desktop and stacks cleanly on mobile.
+- Verification: UI build, lint, and whitespace checks pass; lint retains the
+  two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Modernize overview workflow cards
+
+- Add meaningful task, path, response, saved-state, handoff, and recovery icons
+  to the setup/reliability cards, with accent rails, connected step styling,
+  badges, softer surfaces, and clearer hover hierarchy.
+- Verification: UI build, lint, and whitespace checks pass; lint retains the
+  two existing `FlowDetailPage.tsx` warnings. Live workspace visual inspection
+  was limited because the browser had no authenticated session.
+
+## 2026-10-09 — Add clickable workspace breadcrumbs
+
+- Add route-aware breadcrumbs to the signed-in shell so collection and detail
+  pages expose clickable parent levels such as Team → Tasks → Task details.
+- Verification: UI build, lint, and whitespace checks pass; live route-click
+  inspection was limited because the browser had no authenticated workspace.
+
+## 2026-10-09 — Add icons to overview metrics
+
+- Replace placeholder metric letters/arrows with the existing task, flow,
+  escalation, and overview SVG icons while preserving clickable destinations.
+- Verification: UI build, lint, and whitespace checks pass; lint retains the
+  two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Make overview metrics clickable
+
+- Turn the four overview metric cards into semantic links to Tasks, Escalation
+  paths, and Escalations, with full-card hover, focus, and arrow affordances.
+- Verification: UI build, lint, and whitespace checks pass; live click testing
+  was unavailable because the browser had no authenticated workspace session.
+
+## 2026-10-09 — Unify the response tagline
+
+- Replace the comma-based “Your response, in order.” overview title with the
+  natural existing ReplyTrail tagline, “Keep every response on track.”
+- Verification: UI build, lint, phrase search, and whitespace checks pass; the
+  old phrase is absent from the product UI.
+
+## 2026-10-09 — Improve email footer wording
+
+- Replace the awkward comma-based footer slogan in invitation and escalation
+  notification emails with the existing natural ReplyTrail tagline,
+  “Keep every response on track.”
+- Verification: backend package, wording search, and whitespace checks pass.
+
+## 2026-10-09 — Add password visibility controls
+
+- Add a reusable eye-icon show/hide control to sign-in and registration
+  password fields, keeping passwords masked by default with accessible state
+  labels.
+- Verification: UI build, lint, whitespace checks, and Chrome interaction
+  checks pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Silence development SQL statement output
+
+- Disable Hibernate SQL rendering and formatting in the local `dev` profile so
+  debugger terminals keep normal application logs without printing every query.
+- Verification: `mvn -DskipTests package`, property inspection, and whitespace
+  checks pass; production SQL logging settings remain unchanged.
+
+## 2026-10-09 — Clarify the escalation overview description
+
+- Replace the technical-sounding overview description with clearer copy that
+  emphasizes reliable ownership from the first alert to the final handoff.
+- Verification: UI build, lint, and whitespace checks pass; lint retains the
+  two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Soften the light UI palette
+
+- Replace stark white light-mode canvases, cards, controls, public sections,
+  product previews, and dialogs with muted blue-gray/off-white surfaces while
+  preserving text contrast and semantic status colors.
+- Verification: UI build, lint, whitespace checks, and Chrome light/dark theme
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Turn the home page into an interactive product tour
+
+- Replace static use-case tiles with thirteen clickable workflow stories that
+  open accessible details for the scenario, owner handoff, timing, and finish
+  condition; add a responsive signed-in workspace preview of an active run.
+- Add theme-aware product-window, card, dialog, and mobile styling with
+  reduced-motion-safe interactions, keeping the existing registration and sign-in
+  paths unchanged.
+- Verification: UI build and whitespace checks pass; Chrome inspection confirmed
+  the preview, all cards, dialog content, and close behavior. Lint retains the
+  two pre-existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Load local env from the VS Code Java launch profile
+
+- Configure the `AlertOpsApplication` debug profile to load the ignored root
+  `.env` and send Spring logs to the integrated terminal.
+- Verification: launch JSONC parsing and whitespace checks pass; the existing
+  backend remains healthy on port 8096 with the same local env. The VS Code GUI
+  launch itself remains a user-side F5 action.
+
+## 2026-10-09 — Prepare the local full-stack environment
+
+- Reconcile the ignored root `.env` with Docker Compose's PostgreSQL, RabbitMQ,
+  Redis, UI URL, and application defaults; add ignored `ui/.env` with the local
+  Vite proxy configuration and add the missing email-verification example key.
+- Install Docker CLI/Compose and native PostgreSQL 16/RabbitMQ dependencies;
+  start the native services and initialize the local `alert_ops` database using
+  the existing ignored credentials without exposing secret values.
+- Verification: Compose config, backend compile, UI build, Vite proxy, backend
+  liveness, Flyway migrations, and native service checks pass. Docker/Colima VM
+  image downloads stalled, so the app was verified with native services instead.
+
 ## 2026-10-09 — Improve light-mode contrast and home-page engagement
 
 - Strengthen light-mode text, border, control, card, and secondary-surface
