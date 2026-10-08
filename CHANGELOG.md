@@ -4,6 +4,27 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Explain ReplyTrail and its use cases
+
+- Rewrite the [README](README.md) introduction for new visitors with thirteen use
+  cases in plain language and definitions of the core concepts. Simplify setup
+  and ten personal reminders, keeping timing and acknowledgement behavior clear;
+  remove the extended customer onboarding walkthrough.
+- Document current scheduling, resolution, manual actions, and history; correct
+  the first-use walkthrough and Spring Boot version while retaining setup/API examples.
+- Verification: UI build, Maven verification outside the sandbox (240 tests,
+  17 environment-gated skips), link/example checks, and whitespace checks pass. UI lint retains two
+  existing warnings; live email, Docker startup, and deployed journeys were not tested.
+
+## 2026-10-08 — Remove mandatory secondary review instructions
+
+- Remove the repository-level requirement and maintained-plan references that
+  caused an extra review process to run for every task.
+- Preserve historical changelog evidence while keeping current instructions
+  focused on direct local verification.
+- Verification: targeted instruction search and `git diff --check` pass; no
+  product build was needed for this documentation-only change.
+
 ## 2026-10-08 — Implement the ReplyTrail public rebrand
 
 - Rename visible product surfaces, metadata, current documentation, CI display

@@ -148,8 +148,8 @@ renaming namespaces or PVCs is not a cosmetic operation.
   old public endpoints and issued links survive any domain cutover.
 - [ ] All residual AlertOps references are reviewed and classified; historical records
   and applied migrations are preserved.
-- [ ] Local UI build/lint, focused backend tests, full Maven verification, and
-  independent read-only review pass; deployed smoke checks and rollback are proven
+- [ ] Local UI build/lint, focused backend tests, and full Maven verification pass;
+  deployed smoke checks and rollback are proven
   before release readiness is marked complete.
 
 Implementation commands: `npm --prefix ui run build`, `npm --prefix ui run lint`,

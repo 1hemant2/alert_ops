@@ -1,54 +1,52 @@
 # Current task plan
 
-## Task: Implement the ReplyTrail public rebrand
+## Task: Explain ReplyTrail and its use cases in the README
 
 Started: 2026-10-08
-Status: Complete — local public rebrand implemented; domain/deployed rollout pending
+Status: Complete
 
 ### Goal and scope
 
-Implement the selected public name ReplyTrail across visible application surfaces,
-outgoing email copy, current product documentation, and human-readable metadata.
-Keep existing API, storage, package, queue, cache, environment, and deployment
-identifiers compatible. This task does not purchase a domain or deploy a release.
-Previous task: the CI container image fix is complete; its outcome remains in
-[the changelog](../CHANGELOG.md#2026-10-08--fix-ci-container-image-build).
+Rewrite the thirteen [README use cases](../README.md#use-cases) in simple,
+plain language, including setup and personal reminders. Remove the complete
+customer onboarding walkthrough requested by the user; retain onboarding as
+one use case. Scope: README, this plan, and the existing task changelog entry.
+Preserve all other worktree changes.
 
 ### Decision-compliance note
 
-- [Launch readiness](product-launch-readiness.md) remains the release source of truth.
-- Preserve agreed task, escalation, acknowledgement/resolution, scheduling,
-  webhook, audit, and durable-state behavior in the existing feature plans.
-- Distinguish visible branding from existing integration and storage identifiers;
-  exclude blanket renames, new features, schema changes, and infrastructure moves.
-- ReplyTrail is the selected public name for this implementation; its `.com` and
-  `.app` are registered, so no domain claim or purchase is part of this task.
-- Keep `alertops.*`, `ALERTOPS_*`, `X-AlertOps-Webhook-Secret`, `com.alertops`,
-  session keys, event names, and deployment resource identifiers unchanged.
+- [Launch readiness](product-launch-readiness.md) remains the release source of
+  truth; local implementation does not establish deployed readiness.
+- [Lifecycle decisions](resolution-timeout-implementation-plan.md#agreed-resolution-timeout-behavior)
+  govern acknowledgement/resolution; reuse existing task, flow, and run concepts.
+- [Webhook decisions](webhook-escalation-implementation-plan.md#task-fields)
+  govern context: use source, priority, category, referenceUrl, and saved payload.
+- Recipients belong to the team; notifications use email; schedules are one-time.
+  Exclude new integrations, domain-specific schemas, approval states, recurring
+  schedules, and changes to canonical lifecycle fields or timing boundaries.
+- Repeated recipients use distinct existing nodes and execution steps. Waits use
+  relative durations and saved dueAt; a 24-hour interval is 1,440 minutes.
+  Acknowledgement stops a disabled-resolution run; calendar recurrence is excluded.
 
 ### Acceptance criteria
 
-- [x] Visible UI, metadata, email copy, and maintained guidance use ReplyTrail.
-- [x] Existing integration, storage, package, queue, cache, and deployment identifiers
-  remain unchanged and executable.
-- [x] Focused tests, UI build/lint, full Maven verification, and diff checks pass.
-- [x] Residual AlertOps references are reviewed and independently verified.
+- [x] Thirteen use cases and reminder instructions use everyday language.
+- [x] The customer onboarding walkthrough is removed completely.
+- [x] Timing, acknowledgement, team membership, and external-tool detection stay accurate.
+- [x] Documentation checks and normal builds pass; limitations are recorded.
 
 ### Steps
 
-- [x] Confirm the selected public name and record compatibility constraints.
-- [x] Update visible frontend, email, metadata, README, and current checklist copy.
-- [x] Update focused assertions and run UI/backend verification.
-- [x] Review residual references, obtain independent verification, and record outcome.
+- [x] Inspect current README, plan, changelog, and existing changes.
+- [x] Simplify use cases/setup/reminders and remove the requested walkthrough.
+- [x] Check links, examples, scope, and whitespace; run UI build and Maven verify.
+- [x] Update the existing changelog entry and mark this plan complete.
 
-### Intended verification and limitations
+### Verification and limitations
 
-UI build passes; lint reports two existing FlowDetailPage warnings. Focused
-branding/email tests pass (14 tests), and full Maven clean verification passes
-(240 tests, 0 failures/errors, 17 environment-gated skips). `git diff --check`
-passes. Remaining AlertOps references are compatibility identifiers, historical
-records, or planned domain/deployment work; an independent read-only review is
-independent read-only verdict is **Achieved**: 132 relative links/anchors were
-valid, retained-resource paths were unchanged, and no substantive regression was
-found. Domain purchase, real email delivery, and deployed browser/smoke checks
-remain outside this local task.
+Pass: thirteen plain-language use cases, complete walkthrough removal, 32
+relative links/anchors, eight fenced examples (Bash/JSON syntax), whitespace,
+and final scope review. UI build and Maven verify pass: 240 tests, zero failures
+or errors, 17 environment-gated skips. Maven ran outside the sandbox for its
+JVM test agent. Live email, Docker startup, PostgreSQL/Redis, and deployed
+journeys remain unverified.
