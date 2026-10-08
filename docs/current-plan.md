@@ -1,52 +1,47 @@
 # Current task plan
 
-## Task: Explain ReplyTrail and its use cases in the README
+## Task: Prepare local backend and UI environment configuration
 
 Started: 2026-10-08
-Status: Complete
+Status: In progress
 
 ### Goal and scope
 
-Rewrite the thirteen [README use cases](../README.md#use-cases) in simple,
-plain language, including setup and personal reminders. Remove the complete
-customer onboarding walkthrough requested by the user; retain onboarding as
-one use case. Scope: README, this plan, and the existing task changelog entry.
-Preserve all other worktree changes.
+Make the repository runnable locally as one application: reconcile the existing
+server `.env` with Docker Compose's service variables, add the UI Vite env file,
+check required local tooling, and verify startup prerequisites. Preserve all
+existing user-provided secret values and keep ignored local env files untracked.
 
 ### Decision-compliance note
 
-- [Launch readiness](product-launch-readiness.md) remains the release source of
-  truth; local implementation does not establish deployed readiness.
-- [Lifecycle decisions](resolution-timeout-implementation-plan.md#agreed-resolution-timeout-behavior)
-  govern acknowledgement/resolution; reuse existing task, flow, and run concepts.
-- [Webhook decisions](webhook-escalation-implementation-plan.md#task-fields)
-  govern context: use source, priority, category, referenceUrl, and saved payload.
-- Recipients belong to the team; notifications use email; schedules are one-time.
-  Exclude new integrations, domain-specific schemas, approval states, recurring
-  schedules, and changes to canonical lifecycle fields or timing boundaries.
-- Repeated recipients use distinct existing nodes and execution steps. Waits use
-  relative durations and saved dueAt; a 24-hour interval is 1,440 minutes.
-  Acknowledgement stops a disabled-resolution run; calendar recurrence is excluded.
+- The [launch checklist](product-launch-readiness.md) remains the release source
+  of truth; this is local development configuration, not deployment readiness.
+- Docker Compose is the canonical local dependency stack for PostgreSQL,
+  RabbitMQ, and Redis; the Vite proxy remains the canonical local API route.
+- Never replace existing JWT, SMTP, database, or broker credentials; add only
+  missing local defaults and record any unavailable external prerequisite.
 
 ### Acceptance criteria
 
-- [x] Thirteen use cases and reminder instructions use everyday language.
-- [x] The customer onboarding walkthrough is removed completely.
-- [x] Timing, acknowledgement, team membership, and external-tool detection stay accurate.
-- [x] Documentation checks and normal builds pass; limitations are recorded.
+- [ ] Root `.env` contains the Compose service variables needed for local startup.
+- [ ] `ui/.env` points the UI at the local Vite proxy without exposing secrets.
+- [ ] Existing secrets remain unchanged and env files stay ignored by Git.
+- [ ] Required tooling and configuration validation pass; full startup is tested
+  when a local container runtime is available.
 
 ### Steps
 
-- [x] Inspect current README, plan, changelog, and existing changes.
-- [x] Simplify use cases/setup/reminders and remove the requested walkthrough.
-- [x] Check links, examples, scope, and whitespace; run UI build and Maven verify.
-- [x] Update the existing changelog entry and mark this plan complete.
+- [x] Inspect the env examples, Compose file, Spring profiles, UI proxy, and
+  installed local toolchain.
+- [ ] Add missing local Compose defaults and the UI env file without overwriting
+  user-provided credentials.
+- [ ] Validate the resolved Compose configuration and run available checks.
+- [ ] Update the changelog and complete this plan with verification results or a
+  clearly documented runtime prerequisite.
 
-### Verification and limitations
+### Intended verification and limitations
 
-Pass: thirteen plain-language use cases, complete walkthrough removal, 32
-relative links/anchors, eight fenced examples (Bash/JSON syntax), whitespace,
-and final scope review. UI build and Maven verify pass: 240 tests, zero failures
-or errors, 17 environment-gated skips. Maven ran outside the sandbox for its
-JVM test agent. Live email, Docker startup, PostgreSQL/Redis, and deployed
-journeys remain unverified.
+Validate the env key set, `docker compose config`, UI build, backend
+compilation, and full Compose health once Docker is available. Do not print or
+commit secret values. SMTP delivery and external email-provider behavior remain
+outside local configuration verification.

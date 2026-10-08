@@ -4,6 +4,35 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-09 — Improve light-mode contrast and home-page engagement
+
+- Strengthen light-mode text, border, control, card, and secondary-surface
+  contrast for easier reading across the UI.
+- Add workflow-benefit cues, a ready-to-run workflow count, richer public-section
+  surfaces, hover feedback, and subtle reduced-motion-safe status animation.
+- Verification: UI build, lint, diff checks, desktop/mobile Chrome inspection,
+  and light/dark theme checks pass; lint retains two pre-existing warnings.
+
+## 2026-10-08 — Add persisted dark mode to the UI
+
+- Add a local-storage-backed light/dark theme with pre-paint restoration and
+  accessible toggles across public, auth, workspace, team, invitation, and
+  email-action surfaces.
+- Add dark styling for shared navigation, forms, cards, notices, statuses, path
+  builders, and public use-case sections without changing product behavior.
+- Verification: UI build, lint, diff checks, public switching/reload, and sign-in
+  screen inspection pass; lint retains two pre-existing FlowDetailPage warnings.
+
+## 2026-10-08 — Bring ReplyTrail use cases to the home page
+
+- Add a scannable public landing-page section for all thirteen README use cases,
+  with plain-language descriptions, responsive cards, a hero anchor link, and
+  the existing SVG favicon linked for a clean browser preview.
+- Verification: UI build, `git diff --check`, and Chrome desktop/400px responsive
+  inspection pass; the hero anchor and existing signup links work. UI lint retains
+  two pre-existing FlowDetailPage warnings; live email and deployed journeys were
+  not tested.
+
 ## 2026-10-08 — Explain ReplyTrail and its use cases
 
 - Rewrite the [README](README.md) introduction for new visitors with thirteen use
