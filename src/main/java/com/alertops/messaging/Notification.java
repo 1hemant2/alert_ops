@@ -93,7 +93,7 @@ public class Notification {
                     StandardCharsets.UTF_8.name());
             helper.setFrom(fromAddress);
             helper.setTo(flowExecutionState.getUserEmail().trim());
-            helper.setSubject("AlertOps · " + taskSource + " · " + subjectDetails);
+            helper.setSubject("ReplyTrail · " + taskSource + " · " + subjectDetails);
 
             var alternative = new MimeMultipart("alternative");
             var plainPart = new MimeBodyPart();
@@ -147,13 +147,13 @@ public class Notification {
             }
 
             String plainText = """
-                    AlertOps could not start a scheduled escalation after all retry attempts.
+                    ReplyTrail could not start a scheduled escalation after all retry attempts.
 
                     Escalation: %s
                     Escalation ID: %s
                     Reason: %s
 
-                    Review the escalation in AlertOps and follow your team's response procedure.
+                    Review the escalation in ReplyTrail and follow your team's response procedure.
                     """.formatted(safeName, Objects.toString(escalationId, "unknown"), safeReason);
             String html = """
                     <!doctype html>
@@ -165,7 +165,7 @@ public class Notification {
                             <tr><td style="height:5px;background:#c0392b;font-size:0;">&nbsp;</td></tr>
                             <tr><td style="padding:22px 30px;background:#14283f;color:#fff;font-size:18px;font-weight:700;">Scheduled escalation failed to start</td></tr>
                             <tr><td style="padding:30px;font-size:15px;line-height:1.65;">
-                              <p style="margin:0 0 16px;">AlertOps exhausted all start attempts for this scheduled escalation.</p>
+                              <p style="margin:0 0 16px;">ReplyTrail exhausted all start attempts for this scheduled escalation.</p>
                               <p style="margin:0 0 8px;"><strong>Escalation:</strong> %s</p>
                               <p style="margin:0 0 8px;"><strong>Escalation ID:</strong> %s</p>
                               <p style="margin:0;"><strong>Reason:</strong> %s</p>
@@ -184,7 +184,7 @@ public class Notification {
             var helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(fromAddress);
             helper.setTo(recipientEmail.trim());
-            helper.setSubject("AlertOps · START_FAILED · " + safeName);
+            helper.setSubject("ReplyTrail · START_FAILED · " + safeName);
             helper.setText(plainText, html);
             mailSender.send(message);
             return true;
@@ -215,7 +215,7 @@ public class Notification {
         return """
                 # A response needs your attention
 
-                AlertOps has activated a response workflow.
+                ReplyTrail has activated a response workflow.
 
                 ## Task
 
@@ -240,7 +240,7 @@ public class Notification {
 
                 ---
 
-                *Automated notification from AlertOps. Replies may not be monitored.*
+                *Automated notification from ReplyTrail. Replies may not be monitored.*
                 """.formatted(taskName.isBlank() ? "Response needed" : taskName, taskSource, taskPriority,
                         taskCategory, taskReferenceUrl, details,
                         escalationId, recipient, acknowledgementUrl, escalateNowAction);
@@ -264,7 +264,7 @@ public class Notification {
                 <head>
                   <meta charset="UTF-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <title>AlertOps escalation notice</title>
+                  <title>ReplyTrail escalation notice</title>
                   <style>
                     @media only screen and (max-width: 600px) {
                       .email-card { width:100% !important; }
@@ -278,7 +278,7 @@ public class Notification {
                       <table role="presentation" class="email-card" width="620" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:620px;background:#ffffff;border:1px solid #e3eaf1;border-radius:14px;overflow:hidden;">
                         <tr><td style="height:5px;background:#8acb3f;font-size:0;line-height:0;">&nbsp;</td></tr>
                         <tr><td style="padding:22px 30px;background:#14283f;color:#ffffff;">
-                          <div style="font-size:13px;font-weight:700;letter-spacing:2px;">ALERTOPS</div>
+                          <div style="font-size:13px;font-weight:700;letter-spacing:2px;">REPLYTRAIL</div>
                           <div style="margin-top:7px;color:#b8c7d8;font-size:11px;font-weight:700;letter-spacing:1.5px;">ESCALATION NOTIFICATION</div>
                         </td></tr>
                         <tr><td class="email-content" style="padding:32px 34px 24px;font-size:15px;">
@@ -292,7 +292,7 @@ public class Notification {
                           {{ESCALATE_NOW_ACTION}}
                         </td></tr>
                         <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;line-height:1.5;">
-                          Sent automatically by AlertOps. Please use your team's usual incident response channel.
+                          Sent automatically by ReplyTrail. Please use your team's usual incident response channel.
                         </td></tr>
                       </table>
                       <div style="padding:16px 8px;color:#8491a2;font-size:11px;">Reliable escalation, made explicit.</div>
