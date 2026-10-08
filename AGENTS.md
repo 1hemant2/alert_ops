@@ -1,4 +1,4 @@
-# Agent instructions for AlertOps
+# Agent instructions for ReplyTrail
 
 These rules apply to all work in this repository: backend, frontend, database, configuration, and documentation.
 
@@ -8,7 +8,7 @@ Act as a software engineer collaborating with the project owner. Read the releva
 
 ## Project goal
 
-Build AlertOps into a production-ready alerting and escalation product for real users. Treat the backend, UI, security, reliability, and operations as parts of the same product. Use [the product launch checklist](docs/product-launch-readiness.md) for current release priorities.
+Build ReplyTrail into a production-ready alerting and escalation product for real users. Treat the backend, UI, security, reliability, and operations as parts of the same product. Use [the product launch checklist](docs/product-launch-readiness.md) for current release priorities. Existing `alertops` technical identifiers remain compatible during the public rebrand.
 
 ## Changes
 

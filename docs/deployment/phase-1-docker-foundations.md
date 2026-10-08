@@ -1,5 +1,9 @@
 # Phase 1: Docker and Compose foundations
 
+> **ReplyTrail rebrand note:** This Docker and Compose learning record uses older
+> AlertOps wording in historical observations. It refers to the current ReplyTrail
+> product; executable `alertops` resource and configuration identifiers remain unchanged.
+
 This note explains what Docker Compose creates for AlertOps, why each resource exists,
 and which commands are safe to use. It is intended as a reference to revisit while
 learning; memorizing every command is not required.

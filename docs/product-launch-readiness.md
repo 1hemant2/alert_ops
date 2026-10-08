@@ -1,4 +1,4 @@
-# AlertOps: critical path to product release
+# ReplyTrail: critical path to product release
 
 Reassessed: 2026-10-08. This list contains critical bugs to fix first, the two product features selected for this release, and the in-progress review of the Alert Escalation v1 requirements. Scheduling has focused PostgreSQL integration coverage with a simulated broker; the deployed end-to-end release journey remains unverified.
 
@@ -183,6 +183,7 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ## Release check
 
+- [x] Select and implement the public product identity using the [product rebranding plan](product-rebranding-plan.md). ReplyTrail is implemented locally; domain ownership, sender verification, and deployed rollout remain pending. Retain existing integration and storage identifiers during the initial rebrand.
 - [x] All four critical fixes above are complete locally.
 - [ ] A scheduled escalation that exhausts its start retries notifies the responsible user and team administrators. The pending notification survives an application crash and is recovered after restart.
 - [ ] Both product features work together in a deployed end-to-end run: webhook event → one task and run → email → recipient acknowledgement → no later step sent.

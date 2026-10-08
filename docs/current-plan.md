@@ -1,48 +1,54 @@
 # Current task plan
 
-## Task: Fix CI container image build
+## Task: Implement the ReplyTrail public rebrand
 
 Started: 2026-10-08
-Status: Complete
+Status: Complete — local public rebrand implemented; domain/deployed rollout pending
 
 ### Goal and scope
 
-Restore the full CI pipeline after Maven verification succeeds but the Docker
-image build fails. Keep the pinned base image and install the current patched
-Jammy OpenSSL packages without depending on an unavailable repository version.
-
-Previous task: webhook event history navigation is complete in commits
-`1b56267` and `be4c40b`. Spring Boot 4 test-import fixes are in `2e8f807`,
-`c44ce71`, `63e8c7d`, and `6bc0f06`. CI run `37684605184` passed Maven but
-failed during `Build commit image`; diagnostic logging in `c1f81ea` made the
-successful rerun `37686152716` observable.
+Implement the selected public name ReplyTrail across visible application surfaces,
+outgoing email copy, current product documentation, and human-readable metadata.
+Keep existing API, storage, package, queue, cache, environment, and deployment
+identifiers compatible. This task does not purchase a domain or deploy a release.
+Previous task: the CI container image fix is complete; its outcome remains in
+[the changelog](../CHANGELOG.md#2026-10-08--fix-ci-container-image-build).
 
 ### Decision-compliance note
 
-- Keep the existing pinned container base; change only the package installation
-  that currently prevents the image from building.
-- Install named patched packages from the current Jammy repository and retain
-  the image vulnerability scan as the release gate.
+- [Launch readiness](product-launch-readiness.md) remains the release source of truth.
+- Preserve agreed task, escalation, acknowledgement/resolution, scheduling,
+  webhook, audit, and durable-state behavior in the existing feature plans.
+- Distinguish visible branding from existing integration and storage identifiers;
+  exclude blanket renames, new features, schema changes, and infrastructure moves.
+- ReplyTrail is the selected public name for this implementation; its `.com` and
+  `.app` are registered, so no domain claim or purchase is part of this task.
+- Keep `alertops.*`, `ALERTOPS_*`, `X-AlertOps-Webhook-Secret`, `com.alertops`,
+  session keys, event names, and deployment resource identifiers unchanged.
 
 ### Acceptance criteria
 
-- The Docker image builds successfully in CI.
-- Trivy reports no unfixed HIGH or CRITICAL vulnerabilities.
-- Maven verification remains green and the complete CI workflow passes.
-- The changelog records the compatibility fix.
+- [x] Visible UI, metadata, email copy, and maintained guidance use ReplyTrail.
+- [x] Existing integration, storage, package, queue, cache, and deployment identifiers
+  remain unchanged and executable.
+- [x] Focused tests, UI build/lint, full Maven verification, and diff checks pass.
+- [x] Residual AlertOps references are reviewed and independently verified.
 
 ### Steps
 
-- [x] Update the Dockerfile package installation.
-- [x] Run the local diff checks and push the fix.
-- [x] Inspect the diagnostic Docker build result and apply the smallest fix.
-- [x] Monitor CI through Maven, image build, and Trivy completion.
-- [x] Correct the changelog with the final CI result.
+- [x] Confirm the selected public name and record compatibility constraints.
+- [x] Update visible frontend, email, metadata, README, and current checklist copy.
+- [x] Update focused assertions and run UI/backend verification.
+- [x] Review residual references, obtain independent verification, and record outcome.
 
-### Verification and limitations
+### Intended verification and limitations
 
-Local Docker is unavailable. GitHub Actions run `37686152716` passed Maven
-verification, the container image build, and the Trivy scan; the run shows five
-non-blocking deprecation warnings. Maven ran 238 tests with 0 failures/errors
-and 17 environment-gated skips. Independent read-only verification was skipped
-because no usable subagent mechanism was available.
+UI build passes; lint reports two existing FlowDetailPage warnings. Focused
+branding/email tests pass (14 tests), and full Maven clean verification passes
+(240 tests, 0 failures/errors, 17 environment-gated skips). `git diff --check`
+passes. Remaining AlertOps references are compatibility identifiers, historical
+records, or planned domain/deployment work; an independent read-only review is
+independent read-only verdict is **Achieved**: 132 relative links/anchors were
+valid, retained-resource paths were unchanged, and no substantive regression was
+found. Domain purchase, real email delivery, and deployed browser/smoke checks
+remain outside this local task.

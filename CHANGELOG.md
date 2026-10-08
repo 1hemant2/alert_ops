@@ -4,6 +4,29 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-08 — Implement the ReplyTrail public rebrand
+
+- Rename visible product surfaces, metadata, current documentation, CI display
+  labels, verification/invitation mail, and escalation notifications to ReplyTrail.
+- Keep `com.alertops`, `alertops.*`, `ALERTOPS_*`, webhook headers, session keys,
+  queues, caches, and deployment identifiers unchanged for compatibility; domain,
+  sender, and deployed rollout work remain pending.
+- Verification: UI build and 14 focused branding/email tests pass; full Maven clean
+  verification passes (240 tests, 17 environment-gated skips); lint retains two
+  existing FlowDetailPage warnings. Independent read-only review: **Achieved**;
+  residual references, compatibility paths, and 132 documentation links/anchors
+  were checked. Browser/deployed, domain, sender, and real-delivery checks remain pending.
+
+## 2026-10-08 — Plan the product rebrand
+
+- Add a [phased product rebranding plan](docs/product-rebranding-plan.md) covering
+  identity selection, UI and emails, compatibility, verification, rollout, and rollback.
+- Link the pending initiative from launch readiness; final name/domain selection
+  and implementation remain open. This task changes documentation only.
+- Verification: document links, diff checks, UI build, and full Maven verification
+  pass (238 tests, 17 environment-gated skips); lint retains two existing warnings.
+  Independent read-only review: Achieved; runtime/deployed checks await implementation.
+
 ## 2026-10-08 — Fix CI container image build
 
 - Remove brittle exact Jammy OpenSSL package pins while continuing to install

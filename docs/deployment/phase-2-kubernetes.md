@@ -1,5 +1,9 @@
 # Phase 2: Local Kubernetes
 
+> **ReplyTrail rebrand note:** This Kubernetes learning record uses older AlertOps
+> wording in historical observations. It refers to the current ReplyTrail product;
+> executable `alertops` resource and configuration identifiers remain unchanged.
+
 ## Objective
 
 Run the verified AlertOps container stack on a local Kubernetes cluster and understand

@@ -1,6 +1,6 @@
-# AlertOps UI
+# ReplyTrail UI
 
-React and TypeScript client for the AlertOps Spring Boot API. It runs with Vite locally or as static files deployed separately from the backend. See the [root README](../README.md) for backend setup, SMTP configuration, and a webhook API example.
+React and TypeScript client for the ReplyTrail Spring Boot API. It runs with Vite locally or as static files deployed separately from the backend. See the [root README](../README.md) for backend setup, SMTP configuration, and a webhook API example. Existing `ALERTOPS_*` settings and API identifiers remain compatible during the rebrand.
 
 ## Run locally
 
@@ -42,5 +42,8 @@ Deploy `dist/` to a static host that serves `index.html` for unknown client rout
 docker build --build-arg VITE_API_BASE_URL=https://api.example.com -t alertops-ui .
 docker run --rm -p 8080:8080 alertops-ui
 ```
+
+The existing `alertops-ui` image tag is retained for deployment compatibility during
+the public rebrand.
 
 The UI container does not start the Java API. Its Nginx configuration exposes `/health` and supports client-side routes. `npm run typecheck` and `npm run lint` are available for local checks.

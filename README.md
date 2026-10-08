@@ -1,6 +1,6 @@
-# AlertOps
+# ReplyTrail
 
-AlertOps helps teams turn tasks or incoming webhook events into ordered email response paths. A task can represent an operational alert, an onboarding request, or any other item that needs a response. A team member can start an escalation manually, or a webhook can create the task and start it automatically. Email recipients can acknowledge a run to stop later steps.
+ReplyTrail helps teams turn tasks or incoming webhook events into ordered email response paths. A task can represent an operational alert, an onboarding request, or any other item that needs a response. A team member can start an escalation manually, or a webhook can create the task and start it automatically. Email recipients can acknowledge a run to stop later steps.
 
 The product is being prepared for release. See the [product launch checklist](docs/product-launch-readiness.md) for remaining work.
 
@@ -170,7 +170,7 @@ Stop Compose services with `docker compose down`. `docker compose down -v` also 
 
 ## Repository and release status
 
-- `src/main/java/com/alertops/`: Spring Boot API and workers (Java 17, Spring Boot 3.5).
+- `src/main/java/com/alertops/`: Spring Boot API and workers (Java 17, Spring Boot 3.5). The `com.alertops` package and `ALERTOPS_*` settings remain compatibility identifiers during this rebrand.
 - `src/main/resources/db/migration/`: Flyway database migrations.
 - `ui/`: React 19, TypeScript, and Vite client.
 - `docker-compose.yml`: local backend and dependency stack.

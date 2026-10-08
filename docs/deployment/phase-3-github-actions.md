@@ -1,5 +1,9 @@
 # Phase 3: Continuous Integration with GitHub Actions
 
+> **ReplyTrail rebrand note:** This CI learning record uses older AlertOps wording in
+> historical observations. It refers to the current ReplyTrail product; executable
+> `alertops` artifact and resource identifiers remain unchanged.
+
 ## Objective
 
 Turn the verified local build into a repeatable CI pipeline. Every relevant push and
