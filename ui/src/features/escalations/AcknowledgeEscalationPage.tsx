@@ -4,6 +4,7 @@ import { acknowledgeEscalation, previewEscalationAcknowledgement, resolveEscalat
 import { ApiError } from '../../api/client'
 import type { EscalationAcknowledgement, EscalationResolution } from '../../api/types'
 import { Button } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { formatDate } from '../../lib/format'
 
 // Formats safe errors for the acknowledgement preview and confirmation.
@@ -68,6 +69,7 @@ export function AcknowledgeEscalationPage() {
       : null
 
   return <div className="auth-page">
+    <ThemeToggle />
     <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
     <div className="auth-card acknowledgement-card">
       <span className="eyebrow">ESCALATION RESPONSE</span>

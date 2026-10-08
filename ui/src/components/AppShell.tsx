@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../app/useSession'
 import { teamRoleLabel } from '../features/teams/teamRoles'
 import { NavIcon } from './NavIcon'
+import { ThemeToggle } from './ThemeToggle'
 
 // Renders the signed-in ReplyTrail workspace shell.
 export function AppShell() {
@@ -48,7 +49,7 @@ export function AppShell() {
       <main className="main-column">
         <header className="topbar">
           <div className="topbar-crumb"><span>Workspace</span><b>/</b><strong>{team?.name ?? 'ReplyTrail'}</strong></div>
-          <div className="topbar-right"><span className="api-indicator"><i />TEAM WORKSPACE</span><button className="avatar-button" onClick={signOut} title="Sign out"><NavIcon name="signout" /></button></div>
+          <div className="topbar-right"><ThemeToggle /><span className="api-indicator"><i />TEAM WORKSPACE</span><button className="avatar-button" onClick={signOut} title="Sign out"><NavIcon name="signout" /></button></div>
         </header>
         <div className="page-content"><Outlet /></div>
       </main>

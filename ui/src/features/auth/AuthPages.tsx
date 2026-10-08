@@ -5,6 +5,7 @@ import { login, register, resendVerificationEmail, verifyEmail } from '../../api
 import { ApiError } from '../../api/client'
 import { useSession } from '../../app/useSession'
 import { Button, Field, InlineNotice } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 
 const PENDING_VERIFICATION_EMAIL_KEY = 'alertops.pending-verification-email'
 
@@ -36,6 +37,7 @@ export function LoginPage() {
 
   return (
     <div className="auth-page">
+      <ThemeToggle />
       <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
       <div className="auth-card">
         <span className="eyebrow">WELCOME BACK</span><h1>Sign in to ReplyTrail</h1><p>Pick up where your response workflows left off.</p>
@@ -74,6 +76,7 @@ export function RegisterPage() {
 
   return (
     <div className="auth-page">
+      <ThemeToggle />
       <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
       <div className="auth-card">
         <span className="eyebrow">GET STARTED</span><h1>Create your account</h1><p>Build a workspace and walk through a live escalation.</p>
@@ -127,6 +130,7 @@ export function VerifyEmailPage() {
 
   return (
     <div className="auth-page">
+      <ThemeToggle />
       <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
       <div className="auth-card">
         <span className="eyebrow">ACCOUNT SECURITY</span>

@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { acceptTeamInvite, previewTeamInvite, selectTeam } from '../../api/teams'
 import { useSession } from '../../app/useSession'
 import { Button, Card, ErrorState, InlineNotice, LoadingRows } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { teamRoleDescription, teamRoleLabel } from './teamRoles'
 
 const PENDING_INVITE_KEY = 'alertops.pending-invite'
@@ -43,6 +44,7 @@ export function JoinTeamPage() {
   })
 
   return <div className="auth-page join-page">
+    <ThemeToggle />
     <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
     <Card className="auth-card join-card">
       <span className="eyebrow">TEAM INVITATION</span>

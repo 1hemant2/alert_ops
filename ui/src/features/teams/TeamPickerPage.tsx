@@ -5,6 +5,7 @@ import { createTeam, getTeams, selectTeam } from '../../api/teams'
 import type { Team } from '../../api/types'
 import { useSession } from '../../app/useSession'
 import { Button, Card, ErrorState, Field, LoadingRows } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { teamRoleLabel } from './teamRoles'
 
 export function TeamPickerPage() {
@@ -41,6 +42,7 @@ export function TeamPickerPage() {
 
   return (
     <div className="team-picker">
+      <ThemeToggle />
       <div className="eyebrow">YOUR WORKSPACES</div><h1>Choose your team</h1><p className="page-lede">Manage tasks and response paths with your team.</p>
       <div className="team-picker-grid">
         <Card className="team-list-card">

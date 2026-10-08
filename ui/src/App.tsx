@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
 import { AppShell } from './components/AppShell'
 import { SessionProvider } from './app/Session'
+import { ThemeProvider } from './app/theme'
 import { useSession } from './app/useSession'
 import { PublicPage } from './pages/PublicPage'
 import { TeamOverviewPage } from './pages/TeamOverviewPage'
@@ -82,9 +83,10 @@ function AppRoutes() {
   </Routes></BrowserRouter>
 }
 
+// Boots the shared providers and application routes.
 export default function App() {
   useEffect(() => {
     document.documentElement.dataset.ready = 'true'
   }, [])
-  return <QueryClientProvider client={queryClient}><SessionProvider><AppRoutes /></SessionProvider></QueryClientProvider>
+  return <QueryClientProvider client={queryClient}><ThemeProvider><SessionProvider><AppRoutes /></SessionProvider></ThemeProvider></QueryClientProvider>
 }

@@ -4,6 +4,7 @@ import { confirmRecipientEscalateNow, previewRecipientEscalateNow } from '../../
 import { ApiError } from '../../api/client'
 import type { EscalationManualAction } from '../../api/types'
 import { Button } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { formatDate } from '../../lib/format'
 
 // Formats safe errors for the Escalate now preview and confirmation.
@@ -39,6 +40,7 @@ export function EscalateNowPage() {
   const completed = confirm.data ?? (preview.data?.alreadyEscalated ? preview.data : null)
 
   return <div className="auth-page">
+    <ThemeToggle />
     <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
     <div className="auth-card acknowledgement-card">
       <span className="eyebrow">ESCALATION RESPONSE</span>
