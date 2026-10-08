@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router'
 
 export function Button({
@@ -93,4 +93,26 @@ export function Field({
   children: ReactNode
 }) {
   return <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
+}
+
+// Lets users verify a password while preserving masked input by default.
+export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  const [isVisible, setIsVisible] = useState(false)
+
+  return (
+    <span className="password-input-shell">
+      <input {...props} type={isVisible ? 'text' : 'password'} />
+      <button
+        type="button"
+        className="password-toggle"
+        aria-label={isVisible ? 'Hide password' : 'Show password'}
+        aria-pressed={isVisible}
+        onClick={() => setIsVisible(previous => !previous)}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          {isVisible ? <><path d="M3 3l18 18" /><path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" /><path d="M9.9 4.3A10.8 10.8 0 0 1 12 4c5.2 0 8.7 4 10 8-.5 1.5-1.3 2.8-2.4 4" /><path d="M6.6 6.6C4.6 7.9 3.3 10 2 12c1.3 4 4.8 8 10 8 1.7 0 3.2-.4 4.5-1.1" /></> : <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="2.5" /></>}
+        </svg>
+      </button>
+    </span>
+  )
 }

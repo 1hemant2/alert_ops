@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { login, register, resendVerificationEmail, verifyEmail } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import { useSession } from '../../app/useSession'
-import { Button, Field, InlineNotice } from '../../components/Elements'
+import { Button, Field, InlineNotice, PasswordInput } from '../../components/Elements'
 import { ThemeToggle } from '../../components/ThemeToggle'
 
 const PENDING_VERIFICATION_EMAIL_KEY = 'alertops.pending-verification-email'
@@ -43,7 +43,7 @@ export function LoginPage() {
         <span className="eyebrow">WELCOME BACK</span><h1>Sign in to ReplyTrail</h1><p>Pick up where your response workflows left off.</p>
         <form onSubmit={submit} className="form-stack">
           <Field label="Email"><input autoComplete="email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@company.com" /></Field>
-          <Field label="Password"><input autoComplete="current-password" type="password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="Your password" /></Field>
+          <Field label="Password"><PasswordInput autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="Your password" /></Field>
           {loginMutation.error && <div role="alert" className="form-error">{loginMutation.error.message}</div>}
           <Button className="button-full" disabled={loginMutation.isPending}>{loginMutation.isPending ? 'Signing in…' : 'Sign in'} <span>→</span></Button>
         </form>
@@ -83,7 +83,7 @@ export function RegisterPage() {
         <form onSubmit={submit} className="form-stack">
           <Field label="Your name"><input autoComplete="name" required value={name} onChange={event => setName(event.target.value)} placeholder="Alex Morgan" /></Field>
           <Field label="Work email"><input autoComplete="email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@company.com" /></Field>
-          <Field label="Password" hint="Use at least 8 characters."><input autoComplete="new-password" type="password" minLength={8} required value={password} onChange={event => setPassword(event.target.value)} placeholder="Create a password" /></Field>
+          <Field label="Password" hint="Use at least 8 characters."><PasswordInput autoComplete="new-password" minLength={8} required value={password} onChange={event => setPassword(event.target.value)} placeholder="Create a password" /></Field>
           {registrationMutation.error && <div role="alert" className="form-error">{registrationMutation.error.message}</div>}
           <Button className="button-full" disabled={registrationMutation.isPending}>{registrationMutation.isPending ? 'Creating account…' : 'Create account'} <span>→</span></Button>
         </form>
