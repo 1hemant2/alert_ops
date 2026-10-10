@@ -41,8 +41,8 @@ public class ReconcilerService {
         }
     }
 
-    // After the step save commits, put its schedule into the in-memory timer.
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    // Registers a schedule after its transaction commits, or immediately without one.
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public synchronized void onStepScheduled(EscalationStepSchedule step) {
         if (!tryRegisterPendingTimer(step)) {
             markRecoveryNeeded();
