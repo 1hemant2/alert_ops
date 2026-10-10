@@ -157,6 +157,7 @@ export function EscalationDetailPage() {
     initialPageParam: 0,
     getNextPageParam: lastPage => lastPage.last ? undefined : lastPage.page + 1,
     enabled: Boolean(escalationId && escalation.data),
+    refetchInterval: ['OPEN', 'ACKNOWLEDGED'].includes(escalation.data?.status ?? '') ? 3000 : false,
   })
   const tasks = useQuery({ queryKey: ['tasks', teamId], queryFn: getTasks })
   const flowId = escalation.data?.flowId
@@ -317,7 +318,7 @@ export function EscalationDetailPage() {
         return <article className="execution-row" key={state.nodeId}><div className={`execution-index execution-${state.status.toLowerCase()}`}>{terminal ? '✓' : String(index + 1).padStart(2, '0')}</div><div className="execution-connector" /><div className="execution-copy"><div className="execution-title"><div><strong>{node ? nodeName(node) : `Response step ${index + 1}`}</strong><small>{state.userEmail}</small></div><div className="execution-badges"><StatusBadge status={state.status} /></div></div><div className="execution-details"><span>WAIT&nbsp; {node ? `${nodeDelayMinutes(node)} MIN` : '—'}</span><span>ATTEMPTS&nbsp; {state.sendAttemptCount}</span><span>UPDATED&nbsp; {formatDate(state.updatedAt ?? state.createdAt)}</span></div><p className="execution-explanation">{stepStatusExplanation(state.status)}{state.dueAt && ['PENDING', 'SCHEDULED'].includes(state.status) ? ` Due ${formatDate(state.dueAt)}.` : ''}</p></div></article>
       })}</div>}
       {start.error && <div className="form-error start-error" role="alert">{start.error.message}</div>}
-      {['OPEN', 'ACKNOWLEDGED'].includes(item.status) && <div className="polling-note"><span className="live-dot" /> Refreshing saved state every 3 seconds while this run is active.</div>}
+      {['OPEN', 'ACKNOWLEDGED'].includes(item.status) && <div className="polling-note"><span className="live-dot" /> Refreshing status, step progress, and activity every 3 seconds while this run is active.</div>}
     </Card>
     <Card className="activity-card">
       <div className="card-heading">

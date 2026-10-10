@@ -30,11 +30,10 @@ export function FlowDetailPage() {
   const [addStepOpen, setAddStepOpen] = useState(false)
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
-  const [gridColumns, setGridColumns] = useState(5)
   const dragRef = useRef<DragPreview | null>(null)
   const activePointerIdRef = useRef<number | null>(null)
   const addStepRef = useRef<HTMLDivElement>(null)
-  const stepGridRef = useRef<HTMLDivElement>(null)
+  const pathTimingRef = useRef<HTMLDetailsElement>(null)
   const queryClient = useQueryClient()
   const flow = useQuery({ queryKey: ['flow', teamId, flowId], queryFn: () => getFlow(flowId) })
   const nodes = useQuery({ queryKey: ['flow-nodes', teamId, flowId], queryFn: () => getFlowNodes(flowId), enabled: Boolean(flowId) })
@@ -127,6 +126,14 @@ export function FlowDetailPage() {
   })
   const stepWritePending = create.isPending || update.isPending || duplicate.isPending || remove.isPending || reorder.isPending || timing.isPending
 
+  // Opens the timeout settings and brings them into view from the page header.
+  function revealPathSettings() {
+    const settings = pathTimingRef.current
+    if (!settings) return
+    settings.open = true
+    requestAnimationFrame(() => settings.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
   function refreshFlow() {
     return Promise.all([
       queryClient.invalidateQueries({ queryKey: ['flow', teamId, flowId] }),
@@ -185,22 +192,6 @@ export function FlowDetailPage() {
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [deleteTarget, remove.isPending])
-
-  useEffect(() => {
-    const grid = stepGridRef.current
-    if (!grid) return
-    const updateColumns = () => {
-      const style = getComputedStyle(grid)
-      const cardSize = Number.parseFloat(style.getPropertyValue('--path-card-size')) || 264
-      const gap = Number.parseFloat(style.getPropertyValue('--path-card-gap')) || 40
-      const columns = Math.max(1, Math.min(5, Math.floor((grid.clientWidth + gap) / (cardSize + gap))))
-      setGridColumns(current => current === columns ? current : columns)
-    }
-    const observer = new ResizeObserver(updateColumns)
-    observer.observe(grid)
-    updateColumns()
-    return () => observer.disconnect()
-  }, [nodes.data?.length])
 
   function moveNodeAfter(nodeId: string, afterNodeId: string | null) {
     const current = nodes.data
@@ -291,9 +282,8 @@ export function FlowDetailPage() {
 
   function handleGripKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, node: FlowNode, index: number) {
     if (stepWritePending || !nodes.data) return
-    const reverseRow = Math.floor(index / gridColumns) % 2 === 1
-    const moveEarlier = event.key === 'ArrowUp' || (reverseRow ? event.key === 'ArrowRight' : event.key === 'ArrowLeft')
-    const moveLater = event.key === 'ArrowDown' || (reverseRow ? event.key === 'ArrowLeft' : event.key === 'ArrowRight')
+    const moveEarlier = event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+    const moveLater = event.key === 'ArrowRight' || event.key === 'ArrowDown'
     if (moveEarlier && index > 0) {
       event.preventDefault()
       moveNodeAfter(node.id, index < 2 ? null : nodes.data[index - 2].id)
@@ -314,8 +304,15 @@ export function FlowDetailPage() {
 
   return <div className="flow-detail-page">
     <div className="back-link-row"><Link to={`/app/${teamId}/flows`}>Back to escalation paths</Link><span> / </span><span>{flow.data.name}</span></div>
-    <PageHeader eyebrow="ESCALATION PATH / BUILDER" title={flow.data.name} description="Choose who gets contacted, then arrange each handoff in order." action={<div className="path-page-actions"><span className="version-pill">VERSION&nbsp; {flow.data.version ?? 0}</span><Button variant="secondary" disabled={stepWritePending} onClick={() => addStepOpen ? closeStepForm() : startAddingStep()}><span>{addStepOpen ? '×' : '＋'}</span>{addStepOpen ? 'Close form' : 'Add response step'}</Button></div>} />
-    <InlineNotice tone="neutral">Follow the arrows through the path. Rows alternate direction so each handoff stays connected. Drag the grip to reorder; on a keyboard, focus a grip and use the arrow keys.</InlineNotice>
+    <PageHeader eyebrow="ESCALATION PATH / BUILDER" title={flow.data.name} description="Choose who gets contacted, then arrange each handoff in order." action={<div className="path-page-actions">
+      <span className="version-pill">VERSION&nbsp; {flow.data.version ?? 0}</span>
+      <Button className="path-settings-button" variant="secondary" aria-label="Open resolution timeout settings" title="Open resolution timeout settings" onClick={revealPathSettings}>
+        <span className="path-settings-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5" /><path d="M10 6v4l2.5 2" /></svg></span>
+        Resolution timeout
+        <span className="path-settings-status">{resolutionTimeoutEnabled ? 'ON' : 'OFF'}</span>
+      </Button>
+    </div>} />
+    <InlineNotice tone="neutral">Follow the arrows through the path. Scroll horizontally to see more steps. Drag the grip to reorder; on a keyboard, focus a grip and use the arrow keys.</InlineNotice>
     {addStepOpen && <div id="add-path-step" className="path-add-panel" ref={addStepRef}><Card className="path-add-card">
       <div className="card-heading"><div><span className="eyebrow">BUILD THIS PATH</span><h2>{editingNodeId ? 'Edit response step' : 'Add a response step'}</h2></div><Button variant="quiet" disabled={stepWritePending} onClick={closeStepForm}>Close&nbsp; ×</Button></div>
       <p className="form-intro">Choose an existing team member, name their step, and set the wait time before contact.</p>
@@ -329,7 +326,7 @@ export function FlowDetailPage() {
     </Card></div>}
     <div className="path-workspace-layout">
       <Card className="node-timeline-card path-builder-card">
-        <div className="card-heading path-route-heading"><div><span className="eyebrow">YOUR RESPONSE ROUTE</span><h2>Who gets contacted</h2><p>Every handoff is shown in sequence.</p></div><span className="count-pill">{nodes.data?.length ?? '—'} STEPS</span></div>
+        <div className="card-heading path-route-heading"><div><span className="eyebrow">YOUR RESPONSE ROUTE</span><h2>Who gets contacted</h2><p>Every handoff is shown in sequence.</p></div><div className="path-route-heading-tools"><span className="count-pill">{nodes.data?.length ?? '—'} STEPS</span><Button className="path-add-step-button" variant="secondary" disabled={stepWritePending} onClick={() => addStepOpen ? closeStepForm() : startAddingStep()}><span>{addStepOpen ? '×' : '＋'}</span>{addStepOpen ? 'Close form' : 'Add response step'}</Button></div></div>
         {nodes.isPending ? <LoadingRows count={3} /> : nodes.isError ? <ErrorState message={nodes.error.message} onRetry={() => void nodes.refetch()} /> : <div className="path-canvas">
           <div className={`path-origin ${dropTarget?.type === 'start' ? 'is-drop-target' : ''}`} data-path-start>
             <span className="path-origin-mark">S</span>
@@ -341,23 +338,13 @@ export function FlowDetailPage() {
               <span className="path-step-number">01</span>
               <div><span className="step-order-label">FIRST STEP</span><strong>Your response route is empty</strong><small>Add the first teammate to define who responds.</small><button type="button" className="path-inline-action" onClick={startAddingStep}>Add the first step</button></div>
             </div>
-            : <div className="path-step-grid" ref={stepGridRef} role="list" aria-label="Ordered escalation steps">
-              {Array.from({ length: Math.ceil(nodes.data.length / gridColumns) }, (_, rowIndex) => {
-                const startIndex = rowIndex * gridColumns
-                const rowNodes = nodes.data.slice(startIndex, startIndex + gridColumns)
-                const rowEndIndex = startIndex + rowNodes.length - 1
-                const hasNextRow = rowIndex < Math.ceil(nodes.data.length / gridColumns) - 1
-                const rowColumns = nodes.data.length > gridColumns ? gridColumns : rowNodes.length
-                return <div
-                  key={`step-row-${rowIndex}`}
-                  className={`path-step-row ${rowIndex % 2 === 1 ? 'is-reverse' : ''}`}
-                  style={{ gridTemplateColumns: `repeat(${rowColumns}, minmax(0, 264px))` }}
-                >
-                  {rowNodes.map((node, rowPosition) => {
-                    const index = startIndex + rowPosition
+            : <div id="response-step-rail" className="path-step-scroll-region" tabIndex={0} aria-label="Scrollable escalation steps">
+              <div className="path-step-grid" role="list" aria-label="Ordered escalation steps">
+                <div className="path-step-row" style={{ gridTemplateColumns: `repeat(${nodes.data.length}, minmax(0, var(--path-card-size)))` }}>
+                  {nodes.data.map((node, index) => {
                     const isDragSource = dragPreview?.nodeId === node.id
                     const isDropTarget = dropTarget?.type === 'node' && dropTarget.nodeId === node.id
-                    const isSequenceEnd = index === rowEndIndex
+                    const isSequenceEnd = index === nodes.data.length - 1
                     return <article
                       key={node.id}
                       className={`path-step-card ${isDragSource ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${openMenuId === node.id ? 'has-open-menu' : ''}`}
@@ -399,13 +386,11 @@ export function FlowDetailPage() {
                       <h3 title={nodeName(node)}>{nodeName(node)}</h3>
                       <div className="path-delay-block"><span>WAIT BEFORE CONTACT</span><strong>{nodeDelayMinutes(node)} <small>min</small></strong></div>
                       <div className="path-card-recipient"><span className="path-recipient-mark">{node.email.charAt(0).toUpperCase()}</span><div><small>CONTACT</small><strong title={node.email}>{node.email}</strong></div></div>
-                      {isSequenceEnd && hasNextRow
-                        ? <span className="path-step-connector path-step-connector-wrap" aria-hidden="true"><svg viewBox="0 0 20 40"><path d="M10 2v31M4 27l6 6 6-6" /></svg></span>
-                        : !isSequenceEnd && <span className="path-step-connector" aria-hidden="true"><svg viewBox="0 0 40 20"><path d="M2 10h31M27 4l6 6-6 6" /></svg></span>}
+                      {!isSequenceEnd && <span className="path-step-connector" aria-hidden="true"><svg viewBox="0 0 40 20"><path d="M2 10h31M27 4l6 6-6 6" /></svg></span>}
                     </article>
                   })}
                 </div>
-              })}
+              </div>
             </div>}
         </div>}
         {dragPreview && <div className="path-drag-preview" style={{ left: dragPreview.x, top: dragPreview.y }} aria-live="polite">
@@ -413,10 +398,10 @@ export function FlowDetailPage() {
         </div>}
         {reorder.error && <div className="form-error reorder-error" role="alert">{reorder.error.message} The latest path has been loaded; try the reorder again.</div>}
         {duplicate.error && <div className="form-error reorder-error" role="alert">{duplicate.error.message} The latest path has been loaded; try duplicating the step again.</div>}
-        <div className="timeline-caption"><span className="caption-dot" />Wait times control when each contact step becomes eligible to run. Order is saved by the server.</div>
+        <div className="timeline-caption"><span className="caption-dot" />Wait times control when each contact step becomes eligible to run. Order is saved by the server. Scroll horizontally to view additional steps.</div>
       </Card>
     </div>
-    <details className="path-timing-disclosure">
+    <details ref={pathTimingRef} id="path-settings" className="path-timing-disclosure">
       <summary className="path-timing-summary">
         <span><span className="eyebrow">PATH SETTINGS</span><strong>Resolution timeout</strong><small>Optional time limit after a recipient acknowledges a step.</small></span>
         <span className="path-timing-summary-meta"><span className="count-pill">{resolutionTimeoutEnabled ? 'ENABLED' : 'DISABLED'}</span><span className="path-disclosure-icon" aria-hidden="true">＋</span></span>
