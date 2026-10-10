@@ -33,6 +33,7 @@ public class TeamInvitationMailer {
         this.fromAddress = fromAddress == null ? "" : fromAddress.trim();
     }
 
+    // Sends a team invitation with a one-time acceptance link.
     public void sendInvitation(Invite invite, Team team, String invitationUrl) {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null || fromAddress.isBlank()) {
@@ -47,7 +48,7 @@ public class TeamInvitationMailer {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(fromAddress);
             helper.setTo(invite.getEmail());
-            helper.setSubject("You're invited to " + safeSubject(teamName) + " on AlertOps");
+            helper.setSubject("You're invited to " + safeSubject(teamName) + " on ReplyTrail");
             helper.setText(
                     "You've been invited to join " + teamName + " as a " + role + ".\n\n"
                             + "Accept this invitation before " + expiresAt + ":\n" + invitationUrl
@@ -60,17 +61,17 @@ public class TeamInvitationMailer {
                                 <tr><td align="center">
                                   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#fff;border:1px solid #e3eaf1;border-radius:14px;overflow:hidden;">
                                     <tr><td style="height:5px;background:#8acb3f;font-size:0;">&nbsp;</td></tr>
-                                    <tr><td style="padding:22px 30px;background:#14283f;color:#fff;font-weight:700;letter-spacing:2px;">ALERTOPS</td></tr>
+                                    <tr><td style="padding:22px 30px;background:#14283f;color:#fff;font-weight:700;letter-spacing:2px;">REPLYTRAIL</td></tr>
                                     <tr><td style="padding:32px 34px;">
                                       <p style="margin:0 0 8px;color:#718196;font-size:12px;font-weight:700;letter-spacing:1px;">TEAM INVITATION</p>
                                       <h1 style="margin:0 0 16px;color:#14283f;font-size:26px;">You're invited to %s</h1>
-                                      <p style="font-size:15px;line-height:1.65;">You've been invited to join this AlertOps workspace as a <strong>%s</strong>.</p>
+                                      <p style="font-size:15px;line-height:1.65;">You've been invited to join this ReplyTrail workspace as a <strong>%s</strong>.</p>
                                       <p style="margin:24px 0;">
                                         <a href="%s" style="display:inline-block;padding:13px 20px;border-radius:8px;background:#14283f;color:#fff;text-decoration:none;font-weight:700;">Accept invitation</a>
                                       </p>
                                       <p style="color:#718196;font-size:13px;line-height:1.6;">This invitation expires on %s UTC. If you weren't expecting it, you can ignore this email.</p>
                                     </td></tr>
-                                    <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;">Reliable escalation, made explicit.</td></tr>
+                                    <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;">Keep every response on track.</td></tr>
                                   </table>
                                 </td></tr>
                               </table>

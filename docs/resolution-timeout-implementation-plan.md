@@ -9,7 +9,7 @@ Release priorities: [scheduled starts](product-launch-readiness.md#1-scheduled-e
 
 ## Agreed manual actions
 
-**Start now begins the workflow.** It starts an `IDLE` run as today and also lets a team member start a `SCHEDULED` run before its saved start time. The first step keeps its configured delay. Reuse the existing start API and start use case; no extra public early-start endpoint is needed.
+**Start now begins the workflow.** It starts an `IDLE` run as today and also lets a team member start a `SCHEDULED` run before its saved start time. The first response email is sent immediately; its configured duration becomes the response window after delivery. Reuse the existing start API and start use case; no extra public early-start endpoint is needed.
 
 **Escalate now removes the next notification's wait.** In `OPEN`, make the next eligible unsent step due immediately, whether it is scheduled or still pending. In `ACKNOWLEDGED`, end the resolution waiting period, return to `OPEN`, and make the next eligible paused step due immediately. Ask for confirmation in the acknowledged case because someone is already working on the issue. Advance in saved step order, without jumping over unfinished steps or resending a sent notification. If there is no next eligible step, the action is unavailable and makes no state change.
 
@@ -17,8 +17,8 @@ Start now and the signed-in Escalate now action remain restricted to authenticat
 
 | Starting situation | Action | Result |
 | --- | --- | --- |
-| Run is `IDLE` | Start now | `OPEN`; schedule first step with its usual delay |
-| Run is `SCHEDULED` | Start now | `OPEN` early; schedule first step with its usual delay; cancel start timer after commit |
+| Run is `IDLE` | Start now | `OPEN`; send the first response email immediately |
+| Run is `SCHEDULED` | Start now | `OPEN` early; send the first response email immediately; cancel start timer after commit |
 | Run is `OPEN`, next step is waiting | Escalate now | Run stays `OPEN`; next eligible step becomes due immediately |
 | Run is `ACKNOWLEDGED`, next step is paused | Escalate now | Run becomes `OPEN`; end active resolution wait; next step becomes due immediately |
 | Run is terminal or no next step exists | Escalate now | Unavailable; no state change |
@@ -139,7 +139,8 @@ with resolution enabled pauses progression and starts the resolution duration
 from the acknowledgement time. Unresolved resolution expiry makes the next step
 due immediately; do not restart the acknowledgement/delivery wait. Do not stack
 two ordinary waits, compare independent acknowledgement/send delays, add a third
-duration, or introduce a special final-node timeout. Retain the existing first-step
+duration, or introduce a special final-node timeout. Send the first response email
+immediately and use its configured duration as the first response window.
 delay; align runtime ownership/deadline storage with this shared wait during implementation.
 
 ## Agreed viewable links and action deadlines
@@ -210,7 +211,7 @@ Keep the disabled-flow path unchanged apart from explicit step-state representat
 
 ## Timer and concurrency contract
 
-1. Ordinary progression uses one shared acknowledgement/delivery wait. After SMTP acceptance, persist the sent step and the canonical shared wait boundary atomically, aligning the next eligible delivery's `dueAt` with that same wait rather than adding another delay. Do not exhaust solely because this was the final send; persist its normal acknowledgement wait too. Keep the initial first-step delay unchanged.
+1. Ordinary progression uses one shared acknowledgement/delivery wait. After SMTP acceptance, persist the sent step and the canonical shared wait boundary atomically, aligning the next eligible delivery's `dueAt` with that same wait rather than adding another delay. Do not exhaust solely because this was the final send; persist its normal acknowledgement wait too. The first response email is sent immediately; its configured duration starts the first response window after SMTP acceptance.
 2. Acknowledgement locks the run and validates the exact sent step/token. With timeout enabled, atomically save `ACKNOWLEDGED`, the owning step, the deadline, and the paused next step.
 3. After commit, cancel its delivery wake-up where available and register the resolution timer. A delivery callback/message already in flight must reload state and ignore paused or obsolete attempts.
 4. Resolution, timeout, and manual escalation use the same run-lock/conditional-transition boundary. Only one valid transition wins for the same acknowledgement/step. Publish timer changes or delivery work after commit, never on rollback.
@@ -242,7 +243,7 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 ### 2. Support Start now for scheduled runs
 
 - [x] Extend the existing manual start API/use case and conditional claim; reuse step creation and add after-commit start-timer cancellation, actor audit, and the scheduled-run UI action.
-- Acceptance: early start produces one execution-state set, retains the first-step delay, and rolls back without losing the original schedule on failure. Automatic due-time gating remains enforced. Test manual/automatic starts, cancellation/reschedule races, duplicate starts, stale timer callbacks, and team isolation.
+- Acceptance: early start produces one execution-state set, sends the first response email immediately, and rolls back without losing the original schedule on failure. Automatic due-time gating remains enforced. Test manual/automatic starts, cancellation/reschedule races, duplicate starts, stale timer callbacks, and team isolation.
 - This focused task can proceed independently of the remaining resolution decisions when selected by the user.
 - **Local implementation evidence:** The existing `POST /{escalationId}/start` accepts same-team `SCHEDULED` runs, uses a conditional early-start claim, records the authenticated actor, and cancels the scheduler handle after the transactional start returns. The UI exposes **Start now** for scheduled runs. Focused start/controller/scheduling tests, backend packaging, and the UI build pass. PostgreSQL/deployed verification remains pending.
 
@@ -254,7 +255,7 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 ### 4. Add agreed flow/node timing configuration
 
-- [x] Implement the flow toggle and the agreed two node response durations, API validation, consistent configuration updates, and flow-editor controls. Reuse the existing duration for the shared acknowledgement/delivery wait; add no separate send-delay control. Use the same response controls/rules for first, middle, and last nodes, retaining the initial first-step delay.
+- [x] Implement the flow toggle and the agreed two node response durations, API validation, consistent configuration updates, and flow-editor controls. Reuse the existing duration for the shared acknowledgement/delivery wait; add no separate send-delay control. Use the same response controls/rules for first, middle, and last nodes, with the first response email sent immediately.
 - Acceptance: disabled flows have null resolution timeouts; enabled flows have positive resolution timeouts on every node; the configuration update is all-or-nothing under the flow version; and no final-only setting is introduced. Runtime acknowledgement, snapshot, and expiry behavior remain in later tasks.
 - **Local implementation evidence:** Migration V12 stores the flow toggle and nullable positive node timeout. `PUT /api/v1/flow/{flowId}/timing` requires the current flow version and validates the complete node set before saving. Node create/edit requests apply the same enabled/disabled rules, and the flow editor exposes the toggle plus per-node timeout controls. Focused flow-service tests cover enable/disable, partial input, stale versions, and node-level validation.
 
@@ -268,19 +269,19 @@ This prerequisite is complete. Manual-action and activity-timeline behavior rema
 
 - [x] Branch on the saved toggle, invalidate the acknowledgement wait, pause the next step if present, save the resolution deadline, and record lifecycle audit data atomically. Emit wake-up changes after commit.
 - Acceptance: disabled acknowledgement still completes; enabled acknowledgement pauses even on the final node; repeated acknowledgement does not extend the deadline; a stale send cannot bypass the pause.
-- **Local implementation evidence (2026-10-06):** `EscalationAcknowledgementService` locks the run, validates the exact `SENT` step and current sent-step token, keeps disabled acknowledgement terminal as `COMPLETED` / `ACKNOWLEDGED`, and changes enabled acknowledgement to `ACKNOWLEDGED` with the saved step timeout, owner, deadline, and `ACKNOWLEDGED` audit event. The next unsent step is changed to `PAUSED` without changing its canonical shared `dueAt`; its in-memory wake-up is cancelled after commit. Final successful sends remain `OPEN` so the final recipient can acknowledge. Focused acknowledgement, consumer, and timer tests pass; the full Maven suite passes with PostgreSQL/RabbitMQ/Redis integration tests environment-gated and skipped. Independent read-only verifier verdict: **Achieved**. Deadline expiry/recovery, explicit resolution, and deployed verification remain later tasks.
+- **Local implementation evidence (2026-10-06):** `EscalationAcknowledgementService` locks the run, validates the exact `SENT` step and current sent-step token, keeps disabled acknowledgement terminal as `COMPLETED` / `ACKNOWLEDGED`, and changes enabled acknowledgement to `ACKNOWLEDGED` with the saved step timeout, owner, deadline, and `ACKNOWLEDGED` audit event. The next unsent step is changed to `PAUSED` without changing its canonical shared `dueAt`; its in-memory wake-up is cancelled after commit. Final successful sends remain `OPEN` so the final recipient can acknowledge. Focused acknowledgement, consumer, and timer tests pass; the full Maven suite passes with PostgreSQL/RabbitMQ/Redis integration tests environment-gated and skipped. Deadline expiry/recovery, explicit resolution, and deployed verification remain later tasks.
 
 ### 7. Implement explicit resolution
 
 - [x] Add the agreed resolve action, actor/time persistence, idempotency, authorization, skipped steps, audit, and after-commit timer cancellation.
 - Acceptance: authenticated same-team members and the current acknowledging email recipient can resolve before the saved deadline; another team or an obsolete email owner cannot. Terminal runs stay terminal; resolution and timeout have one winner. No new role/state is introduced.
-- **Local implementation evidence (2026-10-07):** `EscalationResolutionService` exposes separate team-member and recipient-token operations, locks the run, enforces the saved resolution deadline and current acknowledgement owner, transitions `ACKNOWLEDGED → RESOLVED`, persists resolving actor/time, clears active acknowledgement ownership, skips pending/scheduled/paused steps, records a `RESOLVED` audit event with the pre-clear step/source/token-hash facts, and cancels step wake-ups after commit. Recipient action eligibility uses the saved resolution deadline rather than token TTL; repeated recipient resolution requires the exact saved token hash plus the accepted step/source recorded in the resolution audit. Repeated same-actor resolution returns the saved result without another write; foreign-team, obsolete-token, late, terminal, and anonymous team requests are rejected. Focused service/controller/security tests pass; independent read-only review was **Inconclusive** only for PostgreSQL/deployed concurrency and rollback because those checks are environment-gated. Deadline expiry/recovery and UI remain later work.
+- **Local implementation evidence (2026-10-07):** `EscalationResolutionService` exposes separate team-member and recipient-token operations, locks the run, enforces the saved resolution deadline and current acknowledgement owner, transitions `ACKNOWLEDGED → RESOLVED`, persists resolving actor/time, clears active acknowledgement ownership, skips pending/scheduled/paused steps, records a `RESOLVED` audit event with the pre-clear step/source/token-hash facts, and cancels step wake-ups after commit. Recipient action eligibility uses the saved resolution deadline rather than token TTL; repeated recipient resolution requires the exact saved token hash plus the accepted step/source recorded in the resolution audit. Repeated same-actor resolution returns the saved result without another write; foreign-team, obsolete-token, late, terminal, and anonymous team requests are rejected. Focused service/controller/security tests pass; PostgreSQL/deployed concurrency and rollback remain environment-gated. Deadline expiry/recovery and UI remain later work.
 
 ### 8. Implement deadline expiry and recovery
 
 - [x] Persist the acknowledgement wait after a successful send instead of immediate final-send exhaustion. Use shared deadline handling with current-owner validation, running-process retry, startup recovery, and the advance-or-exhaust branch; reuse durable publication machinery.
 - Acceptance: acknowledgement expiry continues or exhausts under the agreed timing mapping; resolution expiry makes the next step due immediately in all original-due-time comparisons or exhausts if none exists. No extra last-node logic, fresh wait after restart, automatic resend, or duplicate transition; failed publication remains recoverable.
-- **Local implementation evidence (2026-10-07):** Successful sends persist the next step's `dueAt` as the current acknowledgement boundary; final sends persist their node wait and register a recoverable deadline. POST acknowledgement validates that boundary, cancels the final acknowledgement wake-up after commit, and schedules the saved resolution deadline. Expiry reloads and locks the run/step, exhausts final acknowledgement or resolution waits, and reopens a paused/pending next step with `dueAt=now` for earlier, equal, and later original due times. Deadline wake-ups recover saved final/resolution boundaries after restart, while durable publication recovery handles broker/database failures. Focused expiry/wake-up-scheduler/consumer/acknowledgement tests and the full local suite (190 tests, 0 failures/errors, 17 environment-gated skips) pass; PostgreSQL/deployed concurrency, rollback, and restart checks remain environment-gated, and no independent read-only subagent was available in this session.
+- **Local implementation evidence (2026-10-07):** Successful sends persist the next step's `dueAt` as the current acknowledgement boundary; final sends persist their node wait and register a recoverable deadline. POST acknowledgement validates that boundary, cancels the final acknowledgement wake-up after commit, and schedules the saved resolution deadline. Expiry reloads and locks the run/step, exhausts final acknowledgement or resolution waits, and reopens a paused/pending next step with `dueAt=now` for earlier, equal, and later original due times. Deadline wake-ups recover saved final/resolution boundaries after restart, while durable publication recovery handles broker/database failures. Focused expiry/wake-up-scheduler/consumer/acknowledgement tests and the full local suite (190 tests, 0 failures/errors, 17 environment-gated skips) pass; PostgreSQL/deployed concurrency, rollback, and restart checks remain environment-gated.
 
 ### 9. Implement Escalate now
 

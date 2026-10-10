@@ -28,12 +28,14 @@ import com.alertops.flow.repository.FlowRepository;
 import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.exception.EscalationException;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
+import com.alertops.flow_execution_engine.messaging.EscalationRepeatStopped;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.audit.model.AuditAction;
 import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.model.AuditEvent;
 import com.alertops.audit.service.AuditService;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.model.RepeatType;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 import com.alertops.flow_execution_engine.repository.FlowExecutionStateRepository;
 import com.alertops.security.AuthContext;
@@ -103,6 +105,37 @@ class EscalationServiceSchedulingTest {
         assertEquals(EscalationStatus.SCHEDULED.name(), audit.getValue().newState());
         assertEquals(actorId, audit.getValue().userId());
         assertEquals("owner@example.com", audit.getValue().userEmail());
+    }
+
+    @Test
+    // Verifies daily recurrence stores its next calendar boundary on the original run.
+    void scheduledDailyRepeatStoresItsNextBoundary() {
+        UUID teamId = UUID.randomUUID();
+        UUID flowId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(
+                UUID.randomUUID(), teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        when(flows.findByIdAndTeamId(flowId, teamId)).thenReturn(new Flow());
+        when(tasks.findById(taskId, teamId)).thenReturn(mock(TaskView.class));
+        Escalation scheduled = new Escalation();
+        scheduled.setId(escalationId);
+        scheduled.setTeamId(teamId);
+        scheduled.setStatus(EscalationStatus.IDLE);
+        when(escalations.findByIdAndTeamId(escalationId, teamId)).thenReturn(scheduled);
+        when(escalations.scheduleIdle(any(), any(), any(), any(), any(), any())).thenReturn(1);
+
+        ScheduledEscalationRequest schedule = new ScheduledEscalationRequest();
+        schedule.setScheduleDate(LocalDate.of(2026, 1, 1));
+        schedule.setScheduleTime(LocalTime.of(10, 0));
+        schedule.setTimezone("Asia/Kolkata");
+        schedule.setRepeatType(RepeatType.DAILY);
+
+        Escalation result = service.schedule(escalationId, schedule);
+
+        assertEquals(RepeatType.DAILY, result.getRepeatType());
+        assertEquals(Instant.parse("2026-01-02T04:30:00Z"), result.getNextRepeatAt());
+        verify(events).publishEvent(new EscalationStartSchedule(escalationId, result.getScheduledStartAt()));
     }
 
     @Test
@@ -223,6 +256,32 @@ class EscalationServiceSchedulingTest {
         verify(escalations, never()).cancelScheduled(any(), any(), any());
         verify(auditService, never()).record(any());
         verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    // Verifies stopping repeats changes only future recurrence and records the actor.
+    void stoppingRepeatsClearsTheNextBoundaryWithoutChangingRunStatus() {
+        UUID teamId = UUID.randomUUID();
+        UUID escalationId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        AuthContextHolder.set(new AuthContext(actorId, teamId, "TEAM_OWNER", "token", "owner@example.com"));
+        Escalation original = new Escalation();
+        original.setId(escalationId);
+        original.setTeamId(teamId);
+        original.setStatus(EscalationStatus.COMPLETED);
+        original.setRepeatType(RepeatType.DAILY);
+        original.setNextRepeatAt(now.plusSeconds(60));
+        when(escalations.findByIdForUpdate(escalationId)).thenReturn(java.util.Optional.of(original));
+
+        Escalation result = service.stopRepeating(escalationId);
+
+        assertEquals(EscalationStatus.COMPLETED, result.getStatus());
+        assertNull(result.getNextRepeatAt());
+        verify(events).publishEvent(new EscalationRepeatStopped(escalationId));
+        ArgumentCaptor<AuditEvent> audit = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditService).record(audit.capture());
+        assertEquals(AuditAction.REPEAT_STOPPED, audit.getValue().action());
+        assertEquals(actorId, audit.getValue().userId());
     }
 
     @Test

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router'
 import { AppShell } from './components/AppShell'
 import { SessionProvider } from './app/Session'
+import { ThemeProvider } from './app/theme'
 import { useSession } from './app/useSession'
 import { PublicPage } from './pages/PublicPage'
 import { TeamOverviewPage } from './pages/TeamOverviewPage'
@@ -19,6 +20,7 @@ import { EscalationsPage } from './features/escalations/EscalationsPage'
 import { AcknowledgeEscalationPage } from './features/escalations/AcknowledgeEscalationPage'
 import { EscalateNowPage } from './features/escalations/EscalateNowPage'
 import { WebhooksPage } from './features/webhooks/WebhooksPage'
+import { AuditPage } from './features/audit/AuditPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,8 +50,9 @@ function HomeRedirect() {
   return <PublicPage />
 }
 
+// Renders the fallback for unknown application routes.
 function NotFound() {
-  return <main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to AlertOps</a></main>
+  return <main className="not-found"><span className="eyebrow">404 / ROUTE NOT FOUND</span><h1>This path is out of sequence.</h1><a className="button button-primary" href="/">Return to ReplyTrail</a></main>
 }
 
 function AppRoutes() {
@@ -68,6 +71,7 @@ function AppRoutes() {
           <Route index element={<TeamOverviewPage />} />
           <Route path="members" element={<TeamMembersPage />} />
           <Route path="webhooks" element={<WebhooksPage />} />
+          <Route path="audit" element={<AuditPage />} />
           <Route path="tasks" element={<TasksPage />} />
           <Route path="tasks/:taskId" element={<TaskDetailPage />} />
           <Route path="flows" element={<FlowsPage />} />
@@ -81,9 +85,10 @@ function AppRoutes() {
   </Routes></BrowserRouter>
 }
 
+// Boots the shared providers and application routes.
 export default function App() {
   useEffect(() => {
     document.documentElement.dataset.ready = 'true'
   }, [])
-  return <QueryClientProvider client={queryClient}><SessionProvider><AppRoutes /></SessionProvider></QueryClientProvider>
+  return <QueryClientProvider client={queryClient}><ThemeProvider><SessionProvider><AppRoutes /></SessionProvider></ThemeProvider></QueryClientProvider>
 }

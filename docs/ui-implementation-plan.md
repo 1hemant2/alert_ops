@@ -1,8 +1,8 @@
-# AlertOps UI implementation plan
+# ReplyTrail UI implementation plan
 
 ## Goal
 
-Build an independently deployed web app that lets users run the AlertOps workflow: sign in, choose a team, create a task, configure an ordered escalation flow, start an escalation, and inspect its progress. This document records the initial UI implementation scope; the project goal is a production-ready product, with current release priorities in [the product launch checklist](product-launch-readiness.md). Every displayed status must come from the API; explanatory diagrams may describe the architecture but must be labeled as explanations.
+Build an independently deployed web app that lets users run the ReplyTrail workflow: sign in, choose a team, create a task, configure an ordered escalation flow, start an escalation, and inspect its progress. This document records the initial UI implementation scope; the project goal is a production-ready product, with current release priorities in [the product launch checklist](product-launch-readiness.md). Every displayed status must come from the API; explanatory diagrams may describe the architecture but must be labeled as explanations.
 
 ## Stack and deployment boundary
 
@@ -65,7 +65,7 @@ The follow-on backend and UI tickets are in [Team management UI task list](team-
 
 | Route | Page | Main content |
 | --- | --- | --- |
-| `/` | Public overview | What AlertOps does; concise architecture diagram; sign-in CTA; explain SMTP email requirements and the meaning of `SENT`. |
+| `/` | Public overview | What ReplyTrail does; concise architecture diagram; sign-in CTA; explain SMTP email requirements and the meaning of `SENT`. |
 | `/register`, `/login` | Authentication | Simple forms with visible API errors; unverified users are sent to the verification screen after login. |
 | `/verify-email?token=...` | Email verification | Confirm the one-time link with an explicit `POST`, request another link for the entered email, and continue to teams or an invitation. |
 | `/teams` | Team picker | List teams, create team, select team. After create, select the new team automatically. |

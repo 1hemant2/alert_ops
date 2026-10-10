@@ -4,25 +4,29 @@ import { confirmRecipientEscalateNow, previewRecipientEscalateNow } from '../../
 import { ApiError } from '../../api/client'
 import type { EscalationManualAction } from '../../api/types'
 import { Button } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { formatDate } from '../../lib/format'
 
+// Formats safe errors for the Escalate now preview and confirmation.
 function manualActionError(error: Error | null): string {
   if (error instanceof ApiError) {
     if (error.status === 410) return 'This Escalate now link has expired.'
     if (error.status === 409) return 'This escalation has advanced or its response window has closed. The link cannot change a later step.'
     if (error.status === 400) return 'This Escalate now link is invalid. Open the complete link from your email.'
   }
-  return error?.message ?? 'AlertOps could not load this Escalate now link.'
+  return error?.message ?? 'ReplyTrail could not load this Escalate now link.'
 }
 
+// Renders the success state after the next response is scheduled.
 function CompletedAction({ result }: { result: EscalationManualAction }) {
   return <div className="notice notice-success" role="status">
     <strong>Next notification scheduled</strong>
-    <div>AlertOps removed the wait for the next response step in “{result.escalationName}”.</div>
+    <div>ReplyTrail removed the wait for the next response step in “{result.escalationName}”.</div>
     {result.targetRecipientEmail && <small>The next notification is assigned to {result.targetRecipientEmail}.</small>}
   </div>
 }
 
+// Renders the public Escalate now action page.
 export function EscalateNowPage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
@@ -36,12 +40,13 @@ export function EscalateNowPage() {
   const completed = confirm.data ?? (preview.data?.alreadyEscalated ? preview.data : null)
 
   return <div className="auth-page">
+    <ThemeToggle />
     <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
     <div className="auth-card acknowledgement-card">
       <span className="eyebrow">ESCALATION RESPONSE</span>
       <h1>{completed ? 'Next step scheduled' : preview.data && !preview.data.actionAvailable ? 'Escalate now unavailable' : 'Escalate this alert now'}</h1>
       <p>{completed
-        ? 'The next response step is now due and will be delivered by AlertOps.'
+        ? 'The next response step is now due and will be delivered by ReplyTrail.'
         : 'This read-only preview checks the current saved step before you confirm.'}</p>
 
       {!token && <div className="form-error" role="alert">The Escalate now link is missing its token. Open the complete link from your email.</div>}
@@ -67,6 +72,6 @@ export function EscalateNowPage() {
           </>}
       <div className="acknowledgement-footnote">This link is scoped to the current response step. The saved response deadline is {preview.data?.actionDeadline ? formatDate(preview.data.actionDeadline) : 'not available'}.</div>
     </div>
-    <div className="auth-caption">ALERTOPS <i /> DURABLE, ORDERED ESCALATION</div>
+    <div className="auth-caption">REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK</div>
   </div>
 }

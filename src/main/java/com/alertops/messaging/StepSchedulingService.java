@@ -62,7 +62,6 @@ public class StepSchedulingService {
         state.setDueAt(clock.instant().plus(duration).truncatedTo(ChronoUnit.MICROS));
         state.setPublicationPending(true);
         FlowExecutionState saved = Objects.requireNonNull(stateRepository.save(state), "Saved response step is required");
-        // The listener adds the timer only after this database save commits.
         eventPublisher.publishEvent(toSchedule(saved));
         return saved;
     }
@@ -81,7 +80,6 @@ public class StepSchedulingService {
         state.setDueAt(dueAt.truncatedTo(ChronoUnit.MICROS));
         state.setPublicationPending(true);
         FlowExecutionState saved = Objects.requireNonNull(stateRepository.save(state), "Saved response step is required");
-        // The listener adds the immediate timer only after this database save commits.
         eventPublisher.publishEvent(toSchedule(saved));
         return saved;
     }
@@ -146,12 +144,11 @@ public class StepSchedulingService {
         current.setPublicationPending(true);
         FlowExecutionState saved = Objects.requireNonNull(
                 stateRepository.save(current), "Saved response step is required");
-        // Re-register the saved timer after this transaction commits.
         eventPublisher.publishEvent(toSchedule(saved));
     }
 
-    @Transactional(readOnly = true)
-    // Checks whether this exact step attempt still needs publication.
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    // Checks committed state without reusing entities cached before the start update.
     public boolean isStepStillPendingForPublication(EscalationStepSchedule schedule) {
         if (schedule == null) {
             return false;

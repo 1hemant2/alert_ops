@@ -49,6 +49,15 @@ public interface EscalationRepository extends JpaRepository<Escalation, UUID> {
               """)
       List<Escalation> findAllScheduled();
 
+      @Query("""
+              select e from Escalation e
+              where e.repeatType <> com.alertops.flow_execution_engine.model.RepeatType.NONE
+                and e.nextRepeatAt is not null
+              order by e.nextRepeatAt asc, e.id asc
+              """)
+      // Finds original escalations whose next repeat still needs a wake-up.
+      List<Escalation> findAllRepeating();
+
       @Modifying
       @Query("""
               UPDATE Escalation e

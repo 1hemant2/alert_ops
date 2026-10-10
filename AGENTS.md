@@ -1,4 +1,4 @@
-# Agent instructions for AlertOps
+# Agent instructions for ReplyTrail
 
 These rules apply to all work in this repository: backend, frontend, database, configuration, and documentation.
 
@@ -8,10 +8,16 @@ Act as a software engineer collaborating with the project owner. Read the releva
 
 ## Project goal
 
-Build AlertOps into a production-ready alerting and escalation product for real users. Treat the backend, UI, security, reliability, and operations as parts of the same product. Use [the product launch checklist](docs/product-launch-readiness.md) for current release priorities.
+Build ReplyTrail into a production-ready alerting and escalation product for real users. Treat the backend, UI, security, reliability, and operations as parts of the same product. Use [the product launch checklist](docs/product-launch-readiness.md) for current release priorities. Existing `alertops` technical identifiers remain compatible during the public rebrand.
 
 ## Changes
 
+- Write user-facing copy as natural, complete sentences across the UI, emails,
+  notifications, templates, and user-facing documentation. Avoid comma-separated
+  slogan or headline fragments. Prefer a sentence such as “Review every handoff
+  in one timeline.” Normal grammatical commas in full prose are fine; this rule
+  targets copy that reads like a list of fragments or generic AI-generated
+  marketing text.
 - Use clear, descriptive names for variables, methods, and classes.
 - Name types and methods for the business responsibility or user-visible
   outcome first, not for the internal mechanism. Prefer names such as
@@ -93,8 +99,6 @@ Build AlertOps into a production-ready alerting and escalation product for real 
 - Add or update a focused test for each meaningful behavior or failure path, especially races, retries, restart recovery, idempotency, and null repository results.
 - When a Spring component's constructor dependencies change, update every affected test context before handoff. Provide new dependencies with `@MockitoBean` or explicit test configuration in `@WebMvcTest` and other slice tests, update direct constructor tests, and run the focused slice test. If a context failure threshold appears, inspect the first underlying `UnsatisfiedDependencyException` rather than treating the threshold as the root cause.
 - Run the narrowest relevant tests plus the normal project build before handoff. Clearly distinguish passed local checks from integration or deployed checks that were skipped because required services or environment variables were unavailable.
-- Before handoff for every repository task, run an independent, read-only verification subagent using the original request, acceptance criteria, changed-file list, and intended verification commands as its inputs. Ask it to inspect the current worktree and relevant code, tests, and documentation; run the narrowest relevant checks it can run; and return an evidence-based verdict of `Achieved`, `Not achieved`, or `Inconclusive`, with each acceptance criterion mapped to evidence, command results, gaps, regressions, and recommended follow-up.
-- Keep the verifier independent: do not seed it with the desired conclusion, and do not allow it to modify files, stage changes, commit, or otherwise change repository state. The primary agent remains responsible for the result, must reconcile any disagreement or `Inconclusive` finding before claiming completion, and must record the verifier verdict, evidence, and material limitations in the current plan and final handoff. If the environment has no usable subagent mechanism, explicitly record that verification was skipped and why; do not present the task as independently verified.
 
 ## Transactions
 

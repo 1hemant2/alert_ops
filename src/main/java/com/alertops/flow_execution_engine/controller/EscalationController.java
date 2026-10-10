@@ -102,4 +102,11 @@ public class EscalationController {
         return escalation == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(escalation);
     }
 
+    // Stops future daily or weekly runs while keeping existing runs available.
+    @PostMapping("/{escalationId}/stop-repeat")
+    public ResponseEntity<?> stopRepeat(@PathVariable UUID escalationId) {
+        var escalation = escalationService.stopRepeating(escalationId);
+        return escalation == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(escalation);
+    }
+
 }

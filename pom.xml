@@ -17,7 +17,7 @@
     <artifactId>alertops</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>alertops</name>
-    <description>AlertOps backend service</description>
+    <description>ReplyTrail backend service</description>
 
     <properties>
         <java.version>17</java.version>

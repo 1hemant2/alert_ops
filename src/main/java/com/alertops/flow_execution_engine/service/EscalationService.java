@@ -12,6 +12,8 @@ import com.alertops.flow_execution_engine.dto.ScheduledEscalationRequest;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.model.RepeatType;
+import com.alertops.flow_execution_engine.messaging.EscalationRepeatStopped;
 import com.alertops.audit.model.AuditAction;
 import com.alertops.audit.model.AuditEntityType;
 import com.alertops.audit.model.AuditEvent;
@@ -39,7 +41,9 @@ public class EscalationService {
    private final ApplicationEventPublisher eventPublisher;
    private final Clock clock;
    private final AuditService auditService;
+   private final EscalationRepeatCalculator repeatCalculator = new EscalationRepeatCalculator();
 
+    // Creates the lifecycle service with the existing escalation dependencies.
     public EscalationService(EscalationRepository escalationRepository,
                       FlowExecutionStateRepository flowExecutionStateRepository,
                       FlowRepository flowRepository,
@@ -102,6 +106,7 @@ public class EscalationService {
     }
 
     @Transactional
+    // Schedules one escalation and optionally enables its daily or weekly repeats.
     public Escalation schedule(UUID escalationId, ScheduledEscalationRequest schedule) {
         AuthContext authContext = requireTeamContext();
         AuditActor actor = requireSchedulingActor(authContext);
@@ -117,6 +122,12 @@ public class EscalationService {
 
         Instant scheduledStartAt = resolveScheduledStart(schedule);
         String timezone = schedule.getTimezone().trim();
+        RepeatType repeatType = schedule.getRepeatType() == null
+                ? RepeatType.NONE
+                : schedule.getRepeatType();
+        Instant nextRepeatAt = repeatType == RepeatType.NONE
+                ? null
+                : repeatCalculator.nextAfter(scheduledStartAt, timezone, repeatType, scheduledStartAt);
         int updated = escalationRepository.scheduleIdle(
                 escalationId,
                 authContext.getTeamId(),
@@ -134,6 +145,10 @@ public class EscalationService {
         escalation.setScheduledByUserEmail(actor.email());
         escalation.setScheduledStartRetryCount(0);
         escalation.setScheduledStartNextRetryAt(null);
+        escalation.setRepeatType(repeatType);
+        escalation.setNextRepeatAt(nextRepeatAt);
+        escalation.setRepeatSourceId(null);
+        escalationRepository.save(escalation);
         auditService.record(new AuditEvent(
                 AuditEntityType.ESCALATION, escalationId, AuditAction.SCHEDULED, fromStatus.name(),
                 EscalationStatus.SCHEDULED.name(), actor.userId(), actor.email(), clock.instant(), null, null));
@@ -144,6 +159,7 @@ public class EscalationService {
     }
 
     @Transactional
+    // Reschedules only a non-recurring one-time escalation before it starts.
     public Escalation reschedule(UUID escalationId, ScheduledEscalationRequest schedule) {
         AuthContext authContext = requireTeamContext();
         AuditActor actor = requireSchedulingActor(authContext);
@@ -153,6 +169,11 @@ public class EscalationService {
         }
         if (escalation.getStatus() != EscalationStatus.SCHEDULED) {
             throw EscalationException.transitionConflict("Only scheduled escalations can be rescheduled");
+        }
+        if ((escalation.getRepeatType() != null && escalation.getRepeatType() != RepeatType.NONE)
+                || escalation.getRepeatSourceId() != null) {
+            throw EscalationException.transitionConflict(
+                    "Recurring escalation runs cannot be rescheduled");
         }
         EscalationStatus fromStatus = escalation.getStatus();
         Instant scheduledStartAt = resolveScheduledStart(schedule);
@@ -184,6 +205,7 @@ public class EscalationService {
     }
 
     @Transactional
+    // Cancels one scheduled run without changing its original repeat rule.
     public Escalation cancelScheduled(UUID escalationId) {
         AuthContext authContext = requireTeamContext();
         UUID cancelledByUserId = requireActorId(authContext);
@@ -220,6 +242,37 @@ public class EscalationService {
             eventPublisher.publishEvent(new EscalationStartCancelled(saved.getId()));
         }
         return saved;
+    }
+
+    @Transactional
+    // Stops future repeats while preserving the original run and its history.
+    public Escalation stopRepeating(UUID escalationId) {
+        AuthContext authContext = requireTeamContext();
+        UUID actorId = requireActorId(authContext);
+        Escalation escalation = escalationRepository.findByIdForUpdate(escalationId).orElse(null);
+        if (escalation == null || !authContext.getTeamId().equals(escalation.getTeamId())) {
+            return null;
+        }
+        if (escalation.getRepeatSourceId() != null) {
+            throw EscalationException.transitionConflict(
+                    "Only the original escalation can stop its repeats");
+        }
+        if (escalation.getRepeatType() == null
+                || escalation.getRepeatType() == RepeatType.NONE
+                || escalation.getNextRepeatAt() == null) {
+            return escalation;
+        }
+
+        escalation.setNextRepeatAt(null);
+        escalationRepository.save(escalation);
+        auditService.record(new AuditEvent(
+                AuditEntityType.ESCALATION, escalationId, AuditAction.REPEAT_STOPPED,
+                escalation.getRepeatType().name(), escalation.getRepeatType().name(),
+                actorId, authContext.getEmail(), clock.instant(), null, null));
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new EscalationRepeatStopped(escalationId));
+        }
+        return escalation;
     }
 
     public List<Escalation> getEscalations(int page, int size, String sortBy, String sortDir) {

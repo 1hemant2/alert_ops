@@ -55,6 +55,16 @@ public class Escalation {
 
     private String scheduleTimezone;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "repeat_type", nullable = false)
+    private RepeatType repeatType = RepeatType.NONE;
+
+    @Column(name = "next_repeat_at")
+    private Instant nextRepeatAt;
+
+    @Column(name = "repeat_source_id")
+    private UUID repeatSourceId;
+
     @Column(name = "scheduled_start_retry_count", nullable = false)
     private int scheduledStartRetryCount;
 
@@ -213,6 +223,36 @@ public class Escalation {
 
     public void setScheduleTimezone(String scheduleTimezone) {
         this.scheduleTimezone = scheduleTimezone;
+    }
+
+    // Returns the calendar rule owned by the original escalation.
+    public RepeatType getRepeatType() {
+        return repeatType;
+    }
+
+    // Stores the calendar rule for this escalation row.
+    public void setRepeatType(RepeatType repeatType) {
+        this.repeatType = repeatType;
+    }
+
+    // Returns the next repeat boundary that has not been materialized.
+    public Instant getNextRepeatAt() {
+        return nextRepeatAt;
+    }
+
+    // Stores the next durable repeat boundary.
+    public void setNextRepeatAt(Instant nextRepeatAt) {
+        this.nextRepeatAt = nextRepeatAt;
+    }
+
+    // Returns the original escalation ID for a generated occurrence.
+    public UUID getRepeatSourceId() {
+        return repeatSourceId;
+    }
+
+    // Links a generated occurrence to its original escalation.
+    public void setRepeatSourceId(UUID repeatSourceId) {
+        this.repeatSourceId = repeatSourceId;
     }
 
     public int getScheduledStartRetryCount() {

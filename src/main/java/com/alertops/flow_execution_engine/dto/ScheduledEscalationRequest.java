@@ -3,11 +3,14 @@ package com.alertops.flow_execution_engine.dto;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import com.alertops.flow_execution_engine.model.RepeatType;
+
 /** Local schedule fields supplied by the UI; the service converts them to UTC. */
 public class ScheduledEscalationRequest {
     private LocalDate scheduleDate;
     private LocalTime scheduleTime;
     private String timezone;
+    private RepeatType repeatType = RepeatType.NONE;
 
     public LocalDate getScheduleDate() {
         return scheduleDate;
@@ -31,5 +34,15 @@ public class ScheduledEscalationRequest {
 
     public void setTimezone(String timezone) {
         this.timezone = timezone;
+    }
+
+    // Returns the requested daily or weekly calendar rule.
+    public RepeatType getRepeatType() {
+        return repeatType;
+    }
+
+    // Stores the requested calendar rule from the API boundary.
+    public void setRepeatType(RepeatType repeatType) {
+        this.repeatType = repeatType;
     }
 }
