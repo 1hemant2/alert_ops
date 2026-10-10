@@ -46,6 +46,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -72,6 +74,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -194,6 +197,44 @@ class StepSchedulingPostgresIntegrationTest {
         verify(notification, times(1)).sendEmail(any(), anyString(), any());
     }
 
+    @ParameterizedTest
+    @EnumSource(FlowExecutionStartMode.class)
+    // Verifies that each start mode registers and publishes despite a cached pre-start escalation.
+    void flowStartsPublishWhenDue(FlowExecutionStartMode startMode) throws Exception {
+        UUID teamId = UUID.randomUUID();
+        Escalation escalation = new Escalation();
+        escalation.setTeamId(teamId);
+        escalation.setStatus(startMode == FlowExecutionStartMode.IDLE
+                ? EscalationStatus.IDLE : EscalationStatus.SCHEDULED);
+        escalation.setScheduledStartAt(CLOCK.instant().minusSeconds(1));
+        UUID escalationId = escalations.save(escalation).getId();
+
+        transaction().executeWithoutResult(status -> {
+            // API validation can load this entity before the bulk start update changes its status.
+            escalations.findById(escalationId).orElseThrow();
+            flowExecutionStateService.startFlowExecution(new Task(), new com.alertops.flow.model.Flow(),
+                    List.of(node(1000, "recipient@example.test")), escalationId, teamId, startMode);
+            assertThat(timers.activeTimerCount()).isZero();
+            assertThat(TIMER_CALLS).isEmpty();
+        });
+
+        TimerCall registered = takeTimer();
+        FlowExecutionState firstStep = states.findTopByProcessIdOrderByPositionAsc(escalationId);
+        assertThat(firstStep).isNotNull();
+        assertThat(escalations.findById(escalationId).orElseThrow().getStatus()).isEqualTo(EscalationStatus.OPEN);
+        assertThat(firstStep.getStatus()).isEqualTo(FlowExecutionStepStatus.SCHEDULED);
+        assertThat(firstStep.getDueAt()).isEqualTo(registered.dueAt());
+        assertThat(firstStep.isPublicationPending()).isTrue();
+        assertThat(timers.activeTimerCount()).isEqualTo(1);
+
+        CLOCK.set(registered.dueAt());
+        registered.runnable().run();
+        awaitPendingFlag(firstStep.getId(), false);
+        verify(rabbit).convertAndSend(anyString(), anyString(),
+                eq(new EscalationStepReadyMessage(firstStep.getId(), 0, registered.dueAt())),
+                any(MessagePostProcessor.class), any(CorrelationData.class));
+    }
+
     @Test
     // Verifies that rolled-back scheduling creates no timer or publication.
     void rolledBackSchedulingDoesNotRegisterATimerOrPublish() {
@@ -290,6 +331,20 @@ class StepSchedulingPostgresIntegrationTest {
         assertThat(restored.dueAt()).isEqualTo(persistedDueAt);
         assertThat(timers.activeTimerCount()).isEqualTo(1);
         assertThat(states.findById(saved.getId()).orElseThrow().isPublicationPending()).isTrue();
+    }
+
+    @Test
+    // Verifies a committed schedule event is not dropped when published outside a transaction.
+    void transactionlessScheduleEventRegistersCommittedTimer() throws Exception {
+        Instant dueAt = Instant.now().plus(Duration.ofMinutes(5)).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        FlowExecutionState saved = transaction().execute(
+                status -> createStep(FlowExecutionStepStatus.SCHEDULED, Duration.ZERO, true, dueAt));
+
+        events.publishEvent(new EscalationStepSchedule(saved.getId(), 0, dueAt));
+
+        TimerCall registered = takeTimer();
+        assertThat(registered.dueAt()).isEqualTo(dueAt);
+        assertThat(timers.activeTimerCount()).isEqualTo(1);
     }
 
     @Test
