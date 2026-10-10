@@ -5,6 +5,7 @@ import { createFlow, getFlows } from '../../api/flows'
 import { Button, Card, EmptyState, ErrorState, Field, LoadingRows, PageHeader } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
 
+// Shows saved response paths in a scrollable list with path creation controls.
 export function FlowsPage() {
   const { teamId = '' } = useParams()
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export function FlowsPage() {
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">YOUR TEAM</span><h2>Response paths</h2></div><span className="count-pill">{flows.data?.length ?? '—'}</span></div>
-        {flows.isPending ? <LoadingRows count={4} /> : flows.isError ? <ErrorState message={flows.error.message} onRetry={() => void flows.refetch()} /> : flows.data.length === 0 ? <EmptyState title="No escalation paths yet" description="Create a path, then add recipients and decide how long to wait before each step." /> : <div className="flow-list">{flows.data.map(flow => <Link className="flow-row path-list-row" to={`/app/${teamId}/flows/${flow.id}`} key={flow.id}><span className="flow-symbol path-list-icon"><span /><span /><span /></span><span className="flow-row-copy"><strong>{flow.name}</strong><small>Updated {formatDate(flow.updatedAt ?? flow.createdAt)}</small></span><span className="flow-version">v{flow.version ?? 0}</span><span className="task-id">OPEN&nbsp; →</span></Link>)}</div>}
+        {flows.isPending ? <LoadingRows count={4} /> : flows.isError ? <ErrorState message={flows.error.message} onRetry={() => void flows.refetch()} /> : flows.data.length === 0 ? <EmptyState title="No escalation paths yet" description="Create a path, then add recipients and decide how long to wait before each step." /> : <div className="flow-list" role="region" aria-label="Escalation paths" tabIndex={0}>{flows.data.map(flow => <Link className="flow-row path-list-row" to={`/app/${teamId}/flows/${flow.id}`} key={flow.id}><span className="flow-symbol path-list-icon"><span /><span /><span /></span><span className="flow-row-copy"><strong>{flow.name}</strong><small>Updated {formatDate(flow.updatedAt ?? flow.createdAt)}</small></span><span className="flow-version">v{flow.version ?? 0}</span><span className="task-id">OPEN&nbsp; →</span></Link>)}</div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW PATH</span><h2>Create an escalation path</h2></div><span className="form-number">01</span></div>

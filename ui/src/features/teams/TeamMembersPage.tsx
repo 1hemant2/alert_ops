@@ -7,6 +7,7 @@ import { useSession } from '../../app/useSession'
 import { Button, Card, EmptyState, ErrorState, Field, InlineNotice, LoadingRows, PageHeader } from '../../components/Elements'
 import { teamRoleDescription, teamRoleLabel } from './teamRoles'
 
+// Shows team members in a scrollable list with invitation controls.
 export function TeamMembersPage() {
   const { teamId = '' } = useParams()
   const { team } = useSession()
@@ -75,7 +76,7 @@ export function TeamMembersPage() {
       {members.isPending ? <LoadingRows count={4} />
         : members.isError ? <ErrorState message={members.error.message} onRetry={() => void members.refetch()} />
           : members.data.length === 0 ? <EmptyState title="No members found" description="This team has no member records to show." />
-            : <div className="member-list">
+            : <div className="member-list" role="region" aria-label="Team members" tabIndex={0}>
               {members.data.map(member => (
                 <article className="member-row" key={member.memberId}>
                   <span className="member-mark" aria-hidden="true">{member.name.slice(0, 1).toUpperCase()}</span>

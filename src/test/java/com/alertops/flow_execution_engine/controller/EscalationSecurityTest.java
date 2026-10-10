@@ -121,4 +121,11 @@ class EscalationSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    // Requires authentication before stopping future repeats.
+    void anonymousStopRepeatRequestReturnsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/escalation/{escalationId}/stop-repeat", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
 }

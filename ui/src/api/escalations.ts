@@ -1,8 +1,26 @@
 import { jsonBody, request } from './client'
 import type { Escalation, EscalationAcknowledgement, EscalationHistoryPage, EscalationManualAction, EscalationManualActionRequest, EscalationResolution, ExecutionState } from './types'
 
+// Loads the first page of team escalations for existing workspace screens.
 export function getEscalations(): Promise<Escalation[]> {
-  return request<Escalation[]>('/api/v1/escalation/all?page=0&size=100&sortBy=createdAt&sortDir=desc')
+  return getEscalationsPage(0, 100)
+}
+
+// Loads one page of team escalations for frontend history aggregation.
+function getEscalationsPage(page: number, size: number): Promise<Escalation[]> {
+  return request<Escalation[]>(`/api/v1/escalation/all?page=${page}&size=${size}&sortBy=createdAt&sortDir=desc`)
+}
+
+// Loads every available escalation page for the team audit view.
+export async function getAllEscalations(): Promise<Escalation[]> {
+  const escalations: Escalation[] = []
+  let page = 0
+  while (true) {
+    const batch = await getEscalationsPage(page, 100)
+    escalations.push(...batch)
+    if (batch.length < 100) return escalations
+    page += 1
+  }
 }
 
 export function getEscalation(escalationId: string): Promise<Escalation> {
@@ -20,10 +38,12 @@ export function createEscalation(input: {
   })
 }
 
+// Schedules one-time or daily/weekly repetition for an idle escalation.
 export function scheduleEscalation(escalationId: string, schedule: {
   scheduleDate: string
   scheduleTime: string
   timezone: string
+  repeatType?: 'NONE' | 'DAILY' | 'WEEKLY'
 }): Promise<Escalation> {
   return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/schedule`, {
     method: 'POST',
@@ -49,6 +69,14 @@ export function cancelScheduledEscalation(escalationId: string): Promise<Escalat
   })
 }
 
+// Stops future repeats while leaving every saved escalation run unchanged.
+export function stopRepeatingEscalation(escalationId: string): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/stop-repeat`, {
+    method: 'POST',
+    body: jsonBody({}),
+  })
+}
+
 export function startEscalation(escalationId: string): Promise<string> {
   return request<string>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/start`, {
     method: 'POST',
@@ -62,6 +90,18 @@ export function getExecutionStates(escalationId: string): Promise<ExecutionState
 // Loads the saved lifecycle activity for one escalation page.
 export function getEscalationHistory(escalationId: string, page = 0, size = 20): Promise<EscalationHistoryPage> {
   return request<EscalationHistoryPage>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/history?page=${page}&size=${size}`)
+}
+
+// Loads every saved history page for one escalation for the team audit view.
+export async function getAllEscalationHistory(escalationId: string): Promise<EscalationHistoryPage['events']> {
+  const events: EscalationHistoryPage['events'] = []
+  let page = 0
+  while (true) {
+    const history = await getEscalationHistory(escalationId, page, 100)
+    events.push(...history.events)
+    if (history.last || history.totalPages <= page + 1) return events
+    page += 1
+  }
 }
 
 export function previewEscalationAcknowledgement(token: string): Promise<EscalationAcknowledgement> {

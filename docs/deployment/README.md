@@ -1,8 +1,11 @@
-# AlertOps cloud deployment learning path
+# ReplyTrail cloud deployment learning path
 
-This guide takes AlertOps from a local Spring Boot application to a GitOps-managed
+This guide takes ReplyTrail from a local Spring Boot application to a GitOps-managed
 Kubernetes workload. OCI is the implementation target; AWS equivalents are included
 so the same design can be explained in interviews.
+
+The public product name is ReplyTrail. Existing `alertops` image, service, namespace,
+cache, and resource names in the commands below remain compatibility identifiers.
 
 ## Target architecture
 
@@ -10,7 +13,7 @@ so the same design can be explained in interviews.
 Developer -> GitHub -> GitHub Actions -> GHCR
                   \-> manifests repository -> Argo CD
                                                |
-Internet -> load balancer -> Kubernetes Service -> AlertOps pods
+Internet -> load balancer -> Kubernetes Service -> ReplyTrail pods
                                                    |-- PostgreSQL
                                                    |-- RabbitMQ
                                                    `-- Redis
@@ -22,7 +25,7 @@ AWS: VPC + EKS/EC2     + ECR  + S3
 PostgreSQL, RabbitMQ, and Redis can run inside Kubernetes for learning. For a
 production design, prefer managed services where the chosen cloud provides them.
 Stateful systems require backups, persistent volumes, disruption planning, and
-different scaling rules from the stateless AlertOps application.
+different scaling rules from the stateless ReplyTrail application.
 
 ## Course roadmap
 

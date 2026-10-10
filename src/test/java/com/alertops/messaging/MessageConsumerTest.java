@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -84,12 +86,17 @@ class MessageConsumerTest {
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null)).thenReturn(true);
+        when(notification.sendEmail(
+                eq(currentState), any(Escalation.class), any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"), isNull()))
+                .thenReturn(true);
 
         consumer.deliverReadyStep(queuedState);
         consumer.deliverReadyStep(queuedState);
 
-        verify(notification, times(1)).sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null);
+        verify(notification, times(1)).sendEmail(
+                eq(currentState), any(Escalation.class), any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"), isNull());
         verify(stateRepository, times(1)).claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class));
         assertEquals(FlowExecutionStepStatus.SENT, currentState.getStatus());
         assertEquals(1, currentState.getSendAttemptCount());
@@ -105,7 +112,9 @@ class MessageConsumerTest {
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+        when(notification.sendEmail(
+                eq(currentState), any(Escalation.class), any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"), isNull()))
                 .thenReturn(true);
 
         consumer.deliverReadyStep(queuedState);
@@ -145,9 +154,11 @@ class MessageConsumerTest {
         when(acknowledgementService.createEscalateNowUrl(any(Escalation.class), eq(currentState), eq(nextState)))
                 .thenReturn("https://alerts.example.com/escalate?token=escalate-token");
         when(notification.sendEmail(
-                currentState,
-                "https://alerts.example.com/acknowledge?token=test-token",
-                "https://alerts.example.com/escalate?token=escalate-token"))
+                eq(currentState),
+                any(Escalation.class),
+                any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"),
+                eq("https://alerts.example.com/escalate?token=escalate-token")))
                 .thenReturn(true);
 
         consumer.deliverReadyStep(queuedState);
@@ -156,9 +167,11 @@ class MessageConsumerTest {
         verify(stepSchedulingService).scheduleStep(nextState);
         verify(acknowledgementService).createEscalateNowUrl(any(Escalation.class), eq(currentState), eq(nextState));
         verify(notification).sendEmail(
-                currentState,
-                "https://alerts.example.com/acknowledge?token=test-token",
-                "https://alerts.example.com/escalate?token=escalate-token");
+                eq(currentState),
+                any(Escalation.class),
+                any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"),
+                eq("https://alerts.example.com/escalate?token=escalate-token"));
         verify(timeoutService, never()).scheduleAcknowledgementTimeout(any(), any(), any());
     }
 
@@ -174,7 +187,9 @@ class MessageConsumerTest {
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+        when(notification.sendEmail(
+                eq(currentState), any(Escalation.class), any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"), isNull()))
                 .thenReturn(false);
         when(stepSchedulingService.scheduleStep(currentState)).thenAnswer(invocation -> {
             currentState.setStatus(FlowExecutionStepStatus.SCHEDULED);
@@ -202,7 +217,9 @@ class MessageConsumerTest {
         when(stateRepository.claimForDelivery(eq(STEP_ID), eq(0), any(Instant.class))).thenReturn(1);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+        when(notification.sendEmail(
+                eq(currentState), any(Escalation.class), any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"), isNull()))
                 .thenReturn(false);
 
         consumer.deliverReadyStep(queuedState);
@@ -248,7 +265,9 @@ class MessageConsumerTest {
                 .thenReturn(nextState, nextState);
         when(acknowledgementService.createAcknowledgementUrl(any(Escalation.class), any(FlowExecutionState.class)))
                 .thenReturn("https://alerts.example.com/acknowledge?token=test-token");
-        when(notification.sendEmail(currentState, "https://alerts.example.com/acknowledge?token=test-token", null))
+        when(notification.sendEmail(
+                eq(currentState), any(Escalation.class), any(Duration.class),
+                eq("https://alerts.example.com/acknowledge?token=test-token"), isNull()))
                 .thenThrow(new RuntimeException("unexpected processing error"));
 
         assertThrows(RuntimeException.class, () -> consumer.deliverReadyStep(queuedState));

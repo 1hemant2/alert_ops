@@ -1,5 +1,9 @@
 # Phase 0: production readiness
 
+> **ReplyTrail rebrand note:** This readiness record uses older AlertOps wording in
+> historical observations. It refers to the current ReplyTrail product; executable
+> `alertops` resource and configuration identifiers remain unchanged.
+
 Phase 0 makes failures visible before deployment automation is introduced. Kubernetes
 cannot repair an application that starts with invalid configuration, silently changes
 its database schema, or shares a signing key committed to Git.

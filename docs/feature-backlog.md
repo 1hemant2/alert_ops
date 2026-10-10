@@ -5,7 +5,7 @@ release requirements remain in the [product launch checklist](product-launch-rea
 
 ## Send test escalation
 
-- **Status:** Deferred — revisit after real users start using AlertOps.
+- **Status:** Deferred — revisit after real users start using ReplyTrail.
 - **Decision date:** 2026-10-06.
 - **Goal:** Let a team check its escalation configuration before using it for a real incident.
 - **Next review:** Use feedback from initial users to decide priority and expected behavior.

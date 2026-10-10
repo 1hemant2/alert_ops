@@ -5,6 +5,8 @@ public enum AuditAction {
     CREATED,
     SCHEDULED,
     RESCHEDULED,
+    REPEAT_CREATED,
+    REPEAT_STOPPED,
     STARTED,
     CANCELLED,
     START_FAILED,

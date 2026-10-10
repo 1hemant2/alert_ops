@@ -111,7 +111,11 @@ public class MessageConsumer {
         String escalateNowUrl = nextNode == null
                 ? null
                 : acknowledgementService.createEscalateNowUrl(escalation, flowExecutionState, nextNode);
-        boolean mailSent = notification.sendEmail(flowExecutionState, acknowledgementUrl, escalateNowUrl);
+        Duration responseWindow = nextNode == null
+                ? flowExecutionState.getDuration()
+                : nextNode.getDuration();
+        boolean mailSent = notification.sendEmail(
+                flowExecutionState, escalation, responseWindow, acknowledgementUrl, escalateNowUrl);
         // Persist total attempts, including successful SMTP submissions.
         flowExecutionState.setSendAttemptCount(sendAttemptCount + 1);
         if (mailSent) {

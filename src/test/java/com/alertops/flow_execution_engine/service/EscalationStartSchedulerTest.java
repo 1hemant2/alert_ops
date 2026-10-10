@@ -24,6 +24,7 @@ import org.springframework.scheduling.TaskScheduler;
 import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.model.RepeatType;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 class EscalationStartSchedulerTest {
@@ -32,10 +33,11 @@ class EscalationStartSchedulerTest {
     private final StartFlowExecutionUseCase start = mock(StartFlowExecutionUseCase.class);
     private final FlowExecutionStateService stateService = mock(FlowExecutionStateService.class);
     private final EscalationStartRetryService retryService = mock(EscalationStartRetryService.class);
+    private final EscalationRepeatService repeatService = mock(EscalationRepeatService.class);
     private final Instant now = Instant.parse("2026-01-01T00:00:00Z");
     private final EscalationStartScheduler scheduler = new EscalationStartScheduler(
-            escalations, taskScheduler, Clock.fixed(now, ZoneOffset.UTC), start, stateService,
-            retryService, Duration.ofSeconds(5));
+        escalations, taskScheduler, Clock.fixed(now, ZoneOffset.UTC), start, stateService,
+            retryService, repeatService, Duration.ofSeconds(5));
 
     @Test
     void startupRecoversPersistedSchedules() {
@@ -67,6 +69,25 @@ class EscalationStartSchedulerTest {
         scheduler.recoverScheduledStarts();
 
         verify(taskScheduler).schedule(any(Runnable.class), eq(retryAt));
+    }
+
+    @Test
+    // Verifies terminal original runs still recover their future repeat wake-up.
+    void startupRecoversRepeatsWithoutRequiringAnOpenRun() {
+        UUID id = UUID.randomUUID();
+        Instant nextRepeatAt = now.plusSeconds(60);
+        Escalation original = new Escalation();
+        original.setId(id);
+        original.setStatus(EscalationStatus.COMPLETED);
+        original.setRepeatType(RepeatType.DAILY);
+        original.setNextRepeatAt(nextRepeatAt);
+        when(escalations.findAllRepeating()).thenReturn(List.of(original));
+        when(taskScheduler.schedule(any(Runnable.class), eq(nextRepeatAt)))
+                .thenReturn(mock(ScheduledFuture.class));
+
+        scheduler.recoverRepeatingEscalations();
+
+        verify(taskScheduler).schedule(any(Runnable.class), eq(nextRepeatAt));
     }
 
     @Test

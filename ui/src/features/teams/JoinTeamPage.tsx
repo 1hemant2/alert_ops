@@ -4,10 +4,12 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { acceptTeamInvite, previewTeamInvite, selectTeam } from '../../api/teams'
 import { useSession } from '../../app/useSession'
 import { Button, Card, ErrorState, InlineNotice, LoadingRows } from '../../components/Elements'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { teamRoleDescription, teamRoleLabel } from './teamRoles'
 
 const PENDING_INVITE_KEY = 'alertops.pending-invite'
 
+// Renders the ReplyTrail invitation preview and acceptance flow.
 export function JoinTeamPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -42,7 +44,8 @@ export function JoinTeamPage() {
   })
 
   return <div className="auth-page join-page">
-    <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>ALERT<span>OPS</span></span></Link>
+    <ThemeToggle />
+    <Link className="brand" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
     <Card className="auth-card join-card">
       <span className="eyebrow">TEAM INVITATION</span>
       {!inviteToken ? <>
@@ -57,7 +60,7 @@ export function JoinTeamPage() {
         <ErrorState message={preview.error.message} onRetry={() => void preview.refetch()} />
       </> : <>
         <h1>Join {preview.data.teamName}</h1>
-        <p>You’ve been invited to join this AlertOps team as a <strong>{teamRoleLabel(preview.data.role).toLowerCase()}</strong>.</p>
+        <p>You’ve been invited to join this ReplyTrail team as a <strong>{teamRoleLabel(preview.data.role).toLowerCase()}</strong>.</p>
         <p>{teamRoleDescription(preview.data.role)}</p>
         <dl className="invite-summary">
           <div><dt>Invited email</dt><dd>{preview.data.email}</dd></div>
@@ -77,6 +80,6 @@ export function JoinTeamPage() {
         </>}
       </>}
     </Card>
-    <div className="auth-caption">ALERTOPS <i /> DURABLE, ORDERED ESCALATION</div>
+    <div className="auth-caption">REPLYTRAIL <i /> KEEP EVERY RESPONSE ON TRACK</div>
   </div>
 }
