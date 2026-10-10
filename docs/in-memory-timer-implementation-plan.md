@@ -77,6 +77,13 @@ Reuse the existing fields:
 4. Confirmed acceptance clears `publicationPending`, conditional on the matching attempt and due time.
 5. The consumer atomically claims the attempt and clears obsolete pending state.
 
+The step listener uses `@TransactionalEventListener(AFTER_COMMIT)` with
+`fallbackExecution=true` for events published without a transaction. Its
+publication eligibility check runs in a new read-only transaction: Hibernate
+can retain a cached `IDLE` or `SCHEDULED` escalation after a bulk start update
+has committed `OPEN`, so reusing the committing persistence context can skip
+an otherwise valid timer.
+
 If the process stops after commit but before registration, startup recovery reconstructs the timer from PostgreSQL. If local registration fails while the process stays alive, a tracked retry must repair it. No scheduling-request queue or additional request flag is needed for this single-process handoff.
 
 Late confirmations must never clear the flag of a newer attempt. Broker acceptance is not email delivery, and `SENT` continues to mean SMTP acceptance.

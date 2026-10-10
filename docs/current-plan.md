@@ -1,43 +1,54 @@
 # Current task plan
 
-## Task: Fix home-page theme toggle contrast
+## Task: Register live step timers after commit
 
 Started: 2026-10-10
 Status: Complete
 
 ### Goal and scope
 
-Make the home-page Dark mode button readable when the application is in light
-mode. Keep the public header dark and change only the toggle's light-mode
-foreground and border contrast.
-
-### Resume note
-
-This follows the completed UI theme-control work recorded in the
-[changelog](../CHANGELOG.md). Preserve the persisted theme behavior, public
-header layout, and dark-mode appearance.
+Ensure a newly persisted `SCHEDULED` step is registered with the in-memory
+timer while the application is running, and remains recoverable if that
+registration fails. Keep the existing staged email styling changes untouched.
 
 ### Decision-compliance note
 
-- Keep the existing theme state and toggle behavior as the source of truth.
-- Scope the correction to the public home-page header in light mode; do not
-  change global light or dark surfaces.
+- PostgreSQL `flow_execution_state.dueAt` and `publicationPending` remain the
+  durable source of truth; the timer registry owns only wake-up handles.
+- Do not add a second due-time column, recurring polling loop, or parallel
+  in-memory copy of workflow state.
+- Publish the scheduling event through Spring's `@TransactionalEventListener`
+  after-commit phase, with fallback execution for transactionless callers.
+- Follow the [timer plan](in-memory-timer-implementation-plan.md#durable-scheduling-state):
+  validation must read committed PostgreSQL state, including after a bulk start
+  update; do not trust the committing transaction's cached escalation.
 
 ### Acceptance criteria
 
-- [x] The home-page Dark mode button has readable text, icon, border, and
-  background contrast in light mode.
-- [x] Dark mode and the existing public-header layout remain unchanged.
-- [x] UI build, lint, and whitespace checks pass.
+- [x] Every committed scheduled step reaches the timer registry or is queued
+  for prompt recovery without requiring an application restart.
+- [x] Registration failures and timer-capacity limits remain recoverable from
+  PostgreSQL and retry while the application is healthy.
+- [x] Focused tests cover the after-commit registration path and the recovery
+  fallback; existing scheduling behavior remains green.
 
 ### Steps
 
-- [x] Add the scoped light-mode public-header override.
-- [x] Run UI checks and inspect the final diff.
-- [x] Record the completed result in `CHANGELOG.md`.
+- [x] Inspect the transaction event and recovery wiring for a missed live
+  registration.
+- [x] Implement the simpler Spring transaction-event listener and focused
+  coverage.
+- [x] Reproduce a start with a cached pre-start escalation, fix committed-state
+  validation, and verify immediate and scheduled start modes.
+- [x] Run focused messaging tests, the normal package build, and check the diff.
+- [x] Record the result and live-app verification limitation in `CHANGELOG.md`.
 
 ### Intended verification
 
-UI build and `git diff --check` pass. Lint passes with the two existing
-`FlowDetailPage.tsx` warnings. Browser visual inspection was not available in
-this session; the selector is scoped to the home-page public header.
+The new regression failed in all three start modes before the fresh read and
+passed afterward, including publication at the saved due time. Seven focused
+PostgreSQL cases pass: start modes, zero delay, rollback, fallback and recovery.
+The backend package passes with an explicit Byte Buddy test agent, including
+the focused messaging unit suite; `git diff --check` passes. PostgreSQL tests
+used a temporary schema and a simulated broker. The running local app needs a
+restart to load this fix; real broker/email verification remains outstanding.

@@ -4,6 +4,27 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-10 — Register timers after escalation starts
+
+- Publish scheduling events normally and let a Spring transaction event listener
+  register them after commit, with immediate fallback for transactionless
+  callers. Read committed state in a separate read-only transaction so cached
+  pre-start statuses cannot silently prevent timer registration.
+- Verification: seven focused PostgreSQL cases cover all start modes and due
+  publication, zero delay, rollback, fallback, and recovery; the backend package
+  passes with a test agent, and `git diff --check` passes. The local app needs a
+  restart; real broker/email verification remains pending. See the
+  [timer handoff guidance](docs/in-memory-timer-implementation-plan.md#durable-scheduling-state).
+
+## 2026-10-10 — Style escalation notification email
+
+- Refresh the escalation email with the ReplyTrail navy, mint, and blue
+  palette, a branded header, a structured task panel, and clearer actions while
+  preserving the plain-text fallback and recipient-scoped links.
+- Verification: focused mail test and `./mvnw -q package` pass with 240 tests,
+  0 failures/errors, and 17 environment-gated skips; `git diff --check` passes.
+  Visual email-client inspection was unavailable.
+
 ## 2026-10-10 — Fix home-page theme toggle contrast
 
 - Give the light-mode Dark button in the public home-page header readable
