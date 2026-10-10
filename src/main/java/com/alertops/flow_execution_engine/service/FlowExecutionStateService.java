@@ -1,5 +1,6 @@
 package com.alertops.flow_execution_engine.service;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -31,16 +32,20 @@ public class FlowExecutionStateService {
     EscalationRepository escalationRepository;
     StepSchedulingService stepSchedulingService;
     AuditService auditService;
+    private final Clock clock;
 
+    // Creates the service that starts an escalation and schedules its first alert.
     public FlowExecutionStateService(
             FlowExecutionStateRepository flowExecutionStateRepository,
             EscalationRepository escalationRepository,
             StepSchedulingService stepSchedulingService,
-            AuditService auditService) {
+            AuditService auditService,
+            Clock clock) {
          this.flowExecutionStateRepository = flowExecutionStateRepository;
          this.escalationRepository = escalationRepository;
          this.stepSchedulingService = stepSchedulingService;
          this.auditService = Objects.requireNonNull(auditService, "auditService");
+         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Transactional
@@ -68,7 +73,7 @@ public class FlowExecutionStateService {
             String actorEmail = authContext == null ? null : authContext.getEmail();
             auditService.record(new AuditEvent(
                     AuditEntityType.ESCALATION, escalationId, AuditAction.STARTED, fromStatus.name(),
-                    EscalationStatus.OPEN.name(), actorId, actorEmail, Instant.now(), null, null));
+                    EscalationStatus.OPEN.name(), actorId, actorEmail, clock.instant(), null, null));
 
             if (flow == null) {
                 throw EscalationException.invalidRequest("The escalation flow is not available.");
@@ -108,18 +113,19 @@ public class FlowExecutionStateService {
                 flowExecutionStateRepository.save(flowExecutionState);
             }
             FlowExecutionState flowExecutionState = flowExecutionStateRepository.findTopByProcessIdOrderByPositionAsc(escalationId);
-            stepSchedulingService.scheduleStep(flowExecutionState);
+            stepSchedulingService.scheduleStepImmediately(flowExecutionState, clock.instant());
             return "Started Flow Execution for escalationId: " + escalationId;
         } catch (RuntimeException e) {
             throw e;
         }
     }
 
+    // Claims the escalation transition required by the selected start mode.
     private int claimStart(UUID escalationId, UUID teamId, FlowExecutionStartMode startMode) {
         return switch (startMode) {
             case IDLE -> escalationRepository.claimIdleForStart(escalationId, teamId);
             case SCHEDULED_DUE -> escalationRepository.claimScheduledForStart(
-                    escalationId, teamId, java.time.Instant.now());
+                    escalationId, teamId, clock.instant());
             case SCHEDULED_EARLY -> escalationRepository.claimScheduledForManualStart(escalationId, teamId);
         };
     }

@@ -1,6 +1,7 @@
 package com.alertops.messaging;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 
+import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.FlowExecutionState;
 
 import jakarta.mail.internet.MimeBodyPart;
@@ -39,9 +41,11 @@ public class Notification {
         this.fromAddress = fromAddress == null ? "" : fromAddress.trim();
     }
 
-    // Sends an alert with acknowledgement and optional immediate-escalation actions.
+    // Sends an escalation alert with context, response timing, and recipient actions.
     public boolean sendEmail(
             FlowExecutionState flowExecutionState,
+            Escalation escalation,
+            Duration responseWindow,
             String acknowledgementUrl,
             String escalateNowUrl) {
         if (flowExecutionState == null || isBlank(flowExecutionState.getUserEmail())) {
@@ -70,6 +74,13 @@ public class Notification {
             String taskPriority = sanitizeMetadata(flowExecutionState.getTaskPriority());
             String taskCategory = sanitizeMetadata(flowExecutionState.getTaskCategory());
             String taskReferenceUrl = sanitizeMetadata(flowExecutionState.getTaskReferenceUrl());
+            String escalationName = sanitizeSubject(
+                    escalation == null ? "" : Objects.toString(escalation.getName(), ""));
+            UUID escalationIdentifier = escalation == null || escalation.getId() == null
+                    ? flowExecutionState.getProcessId()
+                    : escalation.getId();
+            String escalationId = Objects.toString(escalationIdentifier, "unknown");
+            String responseWindowText = formatResponseWindow(responseWindow);
             if (taskSource.isEmpty()) {
                 taskSource = "Manual";
             }
@@ -83,9 +94,13 @@ public class Notification {
                 subjectDetails = subjectDetails.substring(0, 97) + "...";
             }
 
+            String subjectContext = escalationName.isBlank() ? subjectDetails : escalationName + " · " + subjectDetails;
+            if (subjectContext.length() > 100) {
+                subjectContext = subjectContext.substring(0, 97) + "...";
+            }
             String markdown = buildMarkdown(
-                    flowExecutionState, taskName, taskSource, taskPriority, taskCategory, taskReferenceUrl,
-                    taskDetails, acknowledgementUrl, escalateNowUrl);
+                    flowExecutionState, escalationName, escalationId, responseWindowText, taskName, taskSource,
+                    taskPriority, taskCategory, taskReferenceUrl, taskDetails, acknowledgementUrl, escalateNowUrl);
             var message = mailSender.createMimeMessage();
             var helper = new MimeMessageHelper(
                     message,
@@ -93,7 +108,7 @@ public class Notification {
                     StandardCharsets.UTF_8.name());
             helper.setFrom(fromAddress);
             helper.setTo(flowExecutionState.getUserEmail().trim());
-            helper.setSubject("ReplyTrail · " + taskSource + " · " + subjectDetails);
+            helper.setSubject("ReplyTrail · " + taskSource + " · " + subjectContext);
 
             var alternative = new MimeMultipart("alternative");
             var plainPart = new MimeBodyPart();
@@ -198,6 +213,9 @@ public class Notification {
     // Builds the plain-text action content for one alert email.
     private String buildMarkdown(
             FlowExecutionState state,
+            String escalationName,
+            String escalationId,
+            String responseWindow,
             String taskName,
             String taskSource,
             String taskPriority,
@@ -208,7 +226,6 @@ public class Notification {
             String escalateNowUrl) {
         String details = taskDetails.isBlank() ? "No task details were provided." : taskDetails;
         String recipient = Objects.toString(state.getUserEmail(), "unknown");
-        String escalationId = Objects.toString(state.getProcessId(), "unknown");
         String escalateNowAction = isBlank(escalateNowUrl)
                 ? ""
                 : "[Escalate now and notify the next person](%s)\n".formatted(escalateNowUrl);
@@ -216,6 +233,12 @@ public class Notification {
                 # A response needs your attention
 
                 ReplyTrail has activated a response workflow.
+
+                ## Escalation
+
+                - **Name:** %s
+                - **Escalation ID:** %s
+                - **Response window:** %s
 
                 ## Task
 
@@ -225,12 +248,11 @@ public class Notification {
                 - **Category:** %s
                 - **Reference URL:** %s
 
+                ## Task details
+
                 %s
 
-                ## Response reference
-
-                - **Escalation ID:** %s
-                - **Assigned user:** %s
+                **Assigned user:** %s
 
                 [Review and acknowledge this escalation](%s)
 
@@ -241,23 +263,33 @@ public class Notification {
                 ---
 
                 *Automated notification from ReplyTrail. Replies may not be monitored.*
-                """.formatted(taskName.isBlank() ? "Response needed" : taskName, taskSource, taskPriority,
-                        taskCategory, taskReferenceUrl, details,
-                        escalationId, recipient, acknowledgementUrl, escalateNowAction);
+                """.formatted(
+                        escalationName.isBlank() ? "Unnamed escalation" : escalationName,
+                        escalationId,
+                        responseWindow,
+                        taskName.isBlank() ? "Response needed" : taskName,
+                        taskSource,
+                        taskPriority,
+                        taskCategory,
+                        taskReferenceUrl,
+                        details,
+                        recipient,
+                        acknowledgementUrl,
+                        escalateNowAction);
     }
 
     // Builds the safe HTML action content for one alert email.
     private String buildHtml(String markdown, String acknowledgementUrl, String escalateNowUrl) {
         String renderedMarkdown = HTML_RENDERER.render(MARKDOWN_PARSER.parse(markdown))
-                .replace("<h1>", "<h1 style=\"margin:0 0 14px;color:#14283f;font-size:26px;line-height:1.25;\">")
-                .replace("<h2>", "<h2 style=\"margin:26px 0 8px;color:#14283f;font-size:16px;line-height:1.4;\">")
+                .replace("<h1>", "<h1 style=\"margin:0 0 14px;color:#edf5ff;font-size:26px;line-height:1.25;\">")
+                .replace("<h2>", "<h2 style=\"margin:26px 0 8px;color:#dceafa;font-size:16px;line-height:1.4;\">")
                 .replace("<p>", "<p style=\"margin:0 0 16px;line-height:1.65;\">")
                 .replace("<ul>", "<ul style=\"margin:0 0 18px;padding-left:22px;line-height:1.7;\">")
                 .replace("<li>", "<li style=\"padding-left:3px;margin:0 0 5px;\">")
-                .replace("<strong>", "<strong style=\"color:#14283f;\">")
-                .replace("<a href=", "<a style=\"color:#345cf5;font-weight:700;text-decoration:none;\" href=")
-                .replace("<code>", "<code style=\"padding:2px 6px;border-radius:4px;background:#eef3f8;color:#193e5b;font-family:Menlo,Consolas,monospace;font-size:13px;\">")
-                .replace("<hr />", "<hr style=\"margin:24px 0;border:0;border-top:1px solid #e3eaf1;\">");
+                .replace("<strong>", "<strong style=\"color:#f4f8ff;\">")
+                .replace("<a href=", "<a style=\"color:#8fe8b4;font-weight:700;text-decoration:none;word-break:break-word;overflow-wrap:anywhere;\" href=")
+                .replace("<code>", "<code style=\"padding:2px 6px;border-radius:4px;background:#223650;color:#d8eaff;font-family:Menlo,Consolas,monospace;font-size:13px;\">")
+                .replace("<hr />", "<hr style=\"margin:24px 0;border:0;border-top:1px solid #2a3b55;\">");
 
         return """
                 <!doctype html>
@@ -267,8 +299,8 @@ public class Notification {
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   <title>ReplyTrail escalation notice</title>
                   <style>
-                    .email-card { box-shadow:0 18px 44px rgba(16,24,40,.12); }
-                    .email-panel { background:#fbfcfe; }
+                    .email-card { box-shadow:0 22px 52px rgba(0,0,0,.35); }
+                    .email-panel { background:#172740; }
                     @media only screen and (max-width: 600px) {
                       .email-card { width:100% !important; }
                       .email-content { padding:24px 20px !important; }
@@ -276,10 +308,10 @@ public class Notification {
                     }
                   </style>
                 </head>
-                <body style="margin:0;padding:0;background:#eef2f5;color:#314156;font-family:Arial,Helvetica,sans-serif;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#eef2f5;padding:40px 12px;">
+                <body style="margin:0;padding:0;background:#0b1220;color:#dbe7f4;font-family:Arial,Helvetica,sans-serif;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#0b1220;padding:40px 12px;">
                     <tr><td align="center">
-                      <table role="presentation" class="email-card" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:#ffffff;border:1px solid #d9e2ea;border-radius:20px;overflow:hidden;">
+                      <table role="presentation" class="email-card" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;table-layout:fixed;background:#111c30;border:1px solid #2a3b55;border-radius:18px;overflow:hidden;">
                         <tr><td style="height:6px;background:#7ce7b2;font-size:0;line-height:0;">&nbsp;</td></tr>
                         <tr><td style="padding:26px 32px 28px;background:#101828;color:#ffffff;">
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -298,26 +330,26 @@ public class Notification {
                             </tr>
                           </table>
                         </td></tr>
-                        <tr><td class="email-content" style="padding:32px 34px 28px;background:#ffffff;font-size:15px;">
-                          <div style="display:block;margin-bottom:22px;padding:14px 16px;border:1px solid #b9e8ce;border-left:4px solid #168553;border-radius:10px;background:#f0fbf5;color:#123d2a;">
-                            <div style="font-size:11px;font-weight:800;letter-spacing:1.3px;color:#168553;">ACTION NEEDED</div>
+                        <tr><td class="email-content" style="padding:28px 28px 24px;background:#111c30;font-size:15px;word-break:break-word;overflow-wrap:anywhere;">
+                          <div style="display:block;margin-bottom:22px;padding:14px 16px;border:1px solid #276f5e;border-left:4px solid #7ce7b2;border-radius:10px;background:#133b34;color:#daf9e7;">
+                            <div style="font-size:11px;font-weight:800;letter-spacing:1.3px;color:#8fe8b4;">ACTION NEEDED</div>
                             <div style="margin-top:5px;font-size:14px;font-weight:700;line-height:1.45;">A response step is assigned to you.</div>
                           </div>
-                          <table role="presentation" class="email-panel" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#fbfcfe;border:1px solid #e3eaf1;border-radius:14px;">
-                            <tr><td class="email-panel-cell" style="padding:24px 24px 18px;color:#314156;font-size:15px;line-height:1.65;">{{MARKDOWN_HTML}}</td></tr>
+                          <table role="presentation" class="email-panel" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#172740;border:1px solid #2a3b55;border-radius:14px;">
+                            <tr><td class="email-panel-cell" style="padding:22px 22px 16px;color:#dbe7f4;font-size:15px;line-height:1.65;word-break:break-word;overflow-wrap:anywhere;">{{MARKDOWN_HTML}}</td></tr>
                           </table>
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;"><tr><td>
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#345cf5" style="border-radius:10px;background:#345cf5;box-shadow:0 5px 14px rgba(52,92,245,.22);">
-                              <a href="{{ACKNOWLEDGEMENT_URL}}" style="display:inline-block;padding:14px 22px;border-radius:10px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Acknowledge escalation</a>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#7ce7b2" style="border-radius:10px;background:#7ce7b2;box-shadow:0 5px 14px rgba(124,231,178,.2);">
+                              <a href="{{ACKNOWLEDGEMENT_URL}}" style="display:inline-block;padding:14px 22px;border-radius:10px;color:#10261c;font-size:15px;font-weight:800;text-decoration:none;">Acknowledge escalation</a>
                             </td></tr></table>
                           </td></tr></table>
                           {{ESCALATE_NOW_ACTION}}
                         </td></tr>
-                        <tr><td style="padding:18px 32px;border-top:1px solid #e4ebe9;background:#f6faf8;color:#708095;font-size:12px;line-height:1.5;">
+                        <tr><td style="padding:18px 28px;border-top:1px solid #263852;background:#0f1a2b;color:#90a4bd;font-size:12px;line-height:1.5;">
                           <span style="display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:#7ce7b2;">&nbsp;</span>Sent automatically by ReplyTrail. Please use your team's usual incident response channel.
                         </td></tr>
                       </table>
-                      <div style="padding:18px 8px;color:#8491a2;font-size:11px;letter-spacing:.2px;">Keep every response on track.</div>
+                      <div style="padding:18px 8px;color:#71849d;font-size:11px;letter-spacing:.2px;">Keep every response on track.</div>
                     </td></tr>
                   </table>
                 </body>
@@ -334,7 +366,44 @@ public class Notification {
         }
         return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:12px;\"><tr><td><a href=\""
                 + HtmlUtils.htmlEscape(escalateNowUrl)
-                + "\" style=\"display:inline-block;padding:11px 17px;border:1px solid #cdd7e3;border-radius:10px;color:#344054;background:#ffffff;font-size:14px;font-weight:700;text-decoration:none;\">Escalate now and notify the next person</a></td></tr></table>";
+                + "\" style=\"display:inline-block;padding:11px 17px;border:1px solid #3a506e;border-radius:10px;color:#dbe7f4;background:#172740;font-size:14px;font-weight:700;text-decoration:none;\">Escalate now and notify the next person</a></td></tr></table>";
+    }
+
+    // Formats the saved response duration for a recipient-facing email sentence.
+    private String formatResponseWindow(Duration responseWindow) {
+        if (responseWindow == null || responseWindow.isNegative()) {
+            return "Not specified";
+        }
+        long totalSeconds = responseWindow.getSeconds();
+        if (totalSeconds == 0) {
+            return "Immediately";
+        }
+        long days = totalSeconds / 86_400;
+        long hours = (totalSeconds % 86_400) / 3_600;
+        long minutes = (totalSeconds % 3_600) / 60;
+        long seconds = totalSeconds % 60;
+        StringBuilder formatted = new StringBuilder();
+        appendDurationPart(formatted, days, "day");
+        appendDurationPart(formatted, hours, "hour");
+        appendDurationPart(formatted, minutes, "minute");
+        if (formatted.isEmpty() || seconds > 0) {
+            appendDurationPart(formatted, seconds, "second");
+        }
+        return formatted.toString();
+    }
+
+    // Adds one nonzero duration unit with readable singular and plural wording.
+    private void appendDurationPart(StringBuilder formatted, long amount, String unit) {
+        if (amount == 0) {
+            return;
+        }
+        if (!formatted.isEmpty()) {
+            formatted.append(' ');
+        }
+        formatted.append(amount).append(' ').append(unit);
+        if (amount != 1) {
+            formatted.append('s');
+        }
     }
 
     private boolean isBlank(String value) {
