@@ -1,146 +1,89 @@
-# ReplyTrail cloud deployment learning path
+# ReplyTrail first-release deployment
 
-This guide takes ReplyTrail from a local Spring Boot application to a GitOps-managed
-Kubernetes workload. OCI is the implementation target; AWS equivalents are included
-so the same design can be explained in interviews.
+The first release will use Docker Compose on a virtual machine. Initial testing
+targets Oracle Cloud Always Free A1 in Mumbai, replacing the earlier EC2-first
+direction. Production hosting will be confirmed after the test deployment. The
+application image, PostgreSQL, RabbitMQ, and Redis will share a private Docker
+network. The React UI and an HTTPS reverse proxy will provide the public entry
+point. Email delivery will use an external SMTP provider.
 
-The public product name is ReplyTrail. Existing `alertops` image, service, namespace,
-cache, and resource names in the commands below remain compatibility identifiers.
+PostgreSQL remains the source of truth for escalation state and schedules.
+RabbitMQ delivers ready notification work. Redis stores temporary workflow
+intents and supports shared webhook rate limiting. In-memory timers are rebuilt
+from saved database state after application startup.
 
-## Target architecture
+## Existing foundations
 
-```text
-Developer -> GitHub -> GitHub Actions -> GHCR
-                  \-> manifests repository -> Argo CD
-                                               |
-Internet -> load balancer -> Kubernetes Service -> ReplyTrail pods
-                                                   |-- PostgreSQL
-                                                   |-- RabbitMQ
-                                                   `-- Redis
+The source repository is [1hemant2/replytrail](https://github.com/1hemant2/replytrail).
+CI derives its image name from `github.repository`, so new builds target
+`ghcr.io/1hemant2/replytrail:<commit-sha>`. The repository rename does not migrate
+old container images; verify a successful image publication and package access
+before configuring deployment to pull the new name.
 
-OCI: VCN + OKE/Compute + OCIR + Object Storage
-AWS: VPC + EKS/EC2     + ECR  + S3
+- [Dockerfile](../../Dockerfile) builds the backend image.
+- [Docker Compose](../../docker-compose.yml) runs the local backend and dependencies.
+- [UI Dockerfile](../../ui/Dockerfile) builds and serves the React application.
+- [GitHub Actions](../../.github/workflows/ci.yml) verifies, scans, and publishes
+  backend images on its configured events.
+- [Production properties](../../src/main/resources/application-prod.properties)
+  read runtime configuration from environment variables.
+
+## Remaining deployment work
+
+The existing Compose file is a local stack. The production configuration has not
+been implemented or deployed yet. Before release:
+
+- Pull an immutable application image from GHCR instead of building on the server.
+- Publish ARM64-compatible images for Oracle A1 and verify dependency image support.
+- Serve the UI and API through the public domain with HTTPS.
+- Keep database, broker, and Redis ports private.
+- Supply production credentials, JWT configuration, email links, and SMTP settings.
+- Configure persistent volumes, restart policies, and log rotation for the services.
+- Back up PostgreSQL outside the EC2 machine and verify restoration.
+- Verify health, email delivery, scheduling, and recovery after a host restart.
+
+One machine is a single point of failure. Persistent volumes do not replace
+external backups. Deployment and end-to-end verification remain the final release
+step; readiness is tracked in the [product launch checklist](../product-launch-readiness.md#release-check).
+
+## Oracle test resource target
+
+Use the existing `alertops` compartment and public subnet in the Mumbai home
+region. The small test target is `replytrail-test`, using `VM.Standard.A1.Flex`
+with 1 OCPU, 2 GB RAM, a 50 GB boot volume, and Ubuntu 24.04 ARM64.
+This is a test allocation, not a measured throughput guarantee. Three waiting
+escalations need little processing, but the OS, Java, PostgreSQL, RabbitMQ, and
+Redis all need memory. Reduce the current local Compose limits, which total
+2.25 GB before OS overhead, before deploying on this VM. Verify memory use and
+the requested 5–10 requests/second with a representative load test.
+
+The old OKE cluster, worker pool, two workers, and three 47 GB boot volumes were
+removed with the owner's approval. Their boot-volume data was permanently deleted.
+The compartment and network were retained.
+
+The initial 1 OCPU / 4 GB launch failed with `Out of host capacity` on 2026-10-11.
+Capacity reports for the reduced 1 OCPU / 2 GB target also show no room in any
+of the three Mumbai fault domains. No new
+VM was created, and ReplyTrail is not deployed. Retry when home-region capacity
+becomes available; choosing a paid shape or another region requires a new decision.
+
+The dedicated SSH key is stored locally at
+`/Users/hemant/.ssh/replytrail_oci_test`; never commit or publish its private key.
+Use profile `REPLYTRAIL` with `--auth security_token` for local Oracle CLI access.
+When the session expires, run:
+
+```bash
+oci session authenticate --region ap-mumbai-1 --profile-name REPLYTRAIL
 ```
 
-PostgreSQL, RabbitMQ, and Redis can run inside Kubernetes for learning. For a
-production design, prefer managed services where the chosen cloud provides them.
-Stateful systems require backups, persistent volumes, disruption planning, and
-different scaling rules from the stateless ReplyTrail application.
+The browser callback requires local port 8181. SeaweedFS is currently stopped at
+the owner's request to leave that port available. Keep test data, credentials,
+queues, and volumes separate from production. CI/CD automation follows successful
+manual deployment and recovery checks.
 
-## Course roadmap
+## Kubernetes archive
 
-| Phase | Build | Main concepts | Evidence of completion |
-|---|---|---|---|
-| 0 | Deployment readiness | config, secrets, health, tests | clean build and production checklist |
-| 1 | Local containers | images, networks, volumes, Compose | healthy local stack after restart |
-| 2 | Kubernetes locally | Pod, Deployment, Service, ConfigMap, Secret, PVC | stack runs in kind/minikube |
-| 3 | CI with GitHub Actions | workflows, jobs, cache, artifacts, image tags, scanning | commit produces tested image |
-| 4 | OCI foundation | compartments, IAM, VCN, subnets, gateways, security lists | private network and cluster exist |
-| 5 | Cloud deployment | registry, ingress, DNS, TLS, storage | public HTTPS health endpoint |
-| 6 | Argo CD GitOps | desired state, sync, drift, rollback | Git change deploys automatically |
-| 7 | Reliability | probes, resources, HPA, PDB, backups, observability | failure and restore drills pass |
-| 8 | Advanced delivery | Helm/Kustomize, promotion, canary, policy | controlled multi-environment release |
-
-Do the phases in order. In particular, do not begin by copying YAML into a cloud
-cluster: first prove the same image and configuration locally.
-
-Completed foundation: [Phase 0 - production readiness](phase-0-readiness.md)
-
-Completed: [Phase 1 - Docker and Compose foundations](phase-1-docker-foundations.md)
-
-Completed: [Phase 2 - local Kubernetes](phase-2-kubernetes.md)
-
-Completed: [Phase 3 - GitHub Actions CI](phase-3-github-actions.md)
-
-Next lesson: Phase 4 - OCI foundation. Phase 3 uses GitHub Actions with GitHub
-Container Registry (GHCR); its GitLab CI terminology mapping is recorded in the
-completed Phase 3 notes.
-
-## Phase 0 audit (current repository)
-
-The application builds on Java 17 and has a multi-stage, non-root Docker image plus a
-Compose stack for PostgreSQL, RabbitMQ, and authenticated Redis. Spring Boot Actuator
-is present. The Maven build now runs the first JWT unit tests; broader service and
-integration coverage is still required. Phase 1 migrated one-time intent state from
-process memory to authenticated Redis with TTL and atomic consumption.
-
-Before treating the image as production-ready, fix these items:
-
-- Move the JWT signing secret out of Java source and rotate the exposed value.
-- Stop tracking `.env`; assume every committed value has been exposed and rotate it.
-- Add actual unit/integration tests. A green build with zero tests is not a quality gate.
-- Use a production profile with schema migrations (Flyway/Liquibase), not
-  `spring.jpa.hibernate.ddl-auto=update`.
-- Expose only health endpoints publicly; protect detailed Actuator endpoints.
-- Replace development database and RabbitMQ credentials.
-- Add readiness, liveness, and startup health groups.
-- Decide how PostgreSQL, RabbitMQ, and Redis data are backed up and restored.
-- Verify Redis-backed intent sharing and atomic consumption before multiple app pods. (Completed in Phase 1.)
-- Pin container versions and add image/dependency scanning in CI.
-
-## Configuration ownership
-
-Use this rule throughout the project:
-
-| Kind | Example | Storage |
-|---|---|---|
-| Non-secret config | port, log level, queue name | Git, ConfigMap |
-| Secret | JWT key, database password | secret manager / Kubernetes Secret source |
-| Build output | JAR, test report | GitHub Actions artifact |
-| Deployable image | immutable image tagged with commit SHA | OCIR (OCI) / ECR (AWS) |
-| Application data | relational records | PostgreSQL with backups |
-| Unstructured backup/export | database dump, report | OCI Object Storage / AWS S3 |
-
-Never commit real credentials, base64-encoded or otherwise. Kubernetes Secret values
-are only encoded, not encrypted by default.
-
-## OCI to AWS interview map
-
-| Purpose | OCI | AWS | Interview explanation |
-|---|---|---|---|
-| Isolation/billing boundary | Compartment | Account/OU (approximate) | OCI compartments are IAM and resource organization boundaries |
-| Virtual network | VCN | VPC | CIDR, routing, subnets, and network controls |
-| Virtual machine | Compute Instance | EC2 | host for self-managed workloads or cluster nodes |
-| Managed Kubernetes | OKE | EKS | managed control plane with worker nodes |
-| Container registry | OCIR | ECR | stores immutable application images |
-| Object storage | Object Storage | S3 | backups and unstructured objects, not a mounted app database |
-| Network firewall | NSG/Security List | Security Group/NACL | stateful workload rules vs subnet rules |
-| Public entry point | OCI Load Balancer | ALB/NLB | routes traffic to Kubernetes ingress/services |
-| Identity | IAM policies/dynamic groups | IAM policies/roles | least-privilege human and workload access |
-| Keys/secrets | Vault | KMS/Secrets Manager | encryption keys and runtime secrets |
-
-The mappings are conceptual, not exact one-to-one product equivalences.
-
-## Recommended repository layout
-
-Later phases will grow toward:
-
-```text
-.
-|-- Dockerfile
-|-- docker-compose.yml
-|-- .github/workflows/
-|   `-- ci.yml
-|-- docs/deployment/
-|-- k8s/
-|   |-- base/
-|   `-- overlays/dev/
-`-- src/
-```
-
-For serious GitOps, use a separate environment repository so CI can update an image
-tag without granting the application repository direct cluster access. Argo CD pulls
-desired state from GitHub; CI should not run `kubectl apply` against production.
-
-## Learning journal template
-
-For every phase, record:
-
-1. What problem the technology solves.
-2. The command/configuration used and why.
-3. One failure you caused deliberately.
-4. How you diagnosed it using logs, events, metrics, or health endpoints.
-5. How the design maps from OCI to AWS.
-6. The rollback and data-recovery procedure.
-
-This turns the deployment into concrete interview stories rather than a list of tools.
+The old `k8s/` manifests and deployment learning guides were moved into the separate
+local Git repository `/Users/hemant/pers/replytrail-kubernetes` on 2026-10-11, so the
+deployment learning journey can continue later. They are also recoverable from
+this repository's Git history. Kubernetes is deferred beyond the first release.

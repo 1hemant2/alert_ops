@@ -31,6 +31,27 @@ const useCases: UseCase[] = [
   { icon: '✓', category: 'PERSONAL', title: 'Personal reminders', description: 'Remind yourself about the same task once a day for as long as you need.', scenario: 'You need a daily nudge for a finite sequence of reminders over ten days.', primary: 'You', fallback: 'You again', timing: '24 hours', result: 'Repeated reminders stop when you acknowledge or the configured sequence ends.' },
 ]
 
+type FeatureGuideItem = {
+  icon: string
+  title: string
+  description: string
+  detailLabel: string
+  detail: string
+}
+
+const featureGuideItems: FeatureGuideItem[] = [
+  { icon: '◎', title: 'Teams keep work separated', description: 'Work inside an explicit team with verified members, shared tasks, response paths, webhooks, and runs.', detailLabel: 'Team boundary', detail: 'The server checks access' },
+  { icon: '▤', title: 'Tasks keep the context', description: 'Give every request a name, description, source, and optional priority, category, or reference link.', detailLabel: 'Reusable context', detail: 'Saved with every run' },
+  { icon: '↯', title: 'Paths define the handoff', description: 'Choose team members in order and decide how long each response step should wait.', detailLabel: 'Ordered ownership', detail: 'One path, many runs' },
+  { icon: '◇', title: 'Runs follow an explicit lifecycle', description: 'Every run moves through named states so your team can see whether it is open, acknowledged, resolved, or complete.', detailLabel: 'Clear state', detail: 'No hidden transitions' },
+  { icon: '◷', title: 'Runs start on your terms', description: 'Start immediately, schedule a future time with its timezone, or repeat a schedule daily or weekly.', detailLabel: 'Flexible starts', detail: 'Now, later, or recurring' },
+  { icon: '✓', title: 'Email actions make ownership explicit', description: 'Recipients preview and confirm acknowledgement, then resolve the issue when a resolution window is enabled.', detailLabel: 'Clear responsibility', detail: 'Acknowledge or resolve' },
+  { icon: '→', title: 'Escalate now moves the next step', description: 'An eligible team member or recipient can make the next response step due without resending the previous email.', detailLabel: 'Manual control', detail: 'Advance the next step' },
+  { icon: '⌁', title: 'Webhooks connect external systems', description: 'An authenticated event creates one task and one run, with safe retries when the same event is sent again.', detailLabel: 'Idempotent intake', detail: 'One event, one run' },
+  { icon: '≡', title: 'History shows every milestone', description: 'Review saved user and system activity, including delivery attempts, acknowledgement, resolution, and completion.', detailLabel: 'Investigation ready', detail: 'A durable timeline' },
+  { icon: '↻', title: 'Recovery keeps work moving', description: 'Saved workflow state lets the application recover scheduled work and ignore stale or duplicate callbacks.', detailLabel: 'Restart safe', detail: 'PostgreSQL stays authoritative' },
+]
+
 const signedInSteps = [
   { number: '01', title: 'Primary on-call', detail: 'ops@replytrail.dev', time: 'ACKNOWLEDGED', state: 'done' },
   { number: '02', title: 'Platform lead', detail: 'maya@replytrail.dev', time: '+ 5 MIN', state: 'active' },
@@ -59,14 +80,14 @@ export function PublicPage() {
     <div className="public-page">
       <header className="public-header">
         <Link className="brand brand-light" to="/"><span className="brand-icon"><b /><b /><b /></span><span>REPLY<span>TRAIL</span></span></Link>
-        <div><ThemeToggle /><Link className="public-login" to="/login">Sign in</Link><Link className="button button-lime" to={token ? '/teams' : '/register'}>{token ? 'Open workspace' : 'Create account'} <span>↗</span></Link></div>
+        <div><a className="public-nav-link" href="#features">Features</a><ThemeToggle /><Link className="public-login" to="/login">Sign in</Link><Link className="button button-lime" to={token ? '/teams' : '/register'}>{token ? 'Open workspace' : 'Create account'} <span>↗</span></Link></div>
       </header>
       <main className="public-main">
         <div className="public-copy">
           <div className="eyebrow eyebrow-lime"><span className="live-dot" /> INCIDENT RESPONSE, WITHOUT THE CHAOS</div>
           <h1>Get the right people<br /><em>on every alert.</em></h1>
           <p>Turn alerts, requests, and reminders into clear follow-up paths with an owner, a waiting time, and a next step.</p>
-          <div className="public-actions"><Link className="button button-lime button-large" to={token ? '/teams' : '/register'}>{token ? 'Open workspace' : 'Create account'} <span>→</span></Link><a href="#use-cases" className="text-link">Explore use cases <span>↓</span></a></div>
+          <div className="public-actions"><Link className="button button-lime button-large" to={token ? '/teams' : '/register'}>{token ? 'Open workspace' : 'Create account'} <span>→</span></Link><a href="#features" className="text-link">See the features <span>↓</span></a><a href="#use-cases" className="text-link">Explore use cases <span>↓</span></a></div>
           <div className="public-footnote"><span>ALERTS</span><i /> <span>REQUESTS</span><i /> <span>REMINDERS</span></div>
           <div className="hero-proof-row" aria-label="Workflow benefits"><span><i>✓</i> Clear owner</span><span><i>↗</i> Timed handoff</span><span><i>↻</i> Restart-safe</span></div>
         </div>
@@ -127,6 +148,25 @@ export function PublicPage() {
             </div>
           </div>
         </div>
+      </section>
+      <section id="features" className="public-features" aria-labelledby="features-heading">
+        <div className="feature-guide-heading">
+          <div>
+            <span className="eyebrow feature-guide-eyebrow">THE REPLYTRAIL FEATURE GUIDE</span>
+            <h2 id="features-heading">Everything that keeps<br /><em>the handoff moving.</em></h2>
+          </div>
+          <p>ReplyTrail gives your team one place to define the work, route the response, and understand what happened next.</p>
+        </div>
+        <div className="feature-guide-grid">
+          {featureGuideItems.map((feature, index) => (
+            <article className="feature-guide-card" key={feature.title}>
+              <div className="feature-guide-card-top"><span className="feature-guide-index">0{index + 1}</span><span className="feature-guide-icon" aria-hidden="true">{feature.icon}</span></div>
+              <div className="feature-guide-card-copy"><h3>{feature.title}</h3><p>{feature.description}</p></div>
+              <div className="feature-guide-card-detail"><span>{feature.detailLabel}</span><strong>{feature.detail}</strong></div>
+            </article>
+          ))}
+        </div>
+        <div className="feature-guide-boundary"><span>PRODUCT BOUNDARY</span><p>ReplyTrail currently sends email. SMS, phone calls, push notifications, native Slack or Teams delivery, rotating on-call calendars, and test escalations are not part of the current product.</p></div>
       </section>
       <section id="use-cases" className="public-use-cases" aria-labelledby="use-cases-heading">
         <div className="use-cases-heading">

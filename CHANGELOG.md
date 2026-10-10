@@ -4,6 +4,81 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-11 — Rename the local workspace folder
+
+- Rename `/Users/hemant/pers/alert_ops` to `/Users/hemant/pers/replytrail`,
+  preserving files, Git metadata, and all uncommitted work.
+- Verify the new working directory, unchanged Git status and origin, and diff
+  checks. Reopen the workspace at the new path; no application code changed.
+
+## 2026-10-11 — Align links with the ReplyTrail repository rename
+
+- Update local origin fetch/push URLs and current documentation links to
+  `1hemant2/replytrail`; preserve runtime compatibility identifiers and the
+  existing workspace directory.
+- Document repository-derived GHCR naming and the need to verify new image
+  publication before deployment. No images or cloud resources were migrated.
+- Verify GitHub's canonical URL, local remotes, documentation file links, and
+  whitespace; Maven verify passes with opt-in integration checks skipped.
+  No old repository URLs remain in the searched source tree.
+
+## 2026-10-11 — Prepare open-source hosting applications
+
+- Correct first-email timing and VM-hosting descriptions; add contribution and
+  security-reporting guidance without changing application behavior.
+- Prepare an [unsent hosting request](docs/deployment/hosting-request.md) with
+  honest adoption and resource limits. GitHub description text is provided for
+  manual update; sponsorship and private vulnerability reporting are not enabled
+  by this change.
+- Verification: relative documentation file links and diff checks pass; Maven
+  verify passes outside the sandbox. Opt-in integration/deployed checks remain
+  unverified; no applications were submitted.
+
+## 2026-10-11 — Show the feature guide on the public home page
+
+- Add a responsive, accessible feature guide to the public landing page with
+  header and hero anchors, light/dark theme styling, and concise explanations of
+  the current ReplyTrail workflow.
+- Keep product boundaries visible by stating that unsupported channels and
+  deferred test escalations are not included in the current product.
+- Verification: UI build and diff checks pass. UI lint passes with two existing
+  React hook warnings in the flow detail page; no new warnings were introduced.
+
+## 2026-10-11 — Publish the ReplyTrail feature guide
+
+- Add a single [feature guide](docs/features.md) with stable feature IDs,
+  human-readable workflows, canonical lifecycle and security rules, API areas,
+  implementation status, and deferred boundaries for people and AI agents.
+- Link the guide from the README and align scheduling scope text with the local
+  daily/weekly recurrence implementation. Preserve the distinction between local
+  implementation and pending PostgreSQL/deployed verification.
+- Verification: documentation links and whitespace checked with `git diff --check`;
+  no backend or frontend behavior changed.
+
+## 2026-10-11 — Clean up old Oracle deployment and prepare minimal test hosting
+
+- Remove the approved old OKE cluster, worker pool, two A1 workers, and three
+  47 GB boot volumes; retain the compartment and network. Boot-volume data was
+  permanently deleted. Install OCI CLI and establish local authenticated access.
+- Document the Oracle ARM64 test target and dedicated SSH access in the
+  [deployment guide](docs/deployment/README.md). The 1 OCPU / 4 GB / 50 GB VM
+  launch failed; the reduced 1 OCPU / 2 GB target also lacks capacity in all
+  Mumbai fault domains and needs lower Compose limits plus load testing. No new
+  VM or application deployment was created, and the task remains pending.
+- Verify successful OKE cleanup, terminated workers/volumes, capacity reports,
+  backend packaging with tests skipped, and diff checks. CI/CD remains pending.
+
+## 2026-10-11 — Separate Kubernetes materials from the first release
+
+- Move Kubernetes manifests and historical deployment learning guides into the
+  separate local repository `/Users/hemant/pers/replytrail-kubernetes`; retain
+  Docker, Compose, and CI here. Preserve the archive alongside the application
+  so the deployment learning journey can continue later.
+- Update the [deployment guide](docs/deployment/README.md) and release checklist
+  for the agreed EC2/Compose direction. Production setup and deployment remain pending.
+- Verification: all 18 archived files match Git history, updated links resolve,
+  backend packaging with tests skipped and diff checks pass.
+
 ## 2026-10-11 — Implement minimum recurring escalation runs
 
 - Implement daily/weekly repeat support on the existing escalation row with
