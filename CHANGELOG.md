@@ -4,6 +4,24 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-10 — Label task details in escalation emails
+
+- Add a dedicated `Task details` section after the task metadata so the
+  description is clearly separated in both plain-text and HTML email formats.
+- Verification: `NotificationTest`, the backend package, and `git diff --check`
+  pass. Visual SMTP-client inspection remains pending.
+
+## 2026-10-10 — Send the first escalation alert immediately
+
+- Send the first response-step email immediately for every start mode, include
+  the escalation name, ID, and response window, and keep later-step timing and
+  retry behavior unchanged.
+- Restyle the HTML email as a compact dark responsive card with wrapped long
+  values while preserving the plain-text fallback and safe action links.
+- Verification: focused unit tests, seven PostgreSQL scheduling tests, the
+  backend package, and `git diff --check` pass. SMTP delivery and multi-client
+  visual inspection remain pending.
+
 ## 2026-10-10 — Register timers after escalation starts
 
 - Publish scheduling events normally and let a Spring transaction event listener
