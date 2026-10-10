@@ -4,6 +4,51 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-10 — Fix home-page theme toggle contrast
+
+- Give the light-mode Dark button in the public home-page header readable
+  foreground and border contrast without changing the persisted theme behavior.
+- Verification: UI build and `git diff --check` pass; lint retains the two
+  existing `FlowDetailPage.tsx` warnings, and browser visual inspection was not
+  available in this session.
+
+## 2026-10-09 — Simplify response-route scanning
+
+- Keep the route card focused on the step count, Add response step, and a
+  compact horizontal card rail with a visible next-card cue; move rail controls
+  out of the header.
+- Add a page-header Resolution timeout shortcut with an ON/OFF status that
+  opens and scrolls to the existing path settings disclosure.
+- Verification: UI build, lint, and `git diff --check` pass; protected route
+  browser inspection was unavailable because the local browser session was at
+  the login screen. Lint retains the two existing `FlowDetailPage.tsx`
+  warnings.
+
+## 2026-10-09 — Refine response-route navigation
+
+- Restore the established compact response-step card size and add a partial
+  next-card cue with accessible previous/next controls for longer routes.
+- Verification: UI build, lint, `git diff --check`, and Chrome inspection of
+  compact cards, overflow cues, and rail navigation pass; lint retains the two
+  existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Expand the response-route workspace
+
+- Move Add response step into the route card and change the ordered steps to a
+  spacious single-row rail that uses the available width and scrolls
+  horizontally for longer paths.
+- Verification: UI build, lint, `git diff --check`, and Chrome inspection of
+  the route header and 11-card horizontal overflow pass; lint retains the two
+  existing `FlowDetailPage.tsx` warnings.
+
+## 2026-10-09 — Keep active escalation activity live
+
+- Poll the escalation detail activity timeline every three seconds alongside
+  status and step progress while a run is `OPEN` or `ACKNOWLEDGED`, then stop
+  polling for terminal and scheduled states.
+- Verification: UI build, lint, `git diff --check`, and Chrome detail-page
+  inspection pass; lint retains the two existing `FlowDetailPage.tsx` warnings.
+
 ## 2026-10-09 — Clarify response-step action icons
 
 - Replace ambiguous Unicode glyphs with visible duplicate, edit, and delete
