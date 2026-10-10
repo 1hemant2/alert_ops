@@ -69,7 +69,10 @@ class NotificationTest {
         assertTrue(html.contains("Platform &lt;on-call&gt;"));
         assertTrue(html.contains("https://example.com/requests/123?view=full&amp;tab=alerts"));
         assertTrue(html.contains("ESCALATION NOTIFICATION"));
-        assertTrue(html.contains("REPLYTRAIL"));
+        assertTrue(html.contains("REPLY<span style=\"color:#7ce7b2;\">TRAIL"));
+        assertTrue(html.contains("background:#101828"));
+        assertTrue(html.contains("background:#7ce7b2"));
+        assertTrue(html.contains("background:#345cf5"));
         assertTrue(html.contains("Sent automatically by ReplyTrail."));
         assertTrue(html.contains("Acknowledge escalation"));
         assertTrue(html.contains("href=\"https://alerts.example.com/acknowledge?token=sample-token\""));
