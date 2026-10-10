@@ -28,6 +28,29 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 - **Evidence:** [schedule migration](../src/main/resources/db/migration/V6__add_escalation_scheduling.sql), [failure-notification migration](../src/main/resources/db/migration/V10__add_scheduled_start_failure_notifications.sql), [scheduled-start scheduler](../src/main/java/com/alertops/flow_execution_engine/service/EscalationStartScheduler.java), [failure-notification service](../src/main/java/com/alertops/flow_execution_engine/service/EscalationStartFailureNotificationService.java), [start claims](../src/main/java/com/alertops/flow_execution_engine/repository/EscalationRepository.java), [creation UI](../ui/src/features/escalations/EscalationsPage.tsx), [schedule controls and failure state](../ui/src/features/escalations/EscalationDetailPage.tsx), [notification tests](../src/test/java/com/alertops/flow_execution_engine/service/EscalationStartFailureNotificationServiceTest.java).
 - **Local verification:** Focused scheduling/retry/notification tests, early-start/controller tests, backend packaging, and `npm run build` pass. PostgreSQL/Testcontainers integration coverage is currently skipped in this environment, so the final readiness box stays open.
 
+#### Recurring schedules — planned extension
+
+- [x] **Minimum scope defined; defaults selected**
+- [x] **Minimum implementation complete locally**
+- [ ] **Locally and deployed verified**
+- **Agreed direction:** One recurring schedule creates independent escalation
+  runs with different IDs. Runs may overlap; an unresolved previous run does not
+  block the next calendar occurrence. Preserve the existing one-time behavior.
+- **Storage agreed:** Keep recurrence on the original escalation in the existing
+  table with repeatType, nextRepeatAt, and repeatSourceId. Generated runs do not
+  repeat themselves. Do not add a separate recurring-schedule table or lifecycle.
+- **Plan:** [Recurring escalation implementation plan](recurring-escalation-implementation-plan.md).
+  Start with daily/weekly repeats on scheduled starts, stop-repeat, and only the
+  latest missed repeat after downtime. Fixed timezone/DST defaults are recorded;
+  monthly/yearly repeats, editing, custom intervals, previews, and extra history
+  views are deferred. This planned extension does not change one-time readiness
+  or claim deployed verification.
+- **Local state:** Daily/weekly recurrence, independent child runs, stop-repeat,
+  durable next-repeat recovery, and existing-screen controls are implemented.
+  Calendar unit coverage, backend compilation/package, UI build/lint, and diff
+  checks pass. Mockito service tests are environment-blocked by Byte Buddy
+  self-attachment; PostgreSQL and deployed verification remain pending.
+
 ### 2. Incident lifecycle
 
 - [x] **Requirements agreed**

@@ -1,41 +1,50 @@
 # Current task plan
 
-## Task: Move response steps reliably in both directions
+## Task: Implement minimum recurring escalation schedules
 
-Started: 2026-10-10
-Status: Complete
+Started: 2026-10-11
+Status: Complete — local implementation finished; deployment remains pending
 
 ### Goal and scope
 
-Make dropping onto a numbered step choose that position, and allow direct
-position selection. Refresh displayed numbers from the saved server order.
+Implement the minimum recurring schedule scope from the [feature plan](recurring-escalation-implementation-plan.md)
+while preserving one-time escalation behavior. This task includes backend,
+frontend, migrations, focused tests, and documentation updates; deployment remains
+excluded and is the final release step.
 
 ### Decision-compliance note
 
-- Reuse PATCH /api/v1/flow/node/reorder with nodeId, afterNodeId, and version.
-- The backend owns durable positions and renumbers them in increments of 1000.
-  Display positions remain one-based indexes of the ordered server response.
-- Preserve the responsive grid and scrolling changes already in the worktree;
-  no schema or timing changes are included.
+- Preserve the existing one-time schedule and escalation lifecycle.
+- Each occurrence has a new escalation ID; overlapping runs are allowed.
+- The existing escalation table owns repeatType, nextRepeatAt, and repeatSourceId.
+  The original row owns repetition; children never own a repeating chain.
+- PostgreSQL owns calendar progress and run state; timers only provide wake-ups.
+- Reuse each run's scheduledStartAt and existing start/retry/publication path.
+- Exclude a new schedule entity/table, duplicate repeat boolean, separate schedule
+  lifecycle, and custom intervals unless separately agreed.
+- Minimum defaults are daily/weekly, scheduled first start, latest missed repeat
+  only, and stop without editing. Do not introduce repeat-after-completion,
+  monthly/yearly, custom intervals, or a separate schedule table.
 
 ### Acceptance criteria
 
-- [x] First/middle steps move later, including to the last position.
-- [x] Later steps move earlier, including to the first position.
-- [x] Dragging, keyboard arrows, and position selection share placement rules.
-- [x] No-op and invalid moves do not submit writes; saved order updates labels.
+- [x] Add the three recurrence fields and daily/weekly calendar calculation.
+- [x] Create independent child runs atomically and recover repeat timers safely.
+- [x] Add stop-repeat and the existing-screen scheduling controls.
+- [x] Run focused backend/frontend checks and update readiness documentation.
 
 ### Steps and verification
 
-- [x] Inspect frontend placement and backend reorder/renumbering behavior.
-- [x] Add a shared position-to-predecessor rule and wire all reorder controls.
-- [x] Cover forward/backward/boundary moves with focused tests.
-- [x] Run ordering tests, backend reorder coverage, UI build/lint, and diff checks.
-- [x] Record completion and browser verification limits in the changelog.
+- [x] Inspect existing scheduling, execution, timer guidance, and launch tracking.
+- [x] Confirm the canonical fields, minimum defaults, and excluded improvements.
+- [x] Implement backend persistence, occurrence creation, timer recovery, and API.
+- [x] Implement the existing UI controls and source-run context.
+- [x] Run focused tests, normal builds, and diff checks; record limitations.
 
 ### Verification results
 
-Four UI ordering tests and two backend reorder/version tests pass. UI build
-and diff checks pass; lint retains the two existing flow-page warnings.
-Backend production code is unchanged. Browser drag/drop and position-selector
-interaction checks remain pending because browser access is unavailable.
+`EscalationRepeatCalculatorTest` passes. Backend test compilation and packaging,
+UI build, UI lint, and `git diff --check` pass; UI lint retains two existing
+warnings in `FlowDetailPage.tsx`. The full Mockito-backed service suite could not
+start because Byte Buddy cannot self-attach on this local JDK/process environment.
+PostgreSQL, broker, SMTP, restart, and deployed checks remain intentionally last.

@@ -4,6 +4,16 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-11 — Implement minimum recurring escalation runs
+
+- Implement daily/weekly repeat support on the existing escalation row with
+  independent child IDs, atomic next-repeat advancement, restart recovery,
+  stop-repeat, existing-screen controls, and source-run links. Defer advanced
+  recurrence options and preserve one-time scheduling behavior.
+- Verification: calendar unit test, backend test compilation/package, UI build,
+  UI lint, and diff checks pass. Mockito service tests are blocked by local
+  Byte Buddy self-attachment; PostgreSQL and deployed checks remain pending.
+
 ## 2026-10-10 — Move response steps to a numbered position
 
 - Make drag targets select the final numbered position and add direct position
