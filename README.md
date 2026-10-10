@@ -2,6 +2,8 @@
 
 **Keep every response on track.**
 
+The source repository is [1hemant2/replytrail](https://github.com/1hemant2/replytrail).
+
 ReplyTrail is a self-hosted web application for team response coordination. Turn an alert or request into a task, choose an ordered path of people to notify, and track the response from the first email to acknowledgement or resolution. If nobody responds within the configured wait, the run advances to the next person.
 
 It helps teams answer three questions: **Who should respond? When should the next person be notified? What happened to this request?** A team member can start a run in the UI, schedule it for later, or let an external system trigger it through a webhook. This repository contains the React UI, Spring Boot API and workers, database migrations, and deployment configuration.
@@ -34,14 +36,14 @@ You can also connect another tool through a webhook to send tasks to ReplyTrail.
 That tool detects the problem and sends the details; ReplyTrail emails the
 people you choose. They carry out the work in the relevant app or system.
 
-### Example: daily reminders for ten days
+### Example: ten reminders spaced one day apart
 
 Create a flow with ten steps and put your own team-member email on every step.
 Set each wait to **1,440 minutes (24 hours)** and leave **resolution timeout**
 disabled. Start it with the task you want to be reminded about.
 
-The first reminder is scheduled for 24 hours after you start. Each later
-reminder is scheduled for 24 hours after the previous email is sent. If you
+The first reminder is sent as soon as the run starts. Each later
+reminder becomes due 24 hours after the previous email is sent. If you
 click **Acknowledge** and confirm, the remaining reminders stop.
 
 If you do not acknowledge, the ten-step sequence continues and then ends;
@@ -61,10 +63,13 @@ emails arrive, so they may not reach you at the same clock time every day.
 
 ## Features
 
+The [feature guide](docs/features.md) explains each feature's purpose, actors,
+workflow, lifecycle rules, API area, and verification status.
+
 - **Accounts and teams:** Registration requires email verification before login. Users can belong to multiple teams. Owners and admins can invite members; admins can invite users only. Acceptance requires the invited, verified email address.
 - **Tasks:** Name, description, and source, plus optional priority, category, and HTTP(S) reference URL. Priority is a user-defined label. Manually created tasks default to source `Manual`.
 - **Response paths:** Ordered steps with a team-member recipient and wait time, plus optional resolution timeouts. Add, edit, delete, and drag steps to reorder them. Started runs retain their saved task context, step details, and timing when a task or path changes.
-- **Immediate or scheduled runs:** Start a run from a task and path immediately, or schedule a one-time start using a date, time, and IANA timezone. Reschedule, cancel, or start a scheduled run early before it begins. The first step keeps its configured wait.
+- **Immediate, scheduled, and recurring runs:** Start a run from a task and path immediately, schedule a one-time start using a date, time, and IANA timezone, or repeat a schedule daily or weekly. Reschedule, cancel, stop future repeats, or start a scheduled run early before it begins. The first email is sent immediately when the run starts; its configured acknowledgement wait begins after delivery.
 - **Webhooks:** Owners and admins can create a webhook with a default path, rotate its secret, and enable or disable it. An incoming event creates a task and starts a run. The complete JSON event is stored with links to both records.
 - **Acknowledgement and resolution:** Recipient-scoped email links open a preview before confirmation. Acknowledgement either completes the run or pauses later steps for a configured resolution window. Unresolved timeouts resume escalation; resolution stops remaining steps.
 - **Manual escalation:** Escalate now makes the next eligible response step due immediately from the signed-in UI or an eligible email action link.
@@ -74,7 +79,7 @@ emails arrive, so they may not reach you at the same clock time every day.
 ## Current scope
 
 - Notifications use **SMTP email**. SMS, phone calls, push notifications, and native Slack/Teams delivery are not implemented.
-- Scheduling supports **one-time starts**, not recurring or cron schedules. A finite reminder sequence can use multiple steps assigned to the same person, as in the ten-day example above.
+- Scheduling supports one-time starts and the minimum daily/weekly recurrence implementation. Monthly, yearly, custom-interval, and cron schedules are not implemented. A finite reminder sequence can still use multiple steps assigned to the same person, as in the ten-reminder example above.
 - A response path names individual team-member recipients; rotating on-call calendars are not implemented.
 - Opening an email link does not accept responsibility automatically; the recipient must confirm the action.
 - Local checks do not establish production readiness. Database/broker integration checks and deployed response journeys are tracked in the launch checklist.
@@ -112,7 +117,7 @@ PostgreSQL stores tasks, paths, events, runs, step states, and due times. The ba
 | Ready-work delivery | RabbitMQ; database-backed timers determine when work becomes ready |
 | Short-lived shared state | Redis for workflow intents and webhook rate limiting |
 | Email | Spring Mail with an SMTP provider |
-| Packaging and deployment | Docker Compose for local services and the planned first EC2 release; GitHub Actions for backend build, verification, and image scanning |
+| Packaging and deployment | Docker Compose for local services and planned VM hosting; GitHub Actions for backend build, verification, and image scanning |
 
 The UI can be deployed as static files separately from the backend. Existing `com.alertops` packages, `ALERTOPS_*` settings, container/resource names, and the `X-AlertOps-Webhook-Secret` header are retained compatibility identifiers from the earlier product name. Use these exact identifiers in configuration and integrations.
 
@@ -250,6 +255,9 @@ Stop Compose services with `docker compose down`. `docker compose down -v` also 
 
 ## Development checks
 
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow
+and [SECURITY.md](SECURITY.md) before reporting a potential vulnerability.
+
 From the repository root:
 
 ```bash
@@ -270,7 +278,9 @@ The backend command runs tests and packages the application; the UI build checks
 - `docker-compose.yml`: local backend and dependency stack.
 - `.github/workflows/ci.yml`: Maven verification, container build, and Trivy image scan on pull requests and configured branch pushes.
 - [`docs/product-launch-readiness.md`](docs/product-launch-readiness.md): release checklist and remaining end-to-end checks.
-- [`docs/deployment/README.md`](docs/deployment/README.md): first-release EC2 and Docker Compose deployment direction.
+- [`docs/features.md`](docs/features.md): human- and AI-readable feature guide.
+- [`docs/deployment/README.md`](docs/deployment/README.md): first-release hosting and Docker Compose deployment direction.
+- [`docs/deployment/hosting-request.md`](docs/deployment/hosting-request.md): an unsent open-source test-hosting request and application preparation guidance.
 - [`CHANGELOG.md`](CHANGELOG.md): completed repository changes and verification notes.
 
 Manual and webhook response flows, one-time scheduling, resolution timeouts, manual actions, and activity history are implemented locally. The release checklist still calls for deployed end-to-end runs, including restart and duplicate-delivery scenarios. Domain ownership, sender verification, and rebrand rollout are tracked in the [product rebranding plan](docs/product-rebranding-plan.md).

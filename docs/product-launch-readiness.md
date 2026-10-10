@@ -19,7 +19,7 @@ Review these requirements in order. A checked **Requirements agreed** box means 
   - Reject a scheduled time that is not in the future. Default the UI timezone to the browser timezone and allow the user to change it.
   - Allow reschedule and cancel only while the run is still `SCHEDULED`, enforced atomically so a start cannot race with either action.
   - Treat **Start immediately** as create-and-start, using the same start use case invoked when a scheduled time becomes due.
-  - Allow **Start now** to start a scheduled run early through the existing manual start API. Commit `SCHEDULED → OPEN` and step creation before cancelling the in-memory start timer. The first step retains its configured delay. This extension is implemented locally; PostgreSQL/deployed verification remains pending. See the [shared lifecycle plan](resolution-timeout-implementation-plan.md#how-start-now-will-work).
+  - Allow **Start now** to start a scheduled run early through the existing manual start API. Commit `SCHEDULED → OPEN` and step creation before cancelling the in-memory start timer. Send the first email immediately; its configured acknowledgement wait begins after delivery. This extension is implemented locally; PostgreSQL/deployed verification remains pending. See the [shared lifecycle plan](resolution-timeout-implementation-plan.md#how-start-now-will-work).
   - Add a terminal `CANCELLED` state for a cancelled scheduled run, consistent with the incident lifecycle in Requirement 2.
   - When the retry limit is exhausted, change the escalation to `START_FAILED` and atomically persist a pending failure-notification obligation in PostgreSQL. Do not rely on the scheduler callback or an in-memory queue to remember that notification.
   - Notify the user who scheduled the escalation and the team owner or administrators. If the application stops after recording `START_FAILED` but before notification delivery, startup recovery must find the pending notification and send it when the application is available again.
@@ -117,7 +117,7 @@ Review these requirements in order. A checked **Requirements agreed** box means 
 - [x] **Requirements agreed**
 - [x] **Implementation complete locally**
 - [ ] **Implemented and verified in PostgreSQL/deployed flow**
-- **Requested behavior:** An authenticated team member, or an eligible notification recipient using a valid email token, can end the wait for the next notification and make that step due immediately, following saved step order. This differs from **Start now**, which begins a not-yet-started run and keeps normal node delays.
+- **Requested behavior:** An authenticated team member, or an eligible notification recipient using a valid email token, can end the wait for the next notification and make that step due immediately, following saved step order. This differs from **Start now**, which begins a not-yet-started run with an immediate first email and its normal acknowledgement window.
 - **Agreed decisions:** Allow the action when nobody has acknowledged (`OPEN`) and while somebody is working on resolution (`ACKNOWLEDGED`). In `OPEN`, the run stays open and the next eligible unsent step becomes due now. In `ACKNOWLEDGED`, confirm the user's intent, end the active resolution wait, return to `OPEN`, and make the next eligible paused step due now. Do not resend the previous notification or skip unfinished steps. No next eligible step or a terminal run means the action is unavailable. Sends already in progress finish normally.
 - **Email action:** Add an **Escalate now** button opening a read-only preview/confirmation page that shows the current next recipient. Allow explicit POST confirmation without login using a hashed recipient token bound to the source step and validated against the expected target/current state. Before acknowledgement, only the current recipient within their acknowledgement window may act; after acknowledgement, only the current acknowledging recipient within their resolution window may act. At expiry or advancement, new actions are unavailable but the scoped link stays viewable. Opening/scanning never changes state. Reject invalid/foreign tokens, terminal runs, and no-next-step actions. Recheck ownership, deadline, and target under the run lock; repeated Step 1 confirmation cannot advance Step 3 after advancing Step 2. Audit the recipient email and affected steps; reuse the UI lifecycle operation. See [email source rules](resolution-timeout-implementation-plan.md#escalate-now-from-email).
 - **State and reliability rules:** Reuse the step-status enum from Requirement 3. Bind manual requests to the expected step so duplicate/stale clicks cannot advance another step. Save the state change, due time, publication obligation, and actor audit together; change timers/publish only after commit. Manual escalation, timeout, and resolution must have one winner for the same acknowledgement/step. Reuse durable immediate-delivery scheduling with resolution timeout expiry.
@@ -206,11 +206,12 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ## Release check
 
-- **Deployment decision (2026-10-11):** Version one targets a single AWS EC2 machine
-  with Docker Compose for the backend, PostgreSQL, RabbitMQ, and Redis, plus UI
-  hosting and HTTPS. Kubernetes is deferred and its learning materials are
-  preserved separately. See the [deployment guide](deployment/README.md).
-- [ ] Prepare and verify the production EC2/Compose setup, private dependency
+- **Deployment decision (2026-10-11):** Version one uses Docker Compose for the
+  backend, PostgreSQL, RabbitMQ, and Redis, plus UI hosting and HTTPS. Initial
+  testing targets a minimal Oracle A1 VM in Mumbai; production hosting is pending
+  confirmation. Kubernetes is deferred and its learning materials are preserved
+  separately. See the [deployment guide](deployment/README.md).
+- [ ] Prepare and verify the production VM/Compose setup, private dependency
   ports, HTTPS, external database backups, and recovery after a host restart.
 - [x] Select and implement the public product identity using the [product rebranding plan](product-rebranding-plan.md). ReplyTrail is implemented locally; domain ownership, sender verification, and deployed rollout remain pending. Retain existing integration and storage identifiers during the initial rebrand.
 - [x] All four critical fixes above are complete locally.
