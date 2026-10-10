@@ -255,6 +255,7 @@ public class Notification {
                 .replace("<ul>", "<ul style=\"margin:0 0 18px;padding-left:22px;line-height:1.7;\">")
                 .replace("<li>", "<li style=\"padding-left:3px;margin:0 0 5px;\">")
                 .replace("<strong>", "<strong style=\"color:#14283f;\">")
+                .replace("<a href=", "<a style=\"color:#345cf5;font-weight:700;text-decoration:none;\" href=")
                 .replace("<code>", "<code style=\"padding:2px 6px;border-radius:4px;background:#eef3f8;color:#193e5b;font-family:Menlo,Consolas,monospace;font-size:13px;\">")
                 .replace("<hr />", "<hr style=\"margin:24px 0;border:0;border-top:1px solid #e3eaf1;\">");
 
@@ -263,39 +264,60 @@ public class Notification {
                 <html lang="en">
                 <head>
                   <meta charset="UTF-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   <title>ReplyTrail escalation notice</title>
                   <style>
+                    .email-card { box-shadow:0 18px 44px rgba(16,24,40,.12); }
+                    .email-panel { background:#fbfcfe; }
                     @media only screen and (max-width: 600px) {
                       .email-card { width:100% !important; }
                       .email-content { padding:24px 20px !important; }
+                      .email-panel-cell { padding:20px !important; }
                     }
                   </style>
                 </head>
-                <body style="margin:0;padding:0;background:#f2f5f9;color:#314156;font-family:Arial,Helvetica,sans-serif;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#f2f5f9;padding:28px 12px;">
+                <body style="margin:0;padding:0;background:#eef2f5;color:#314156;font-family:Arial,Helvetica,sans-serif;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#eef2f5;padding:40px 12px;">
                     <tr><td align="center">
-                      <table role="presentation" class="email-card" width="620" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:620px;background:#ffffff;border:1px solid #e3eaf1;border-radius:14px;overflow:hidden;">
-                        <tr><td style="height:5px;background:#8acb3f;font-size:0;line-height:0;">&nbsp;</td></tr>
-                        <tr><td style="padding:22px 30px;background:#14283f;color:#ffffff;">
-                          <div style="font-size:13px;font-weight:700;letter-spacing:2px;">REPLYTRAIL</div>
-                          <div style="margin-top:7px;color:#b8c7d8;font-size:11px;font-weight:700;letter-spacing:1.5px;">ESCALATION NOTIFICATION</div>
+                      <table role="presentation" class="email-card" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:#ffffff;border:1px solid #d9e2ea;border-radius:20px;overflow:hidden;">
+                        <tr><td style="height:6px;background:#7ce7b2;font-size:0;line-height:0;">&nbsp;</td></tr>
+                        <tr><td style="padding:26px 32px 28px;background:#101828;color:#ffffff;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="width:38px;vertical-align:middle;">
+                                <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                                  <td style="width:5px;height:23px;border-radius:4px;background:#7ce7b2;font-size:0;">&nbsp;</td>
+                                  <td style="width:5px;height:31px;border-radius:4px;background:#a6f4c5;font-size:0;">&nbsp;</td>
+                                  <td style="width:5px;height:18px;border-radius:4px;background:#7ce7b2;font-size:0;">&nbsp;</td>
+                                </tr></table>
+                              </td>
+                              <td style="vertical-align:middle;">
+                                <div style="font-size:14px;font-weight:800;letter-spacing:2.5px;">REPLY<span style="color:#7ce7b2;">TRAIL</span></div>
+                                <div style="margin-top:7px;color:#b9c7d8;font-size:11px;font-weight:700;letter-spacing:1.4px;">ESCALATION NOTIFICATION</div>
+                              </td>
+                            </tr>
+                          </table>
                         </td></tr>
-                        <tr><td class="email-content" style="padding:32px 34px 24px;font-size:15px;">
-                          <div style="margin-bottom:24px;padding:11px 14px;border:1px solid #f1d7a8;border-radius:8px;background:#fff8eb;color:#7b4a06;font-size:13px;font-weight:700;">
-                            ACTION NEEDED &nbsp;·&nbsp; A response step is assigned to you
+                        <tr><td class="email-content" style="padding:32px 34px 28px;background:#ffffff;font-size:15px;">
+                          <div style="display:block;margin-bottom:22px;padding:14px 16px;border:1px solid #b9e8ce;border-left:4px solid #168553;border-radius:10px;background:#f0fbf5;color:#123d2a;">
+                            <div style="font-size:11px;font-weight:800;letter-spacing:1.3px;color:#168553;">ACTION NEEDED</div>
+                            <div style="margin-top:5px;font-size:14px;font-weight:700;line-height:1.45;">A response step is assigned to you.</div>
                           </div>
-                          <div style="color:#314156;font-size:15px;line-height:1.65;">{{MARKDOWN_HTML}}</div>
-                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;"><tr><td bgcolor="#4b18f5" style="border-radius:8px;background:#4b18f5;">
-                            <a href="{{ACKNOWLEDGEMENT_URL}}" style="display:inline-block;padding:14px 22px;border-radius:8px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Acknowledge escalation</a>
+                          <table role="presentation" class="email-panel" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#fbfcfe;border:1px solid #e3eaf1;border-radius:14px;">
+                            <tr><td class="email-panel-cell" style="padding:24px 24px 18px;color:#314156;font-size:15px;line-height:1.65;">{{MARKDOWN_HTML}}</td></tr>
+                          </table>
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;"><tr><td>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#345cf5" style="border-radius:10px;background:#345cf5;box-shadow:0 5px 14px rgba(52,92,245,.22);">
+                              <a href="{{ACKNOWLEDGEMENT_URL}}" style="display:inline-block;padding:14px 22px;border-radius:10px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Acknowledge escalation</a>
+                            </td></tr></table>
                           </td></tr></table>
                           {{ESCALATE_NOW_ACTION}}
                         </td></tr>
-                        <tr><td style="padding:16px 30px;border-top:1px solid #e8edf3;background:#f8fafc;color:#708095;font-size:12px;line-height:1.5;">
-                          Sent automatically by ReplyTrail. Please use your team's usual incident response channel.
+                        <tr><td style="padding:18px 32px;border-top:1px solid #e4ebe9;background:#f6faf8;color:#708095;font-size:12px;line-height:1.5;">
+                          <span style="display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:#7ce7b2;">&nbsp;</span>Sent automatically by ReplyTrail. Please use your team's usual incident response channel.
                         </td></tr>
                       </table>
-                      <div style="padding:16px 8px;color:#8491a2;font-size:11px;">Keep every response on track.</div>
+                      <div style="padding:18px 8px;color:#8491a2;font-size:11px;letter-spacing:.2px;">Keep every response on track.</div>
                     </td></tr>
                   </table>
                 </body>
@@ -310,9 +332,9 @@ public class Notification {
         if (isBlank(escalateNowUrl)) {
             return "";
         }
-        return "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:12px;\"><tr><td style=\"padding:10px 0;\"><a href=\""
+        return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:12px;\"><tr><td><a href=\""
                 + HtmlUtils.htmlEscape(escalateNowUrl)
-                + "\" style=\"color:#4b18f5;font-size:14px;font-weight:700;text-decoration:underline;\">Escalate now and notify the next person</a></td></tr></table>";
+                + "\" style=\"display:inline-block;padding:11px 17px;border:1px solid #cdd7e3;border-radius:10px;color:#344054;background:#ffffff;font-size:14px;font-weight:700;text-decoration:none;\">Escalate now and notify the next person</a></td></tr></table>";
     }
 
     private boolean isBlank(String value) {
