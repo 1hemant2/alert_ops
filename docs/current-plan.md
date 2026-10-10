@@ -1,37 +1,41 @@
 # Current task plan
 
-## Task: Label task details in escalation emails
+## Task: Move response steps reliably in both directions
 
 Started: 2026-10-10
 Status: Complete
 
 ### Goal and scope
 
-Give the existing task description a clear `Task details` heading immediately
-after the task metadata in both the plain-text and HTML email formats.
+Make dropping onto a numbered step choose that position, and allow direct
+position selection. Refresh displayed numbers from the saved server order.
 
 ### Decision-compliance note
 
-- Reuse the existing `taskDetails` field as the canonical source; do not add a
-  second email or database field.
-- Keep the current Markdown fallback, HTML escaping, compact dark styling, and
-  recipient-scoped action links unchanged.
+- Reuse PATCH /api/v1/flow/node/reorder with nodeId, afterNodeId, and version.
+- The backend owns durable positions and renumbers them in increments of 1000.
+  Display positions remain one-based indexes of the ordered server response.
+- Preserve the responsive grid and scrolling changes already in the worktree;
+  no schema or timing changes are included.
 
 ### Acceptance criteria
 
-- [x] Plain-text email labels the description as `Task details` after `Task`.
-- [x] HTML email renders the same content as a separate readable section.
-- [x] Existing escaping, links, and email layout remain unchanged.
+- [x] First/middle steps move later, including to the last position.
+- [x] Later steps move earlier, including to the first position.
+- [x] Dragging, keyboard arrows, and position selection share placement rules.
+- [x] No-op and invalid moves do not submit writes; saved order updates labels.
 
-### Steps
+### Steps and verification
 
-- [x] Inspect the existing email structure and focused test.
-- [x] Add the labeled details section and assertions.
-- [x] Run the focused notification test, backend package, and diff checks.
-- [x] Update the changelog and mark this plan complete.
+- [x] Inspect frontend placement and backend reorder/renumbering behavior.
+- [x] Add a shared position-to-predecessor rule and wire all reorder controls.
+- [x] Cover forward/backward/boundary moves with focused tests.
+- [x] Run ordering tests, backend reorder coverage, UI build/lint, and diff checks.
+- [x] Record completion and browser verification limits in the changelog.
 
-### Intended verification
+### Verification results
 
-`NotificationTest`, the normal backend package with the repository's test
-agent, and `git diff --check` pass. Visual SMTP-client inspection remains
-outside local verification.
+Four UI ordering tests and two backend reorder/version tests pass. UI build
+and diff checks pass; lint retains the two existing flow-page warnings.
+Backend production code is unchanged. Browser drag/drop and position-selector
+interaction checks remain pending because browser access is unavailable.

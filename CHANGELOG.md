@@ -4,6 +4,32 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-10 — Move response steps to a numbered position
+
+- Make drag targets select the final numbered position and add direct position
+  selection to each card. Dragging, keyboard arrows, and selection share the
+  same placement rule and refresh numbers from the saved order.
+- Verification: four UI ordering tests, two backend reorder tests, UI build,
+  and diff checks pass. Lint retains two existing flow-page warnings; browser
+  interaction checks remain pending.
+
+## 2026-10-10 — Use available space for escalation steps
+
+- Replace the horizontal response-step strip with a responsive grid that fills
+  the workspace width and scrolls vertically for long paths. Show numbered
+  order across rows and retain step actions and reordering controls.
+- Verification: UI build and diff checks pass; lint retains two existing
+  flow-page warnings. Browser visual and interaction checks remain pending.
+
+## 2026-10-10 — Keep growing workspace lists scrollable
+
+- Bound growing workspace collections with responsive scrolling, themed
+  scrollbars, and keyboard-accessible regions. Keep table headers visible and
+  leave headings, filters, and actions above the scrolling content.
+- Verification: UI build and `git diff --check` pass; lint retains the two
+  existing flow-page warnings. Browser visual and interaction checks remain
+  pending because browser access was unavailable.
+
 ## 2026-10-10 — Label task details in escalation emails
 
 - Add a dedicated `Task details` section after the task metadata so the
