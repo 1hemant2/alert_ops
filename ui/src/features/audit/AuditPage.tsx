@@ -151,7 +151,7 @@ export function AuditPage() {
         {hasDateRange && <Button className="audit-range-clear" variant="quiet" type="button" onClick={() => { setFromDate(''); setToDate('') }}>Clear dates</Button>}
       </div>
       {invalidDateRange && <div className="audit-range-error" role="alert">The From date must be on or before the To date.</div>}
-      {audit.isPending ? <LoadingRows count={5} /> : audit.isError ? <ErrorState message={audit.error.message} onRetry={() => void audit.refetch()} /> : events.length === 0 ? <EmptyState title="No audit events yet" description="Events will appear here when an escalation is created or progresses through its response path." /> : filteredEvents.length === 0 ? <div className="audit-filter-empty">No saved events match these filters.</div> : <div className="audit-event-list">{filteredEvents.map(event => <AuditEventRow event={event} teamId={teamId} key={event.id} />)}</div>}
+      {audit.isPending ? <LoadingRows count={5} /> : audit.isError ? <ErrorState message={audit.error.message} onRetry={() => void audit.refetch()} /> : events.length === 0 ? <EmptyState title="No audit events yet" description="Events will appear here when an escalation is created or progresses through its response path." /> : filteredEvents.length === 0 ? <div className="audit-filter-empty">No saved events match these filters.</div> : <div className="audit-event-list" role="region" aria-label="Audit events" tabIndex={0}>{filteredEvents.map(event => <AuditEventRow event={event} teamId={teamId} key={event.id} />)}</div>}
     </Card>
   </>
 }

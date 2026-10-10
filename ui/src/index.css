@@ -1247,9 +1247,6 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 /* Keep a short response route compact and connect consecutive steps. */
 .path-step-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 264px), 264px)); gap: 40px; justify-content: center; }
 .path-step-card { width: 100%; max-width: 264px; justify-self: center; overflow: visible; }
-.path-step-connector { position: absolute; z-index: 3; top: 50%; right: -40px; width: 40px; height: 20px; display: grid; place-items: center; transform: translateY(-50%); pointer-events: none; }
-.path-step-connector svg { width: 40px; height: 20px; overflow: visible; }
-.path-step-connector path { fill: none; stroke: #7188ee; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Align labels, controls, and actions across inline forms. */
 .field > span { min-height: 20px; line-height: 20px; }
@@ -1264,15 +1261,6 @@ td { padding: 15px 10px; border-color: #eaecf0; color: #475467; font-size: 14px;
 @media (max-width: 560px) {
   .invite-form > .button { margin-top: 0; }
 }
-
-/* Snake each row so the final card connects cleanly into the next row. */
-.path-step-grid { --path-card-size: 264px; --path-card-gap: 40px; display: flex; width: 100%; flex-direction: column; align-items: center; gap: var(--path-card-gap); }
-.path-step-row { display: grid; width: max-content; max-width: 100%; gap: var(--path-card-gap); justify-content: center; }
-.path-step-row.is-reverse { direction: rtl; }
-.path-step-card { width: 100%; max-width: var(--path-card-size); min-width: 0; justify-self: stretch; direction: ltr; }
-.path-step-connector-wrap { top: auto; right: auto; bottom: calc(-1 * var(--path-card-gap)); left: 50%; width: 20px; height: var(--path-card-gap); transform: translateX(-50%); }
-.path-step-connector-wrap svg { width: 20px; height: var(--path-card-gap); }
-.path-step-row.is-reverse .path-step-connector:not(.path-step-connector-wrap) { right: auto; left: calc(-1 * var(--path-card-gap)); transform: translateY(-50%) rotate(180deg); }
 
 /* Keep step actions discoverable without adding persistent controls to every card. */
 .path-step-card.has-open-menu { z-index: 8; }
@@ -2173,7 +2161,7 @@ html[data-theme="dark"] .password-toggle:hover { color: #b8c6ff; background: #20
   .app-frame.sidebar-mobile-open .sidebar-backdrop { display: block; position: fixed; z-index: 3; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(8,15,25,.48); }
 }
 
-/* Keeps the route header action beside the step count and gives the card rail the available width. */
+/* Keeps route actions above a responsive grid that uses the available workspace width. */
 .flow-detail-page .path-route-heading { flex-wrap: wrap; align-items: flex-start; }
 .flow-detail-page .path-route-heading-tools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .flow-detail-page .path-add-step-button { min-height: 40px; }
@@ -2182,12 +2170,50 @@ html[data-theme="dark"] .password-toggle:hover { color: #b8c6ff; background: #20
 .flow-detail-page .path-settings-icon { display: grid; width: 16px; height: 16px; place-items: center; }
 .flow-detail-page .path-settings-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 .flow-detail-page .path-settings-status { min-width: 28px; padding: 3px 6px; border: 1px solid #d6defe; border-radius: 999px; color: #526ff0; background: #f0f3ff; font-size: 10px; font-weight: 800; letter-spacing: .08em; line-height: 1; text-align: center; }
-.flow-detail-page .path-step-scroll-region { width: 100%; min-width: 0; margin-top: 14px; padding: 3px 4px 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-padding-inline: 4px; scroll-snap-type: x proximity; scrollbar-color: #b8c7f4 transparent; scrollbar-width: thin; touch-action: pan-x; }
+.flow-detail-page .path-step-scroll-region { width: 100%; min-width: 0; max-height: min(68vh, 760px); max-height: min(68svh, 760px); margin-top: 14px; padding: 4px 8px 12px 4px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; scroll-padding-block: 8px; scrollbar-color: #b8c7f4 transparent; scrollbar-width: thin; }
 .flow-detail-page .path-step-scroll-region:focus-visible { outline: 3px solid rgba(52,92,245,.26); outline-offset: 2px; border-radius: 13px; }
-.flow-detail-page .path-step-grid { --path-card-size: 264px; --path-card-gap: 24px; display: block; width: max-content; min-width: 100%; margin-top: 0; }
-.flow-detail-page .path-step-row { width: max-content; max-width: none; min-width: 100%; gap: var(--path-card-gap); justify-content: start; padding-right: 20px; }
-.flow-detail-page .path-step-card { max-width: var(--path-card-size); }
-.flow-detail-page .path-step-card { scroll-snap-align: start; }
+.flow-detail-page .path-step-grid { display: grid; width: 100%; grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr)); gap: 16px; align-items: stretch; margin-top: 0; }
+.flow-detail-page .path-step-card { width: 100%; max-width: none; min-height: 240px; aspect-ratio: auto; padding: 16px; }
+.flow-detail-page .path-position-select { width: 64px; min-height: 34px; height: 34px; padding: 4px 6px; border: 1px solid var(--line); color: var(--ink); background: var(--paper); font-size: 13px; cursor: pointer; }
+.flow-detail-page .path-position-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Keeps growing collections inside their cards while headings and actions stay accessible. */
+:is(.task-list, .flow-list, .table-scroll, .member-list, .team-list,
+    .execution-timeline, .activity-list, .audit-event-list, .path-timing-grid,
+    .webhook-event-list) {
+  min-width: 0;
+  max-height: min(60vh, 640px);
+  max-height: min(60svh, 640px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+  scroll-padding-block: 12px;
+}
+
+:is(.task-list, .flow-list, .member-list, .team-list, .execution-timeline,
+    .activity-list, .audit-event-list, .path-timing-grid, .webhook-event-list) {
+  padding-inline-end: 8px;
+  overflow-wrap: anywhere;
+}
+
+:is(.path-timing-grid, .webhook-event-list) { align-content: start; }
+.webhook-event-list { max-height: 280px; }
+.table-scroll th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--paper);
+  box-shadow: inset 0 -1px var(--line);
+}
+:is(.task-list, .flow-list, .table-scroll, .member-list, .team-list,
+    .execution-timeline, .activity-list, .audit-event-list, .path-timing-grid,
+    .webhook-event-list):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
 html[data-theme="dark"] .flow-detail-page .path-step-scroll-region { scrollbar-color: #526b9a transparent; }
 html[data-theme="dark"] .flow-detail-page .path-settings-status { border-color: #405583; color: #b8c6ff; background: #202d4c; }
 

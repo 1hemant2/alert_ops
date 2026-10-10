@@ -5,6 +5,7 @@ import { createFlowNode, deleteFlowNode, getFlow, getFlowNodes, nodeDelayMinutes
 import type { FlowNode } from '../../api/types'
 import { Button, Card, ErrorState, Field, InlineNotice, LoadingRows, PageHeader } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
+import { findStepPredecessor } from './stepOrdering'
 
 type DropTarget = { type: 'start' } | { type: 'node'; nodeId: string }
 type DragPreview = { nodeId: string; title: string; index: number; x: number; y: number }
@@ -193,20 +194,13 @@ export function FlowDetailPage() {
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [deleteTarget, remove.isPending])
 
-  function moveNodeAfter(nodeId: string, afterNodeId: string | null) {
+  // Saves a requested display position using the backend's predecessor-based reorder API.
+  function moveNodeToPosition(nodeId: string, position: number) {
     const current = nodes.data
-    if (!current || reorder.isPending) return
-    const movingNode = current.find(node => node.id === nodeId)
-    if (!movingNode) return
-
-    const remaining = current.filter(node => node.id !== nodeId)
-    const afterIndex = afterNodeId === null ? -1 : remaining.findIndex(node => node.id === afterNodeId)
-    if (afterNodeId !== null && afterIndex < 0) return
-    const insertAt = afterNodeId === null ? 0 : afterIndex + 1
-
-    const next = [...remaining]
-    next.splice(insertAt, 0, movingNode)
-    if (next.every((node, index) => node.id === current[index]?.id)) return
+    if (!current || stepWritePending) return
+    const afterNodeId = findStepPredecessor(current, nodeId, position)
+    if (afterNodeId === undefined || current.findIndex(node => node.id === nodeId) === position - 1) return
+    setOpenMenuId(null)
     reorder.mutate({ nodeId, afterNodeId })
   }
 
@@ -267,6 +261,7 @@ export function FlowDetailPage() {
     setDropTarget(target?.type === 'node' && target.nodeId === preview.nodeId ? null : target)
   }
 
+  // Places a dragged step at the target card's numbered position.
   function finishDrag(event: ReactPointerEvent<HTMLButtonElement>, cancelled = false) {
     if (activePointerIdRef.current !== event.pointerId) return
     const preview = dragRef.current
@@ -276,20 +271,24 @@ export function FlowDetailPage() {
     setDragPreview(null)
     setDropTarget(null)
     if (!preview || !target) return
-    if (target.type === 'start') moveNodeAfter(preview.nodeId, null)
-    else if (target.nodeId !== preview.nodeId) moveNodeAfter(preview.nodeId, target.nodeId)
+    if (target.type === 'start') moveNodeToPosition(preview.nodeId, 1)
+    else if (nodes.data) {
+      const targetPosition = nodes.data.findIndex(node => node.id === target.nodeId) + 1
+      moveNodeToPosition(preview.nodeId, targetPosition)
+    }
   }
 
+  // Moves a focused step one saved position earlier or later with the arrow keys.
   function handleGripKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, node: FlowNode, index: number) {
     if (stepWritePending || !nodes.data) return
     const moveEarlier = event.key === 'ArrowLeft' || event.key === 'ArrowUp'
     const moveLater = event.key === 'ArrowRight' || event.key === 'ArrowDown'
     if (moveEarlier && index > 0) {
       event.preventDefault()
-      moveNodeAfter(node.id, index < 2 ? null : nodes.data[index - 2].id)
+      moveNodeToPosition(node.id, index)
     } else if (moveLater && index < nodes.data.length - 1) {
       event.preventDefault()
-      moveNodeAfter(node.id, nodes.data[index + 1].id)
+      moveNodeToPosition(node.id, index + 2)
     }
   }
 
@@ -299,8 +298,8 @@ export function FlowDetailPage() {
   const activeDropLabel = dropTarget?.type === 'start'
     ? 'Drop here to make this the first step'
     : dropTarget?.type === 'node'
-      ? `Drop after step ${String((nodes.data ?? []).findIndex(node => node.id === dropTarget.nodeId) + 1).padStart(2, '0')}`
-      : 'Drop on a card to place after it, or on Start to make it first'
+      ? `Move to position ${String((nodes.data ?? []).findIndex(node => node.id === dropTarget.nodeId) + 1).padStart(2, '0')}`
+      : 'Drop on a numbered card to choose that position, or on Start to make it first'
 
   return <div className="flow-detail-page">
     <div className="back-link-row"><Link to={`/app/${teamId}/flows`}>Back to escalation paths</Link><span> / </span><span>{flow.data.name}</span></div>
@@ -312,7 +311,7 @@ export function FlowDetailPage() {
         <span className="path-settings-status">{resolutionTimeoutEnabled ? 'ON' : 'OFF'}</span>
       </Button>
     </div>} />
-    <InlineNotice tone="neutral">Follow the arrows through the path. Scroll horizontally to see more steps. Drag the grip to reorder; on a keyboard, focus a grip and use the arrow keys.</InlineNotice>
+    <InlineNotice tone="neutral">Read steps from left to right, then continue on the next row. Change a step’s number to move it, or drag its grip onto the desired position. You can also focus a grip and use the arrow keys.</InlineNotice>
     {addStepOpen && <div id="add-path-step" className="path-add-panel" ref={addStepRef}><Card className="path-add-card">
       <div className="card-heading"><div><span className="eyebrow">BUILD THIS PATH</span><h2>{editingNodeId ? 'Edit response step' : 'Add a response step'}</h2></div><Button variant="quiet" disabled={stepWritePending} onClick={closeStepForm}>Close&nbsp; ×</Button></div>
       <p className="form-intro">Choose an existing team member, name their step, and set the wait time before contact.</p>
@@ -338,58 +337,56 @@ export function FlowDetailPage() {
               <span className="path-step-number">01</span>
               <div><span className="step-order-label">FIRST STEP</span><strong>Your response route is empty</strong><small>Add the first teammate to define who responds.</small><button type="button" className="path-inline-action" onClick={startAddingStep}>Add the first step</button></div>
             </div>
-            : <div id="response-step-rail" className="path-step-scroll-region" tabIndex={0} aria-label="Scrollable escalation steps">
+            : <div className="path-step-scroll-region" role="region" tabIndex={0} aria-label="Scrollable escalation steps">
               <div className="path-step-grid" role="list" aria-label="Ordered escalation steps">
-                <div className="path-step-row" style={{ gridTemplateColumns: `repeat(${nodes.data.length}, minmax(0, var(--path-card-size)))` }}>
-                  {nodes.data.map((node, index) => {
-                    const isDragSource = dragPreview?.nodeId === node.id
-                    const isDropTarget = dropTarget?.type === 'node' && dropTarget.nodeId === node.id
-                    const isSequenceEnd = index === nodes.data.length - 1
-                    return <article
-                      key={node.id}
-                      className={`path-step-card ${isDragSource ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${openMenuId === node.id ? 'has-open-menu' : ''}`}
-                      data-path-step-id={node.id}
-                      data-drop-hint={isDropTarget ? `DROP AFTER STEP ${String(index + 1).padStart(2, '0')}` : undefined}
-                      role="listitem"
-                    >
-                      <div className="path-card-header">
-                        <span className="path-step-number">{String(index + 1).padStart(2, '0')}</span>
-                        <div className="path-card-tools">
-                        <button
-                          type="button"
-                          className="step-drag-handle"
-                          aria-label={`Reorder ${nodeName(node)}, step ${index + 1} of ${nodes.data.length}. Drag to reorder; use arrow keys to move earlier or later.`}
-                          title="Drag to reorder · keyboard: use arrow keys"
-                          disabled={stepWritePending}
-                          onPointerDown={event => beginDrag(event, node, index)}
-                          onPointerMove={continueDrag}
-                          onPointerUp={event => finishDrag(event)}
-                          onPointerCancel={event => finishDrag(event, true)}
-                          onLostPointerCapture={event => finishDrag(event, true)}
-                          onKeyDown={event => handleGripKeyDown(event, node, index)}
-                        >
-                          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r="1.35"/><circle cx="13" cy="5" r="1.35"/><circle cx="7" cy="10" r="1.35"/><circle cx="13" cy="10" r="1.35"/><circle cx="7" cy="15" r="1.35"/><circle cx="13" cy="15" r="1.35"/></svg>
+                {nodes.data.map((node, index) => {
+                  const isDragSource = dragPreview?.nodeId === node.id
+                  const isDropTarget = dropTarget?.type === 'node' && dropTarget.nodeId === node.id
+                  return <article
+                    key={node.id}
+                    className={`path-step-card ${isDragSource ? 'is-dragging' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${openMenuId === node.id ? 'has-open-menu' : ''}`}
+                    data-path-step-id={node.id}
+                    data-drop-hint={isDropTarget ? `MOVE TO POSITION ${String(index + 1).padStart(2, '0')}` : undefined}
+                    role="listitem"
+                  >
+                    <div className="path-card-header">
+                      <select className="path-step-number path-position-select" aria-label={`Position for ${nodeName(node)}`} title="Change step position" value={index + 1} disabled={stepWritePending} onChange={event => moveNodeToPosition(node.id, Number(event.target.value))}>
+                        {nodes.data.map((target, position) => <option key={target.id} value={position + 1}>{String(position + 1).padStart(2, '0')}</option>)}
+                      </select>
+                      <div className="path-card-tools">
+                      <button
+                        type="button"
+                        className="step-drag-handle"
+                        aria-label={`Reorder ${nodeName(node)}, step ${index + 1} of ${nodes.data.length}. Drag to reorder; use arrow keys to move earlier or later.`}
+                        title="Drag to reorder · keyboard: use arrow keys"
+                        disabled={stepWritePending}
+                        onPointerDown={event => beginDrag(event, node, index)}
+                        onPointerMove={continueDrag}
+                        onPointerUp={event => finishDrag(event)}
+                        onPointerCancel={event => finishDrag(event, true)}
+                        onLostPointerCapture={event => finishDrag(event, true)}
+                        onKeyDown={event => handleGripKeyDown(event, node, index)}
+                      >
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r="1.35"/><circle cx="13" cy="5" r="1.35"/><circle cx="7" cy="10" r="1.35"/><circle cx="13" cy="10" r="1.35"/><circle cx="7" cy="15" r="1.35"/><circle cx="13" cy="15" r="1.35"/></svg>
+                      </button>
+                      <div className="path-step-actions" data-step-actions>
+                        <button type="button" className="path-step-menu-trigger" aria-label={`${openMenuId === node.id ? 'Close' : 'Open'} actions for ${nodeName(node)}`} title={`${openMenuId === node.id ? 'Close' : 'Open'} step actions`} aria-expanded={openMenuId === node.id} disabled={stepWritePending} onClick={() => setOpenMenuId(current => current === node.id ? null : node.id)}>
+                          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4" r="1.4"/><circle cx="10" cy="10" r="1.4"/><circle cx="10" cy="16" r="1.4"/></svg>
                         </button>
-                        <div className="path-step-actions" data-step-actions>
-                          <button type="button" className="path-step-menu-trigger" aria-label={`${openMenuId === node.id ? 'Close' : 'Open'} actions for ${nodeName(node)}`} title={`${openMenuId === node.id ? 'Close' : 'Open'} step actions`} aria-expanded={openMenuId === node.id} disabled={stepWritePending} onClick={() => setOpenMenuId(current => current === node.id ? null : node.id)}>
-                            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="4" r="1.4"/><circle cx="10" cy="10" r="1.4"/><circle cx="10" cy="16" r="1.4"/></svg>
-                          </button>
-                          {openMenuId === node.id && <div className="path-step-menu" role="menu">
-                            <button type="button" role="menuitem" title="Create a copy of this step" onClick={() => { setOpenMenuId(null); duplicate.mutate(node) }}><span className="menu-action-icon menu-duplicate-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="6.5" y="6.5" width="9" height="9" rx="1.5"/><path d="M13.5 6.5V5A1.5 1.5 0 0 0 12 3.5H5A1.5 1.5 0 0 0 3.5 5v7A1.5 1.5 0 0 0 5 13.5h1.5"/></svg></span>Duplicate step</button>
-                            <button type="button" role="menuitem" title="Change this step" onClick={() => startEditing(node)}><span className="menu-action-icon menu-edit-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m4 16 .8-3.6L13.9 3.3a1.8 1.8 0 0 1 2.6 2.6L7.4 15.1 4 16Z"/><path d="m12.8 4.4 2.8 2.8"/></svg></span>Edit step</button>
-                            <button type="button" role="menuitem" className="is-danger" title="Remove this step" onClick={() => { setOpenMenuId(null); remove.reset(); setDeleteTarget(node) }}><span className="menu-action-icon menu-delete-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M6 6l.8 10h6.4L14 6M8.5 9v4M11.5 9v4"/></svg></span>Delete step</button>
-                          </div>}
-                        </div>
-                        </div>
+                        {openMenuId === node.id && <div className="path-step-menu" role="menu">
+                          <button type="button" role="menuitem" title="Create a copy of this step" onClick={() => { setOpenMenuId(null); duplicate.mutate(node) }}><span className="menu-action-icon menu-duplicate-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="6.5" y="6.5" width="9" height="9" rx="1.5"/><path d="M13.5 6.5V5A1.5 1.5 0 0 0 12 3.5H5A1.5 1.5 0 0 0 3.5 5v7A1.5 1.5 0 0 0 5 13.5h1.5"/></svg></span>Duplicate step</button>
+                          <button type="button" role="menuitem" title="Change this step" onClick={() => startEditing(node)}><span className="menu-action-icon menu-edit-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m4 16 .8-3.6L13.9 3.3a1.8 1.8 0 0 1 2.6 2.6L7.4 15.1 4 16Z"/><path d="m12.8 4.4 2.8 2.8"/></svg></span>Edit step</button>
+                          <button type="button" role="menuitem" className="is-danger" title="Remove this step" onClick={() => { setOpenMenuId(null); remove.reset(); setDeleteTarget(node) }}><span className="menu-action-icon menu-delete-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M6 6l.8 10h6.4L14 6M8.5 9v4M11.5 9v4"/></svg></span>Delete step</button>
+                        </div>}
                       </div>
-                      <span className="step-order-label">{index === 0 ? 'FIRST STEP' : `AFTER STEP ${String(index).padStart(2, '0')}`}</span>
-                      <h3 title={nodeName(node)}>{nodeName(node)}</h3>
-                      <div className="path-delay-block"><span>WAIT BEFORE CONTACT</span><strong>{nodeDelayMinutes(node)} <small>min</small></strong></div>
-                      <div className="path-card-recipient"><span className="path-recipient-mark">{node.email.charAt(0).toUpperCase()}</span><div><small>CONTACT</small><strong title={node.email}>{node.email}</strong></div></div>
-                      {!isSequenceEnd && <span className="path-step-connector" aria-hidden="true"><svg viewBox="0 0 40 20"><path d="M2 10h31M27 4l6 6-6 6" /></svg></span>}
-                    </article>
-                  })}
-                </div>
+                      </div>
+                    </div>
+                    <span className="step-order-label">{index === 0 ? 'FIRST STEP' : `AFTER STEP ${String(index).padStart(2, '0')}`}</span>
+                    <h3 title={nodeName(node)}>{nodeName(node)}</h3>
+                    <div className="path-delay-block"><span>WAIT BEFORE CONTACT</span><strong>{nodeDelayMinutes(node)} <small>min</small></strong></div>
+                    <div className="path-card-recipient"><span className="path-recipient-mark">{node.email.charAt(0).toUpperCase()}</span><div><small>CONTACT</small><strong title={node.email}>{node.email}</strong></div></div>
+                  </article>
+                })}
               </div>
             </div>}
         </div>}
@@ -398,7 +395,7 @@ export function FlowDetailPage() {
         </div>}
         {reorder.error && <div className="form-error reorder-error" role="alert">{reorder.error.message} The latest path has been loaded; try the reorder again.</div>}
         {duplicate.error && <div className="form-error reorder-error" role="alert">{duplicate.error.message} The latest path has been loaded; try duplicating the step again.</div>}
-        <div className="timeline-caption"><span className="caption-dot" />Wait times control when each contact step becomes eligible to run. Order is saved by the server. Scroll horizontally to view additional steps.</div>
+        <div className="timeline-caption"><span className="caption-dot" />Steps follow their numbered order across each row. Scroll down to see additional steps.</div>
       </Card>
     </div>
     <details ref={pathTimingRef} id="path-settings" className="path-timing-disclosure">
@@ -408,7 +405,7 @@ export function FlowDetailPage() {
       </summary>
       <Card className="path-timing-card">
         <label className="checkbox-field"><input type="checkbox" checked={resolutionTimeoutEnabled} disabled={stepWritePending} onChange={event => setResolutionTimeoutEnabled(event.target.checked)} /><span>Enable resolution timeout for this path</span></label>
-        {resolutionTimeoutEnabled && <div className="path-timing-grid">
+        {resolutionTimeoutEnabled && <div className="path-timing-grid" role="region" aria-label="Response timing settings" tabIndex={0}>
           {(nodes.data ?? []).map((node, index) => <Field key={node.id} label={`Step ${String(index + 1).padStart(2, '0')} · ${nodeName(node)}`} hint="Time allowed after acknowledgement."><div className="input-with-suffix"><input required type="number" min="1" max="10080" value={resolutionTimeouts[node.id] ?? ''} disabled={stepWritePending} onChange={event => setResolutionTimeouts(current => ({ ...current, [node.id]: event.target.value }))} /><span>minutes</span></div></Field>)}
         </div>}
         <div className="path-timing-actions"><Button variant="secondary" disabled={stepWritePending || !flow.data || !nodes.data} onClick={() => timing.mutate()}>{timing.isPending ? 'Saving timing…' : 'Save timing settings'}</Button></div>

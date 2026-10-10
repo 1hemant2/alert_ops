@@ -53,7 +53,7 @@ export function WebhooksPage() {
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">TEAM INTEGRATIONS</span><h2>Configured webhooks</h2></div><span className="count-pill">{webhooks.data?.length ?? '—'}</span></div>
-        {webhooks.isPending ? <LoadingRows count={3} /> : webhooks.isError ? <ErrorState message={webhooks.error.message} onRetry={() => void webhooks.refetch()} /> : webhooks.data.length === 0 ? <EmptyState title="No webhooks yet" description="Create one to let another system start a response path." /> : <div className="task-list">{webhooks.data.map(webhook => <WebhookRow key={webhook.id} webhook={webhook} flowName={flows.data?.find(flow => flow.id === webhook.defaultFlowId)?.name} teamId={teamId} canManage={canManage} onToggle={enabled => toggle.mutate({ id: webhook.id, enabled })} onRotate={() => rotate.mutate(webhook.id)} />)}</div>}
+        {webhooks.isPending ? <LoadingRows count={3} /> : webhooks.isError ? <ErrorState message={webhooks.error.message} onRetry={() => void webhooks.refetch()} /> : webhooks.data.length === 0 ? <EmptyState title="No webhooks yet" description="Create one to let another system start a response path." /> : <div className="task-list" role="region" aria-label="Webhooks" tabIndex={0}>{webhooks.data.map(webhook => <WebhookRow key={webhook.id} webhook={webhook} flowName={flows.data?.find(flow => flow.id === webhook.defaultFlowId)?.name} teamId={teamId} canManage={canManage} onToggle={enabled => toggle.mutate({ id: webhook.id, enabled })} onRotate={() => rotate.mutate(webhook.id)} />)}</div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW INTEGRATION</span><h2>Create webhook</h2></div><span className="form-number">01</span></div>
@@ -103,7 +103,7 @@ function WebhookEventHistory({ teamId, webhookId, events, isLoading, errorMessag
   return <>
     <small>{events.length} event{events.length === 1 ? '' : 's'}</small>
     {events.length > 3 && <div className="webhook-event-controls"><Button variant="quiet" aria-expanded={showAllEvents} aria-controls={`webhook-events-${webhookId}`} onClick={() => setShowAllEvents(current => !current)}>{showAllEvents ? 'Show latest 3' : `View all ${events.length} events`}</Button></div>}
-    <div className="webhook-event-list" id={`webhook-events-${webhookId}`}>
+    <div className="webhook-event-list" role="region" aria-label="Webhook events" tabIndex={0} id={`webhook-events-${webhookId}`}>
       {visibleEvents.map(event => <details key={event.id}>
         <summary>{event.eventId} · {formatDate(event.receivedAt)}</summary>
         <p><Link to={`/app/${teamId}/tasks/${event.taskId}`}>Task {event.taskId.slice(0, 8)}</Link> · <Link to={`/app/${teamId}/escalations/${event.escalationId}`}>Run {event.escalationId.slice(0, 8)}</Link></p>

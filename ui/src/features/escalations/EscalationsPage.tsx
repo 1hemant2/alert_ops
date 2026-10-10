@@ -7,6 +7,7 @@ import { getTasks } from '../../api/tasks'
 import { Button, Card, EmptyState, ErrorState, Field, LoadingRows, PageHeader, StatusBadge } from '../../components/Elements'
 import { formatDate } from '../../lib/format'
 
+// Shows team escalations in a scrollable table with run creation controls.
 export function EscalationsPage() {
   const { teamId = '' } = useParams()
   const [name, setName] = useState('')
@@ -48,7 +49,7 @@ export function EscalationsPage() {
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">LIVE + HISTORY</span><h2>Team escalations</h2></div><span className="count-pill">{escalations.data?.length ?? '—'}</span></div>
-        {escalations.isPending ? <LoadingRows count={4} /> : escalations.isError ? <ErrorState message={escalations.error.message} onRetry={() => void escalations.refetch()} /> : escalations.data.length === 0 ? <EmptyState title="No escalations have run" description="Choose a task and an escalation path to create your first team escalation." /> : <div className="table-scroll"><table><thead><tr><th>NAME</th><th>STATUS</th><th>CREATED</th><th /></tr></thead><tbody>{escalations.data.map(item => <tr key={item.id}><td><Link className="table-primary" to={`/app/${teamId}/escalations/${item.id}`}>{item.name}</Link><small className="table-subtext">{item.id.slice(0, 8)}</small></td><td><StatusBadge status={item.status} /></td><td>{formatDate(item.createdAt)}</td><td><Link className="table-arrow" to={`/app/${teamId}/escalations/${item.id}`}>→</Link></td></tr>)}</tbody></table></div>}
+        {escalations.isPending ? <LoadingRows count={4} /> : escalations.isError ? <ErrorState message={escalations.error.message} onRetry={() => void escalations.refetch()} /> : escalations.data.length === 0 ? <EmptyState title="No escalations have run" description="Choose a task and an escalation path to create your first team escalation." /> : <div className="table-scroll" role="region" aria-label="Escalations" tabIndex={0}><table><thead><tr><th>NAME</th><th>STATUS</th><th>CREATED</th><th /></tr></thead><tbody>{escalations.data.map(item => <tr key={item.id}><td><Link className="table-primary" to={`/app/${teamId}/escalations/${item.id}`}>{item.name}</Link><small className="table-subtext">{item.id.slice(0, 8)}</small></td><td><StatusBadge status={item.status} /></td><td>{formatDate(item.createdAt)}</td><td><Link className="table-arrow" to={`/app/${teamId}/escalations/${item.id}`}>→</Link></td></tr>)}</tbody></table></div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW EXECUTION</span><h2>Configure a run</h2></div><span className="form-number">03</span></div>
