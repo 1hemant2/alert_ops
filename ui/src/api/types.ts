@@ -128,6 +128,9 @@ export interface Escalation {
   resolutionDeadline?: string | null
   scheduledStartAt?: string | null
   scheduleTimezone?: string | null
+  repeatType?: 'NONE' | 'DAILY' | 'WEEKLY' | null
+  nextRepeatAt?: string | null
+  repeatSourceId?: string | null
   cancelledAt?: string | null
   createdAt: string
   updatedAt?: string

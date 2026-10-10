@@ -38,10 +38,12 @@ export function createEscalation(input: {
   })
 }
 
+// Schedules one-time or daily/weekly repetition for an idle escalation.
 export function scheduleEscalation(escalationId: string, schedule: {
   scheduleDate: string
   scheduleTime: string
   timezone: string
+  repeatType?: 'NONE' | 'DAILY' | 'WEEKLY'
 }): Promise<Escalation> {
   return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/schedule`, {
     method: 'POST',
@@ -62,6 +64,14 @@ export function rescheduleEscalation(escalationId: string, schedule: {
 
 export function cancelScheduledEscalation(escalationId: string): Promise<Escalation> {
   return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/cancel`, {
+    method: 'POST',
+    body: jsonBody({}),
+  })
+}
+
+// Stops future repeats while leaving every saved escalation run unchanged.
+export function stopRepeatingEscalation(escalationId: string): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalation/${encodeURIComponent(escalationId)}/stop-repeat`, {
     method: 'POST',
     body: jsonBody({}),
   })

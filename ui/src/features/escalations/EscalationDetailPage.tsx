@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelScheduledEscalation, escalateNow, getEscalation, getEscalationHistory, getExecutionStates, previewEscalateNow, resolveEscalation, rescheduleEscalation, startEscalation } from '../../api/escalations'
+import { cancelScheduledEscalation, escalateNow, getEscalation, getEscalationHistory, getExecutionStates, previewEscalateNow, resolveEscalation, rescheduleEscalation, startEscalation, stopRepeatingEscalation } from '../../api/escalations'
 import type { EscalationHistoryEvent } from '../../api/types'
 import { getFlow, getFlowNodes, nodeDelayMinutes, nodeName } from '../../api/flows'
 import { getTasks } from '../../api/tasks'
@@ -14,6 +14,8 @@ const activityActionLabels: Record<string, string> = {
   CREATED: 'Escalation created',
   SCHEDULED: 'Escalation scheduled',
   RESCHEDULED: 'Escalation rescheduled',
+  REPEAT_CREATED: 'Repeated escalation created',
+  REPEAT_STOPPED: 'Future repeats stopped',
   STARTED: 'Escalation started',
   CANCELLED: 'Schedule cancelled',
   START_FAILED: 'Escalation could not start',
@@ -210,6 +212,16 @@ export function EscalationDetailPage() {
       ])
     },
   })
+  const stopRepeat = useMutation({
+    mutationFn: () => stopRepeatingEscalation(escalationId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['escalation', teamId, escalationId] }),
+        queryClient.invalidateQueries({ queryKey: ['escalations', teamId] }),
+        invalidateActivityHistory(),
+      ])
+    },
+  })
   const actionSourceStepId = escalation.data?.status === 'ACKNOWLEDGED'
     ? escalation.data.acknowledgedStepId ?? ''
     : [...(execution.data ?? [])].reverse().find(state => state.status === 'SENT')?.id ?? ''
@@ -261,6 +273,10 @@ export function EscalationDetailPage() {
   const taskReferenceUrl = savedTask ? savedTask.taskReferenceUrl : task?.referenceUrl
   const completed = item.status === 'COMPLETED'
   const scheduled = item.status === 'SCHEDULED'
+  const isOriginalRepeat = Boolean(item.repeatType && item.repeatType !== 'NONE' && !item.repeatSourceId)
+  const isRepeatChild = Boolean(item.repeatSourceId)
+  const isRecurringRun = isOriginalRepeat || isRepeatChild
+  const repeatsStopped = isOriginalRepeat && !item.nextRepeatAt
   const canOfferEscalateNow = (item.status === 'OPEN' || item.status === 'ACKNOWLEDGED') && Boolean(manualActionRequest)
   const activityEvents = activityHistory.data?.pages.flatMap(page => page.events) ?? []
   const activityGroups = groupActivityEvents(activityEvents)
@@ -270,11 +286,12 @@ export function EscalationDetailPage() {
     <div className="back-link-row"><Link to={`/app/${teamId}/escalations`}>← Escalations</Link><span> / </span><span>{item.name}</span></div>
     <PageHeader eyebrow={`EXECUTION / ${item.id.slice(0, 8).toUpperCase()}`} title={item.name} description="Durable progress for this team scoped escalation." action={<StatusBadge status={item.status} />} />
     <InlineNotice>Each active step emails its configured recipient with the task context. SENT means the email service accepted the message; it does not confirm delivery.</InlineNotice>
+    {item.repeatSourceId && <InlineNotice>This run was created by the repeating escalation <Link to={`/app/${teamId}/escalations/${item.repeatSourceId}`}>{item.repeatSourceId.slice(0, 8)}</Link>. Its lifecycle is independent.</InlineNotice>}
     {item.status === 'START_FAILED' && <InlineNotice tone="error"><strong>This scheduled escalation could not start.</strong> ReplyTrail exhausted its start retries. A notification was queued for the scheduler owner and team administrators; undelivered notifications retry and recover after restart.</InlineNotice>}
     {scheduled && item.scheduledStartAt && <Card className="schedule-management-card">
       <div className="card-heading"><div><span className="eyebrow">SCHEDULED START</span><h2>{formatDate(item.scheduledStartAt)}</h2></div><StatusBadge status="SCHEDULED" /></div>
-      <p className="form-intro">Configured timezone: {item.scheduleTimezone ?? 'UTC'}. You can change or cancel this one-time start before it begins.</p>
-      <form onSubmit={event => { event.preventDefault(); reschedule.mutate() }} className="form-stack">
+      <p className="form-intro">Configured timezone: {item.scheduleTimezone ?? 'UTC'}. {isRecurringRun ? 'This run belongs to a repeating escalation. You can cancel this run, but its saved occurrence time cannot be changed.' : 'You can change or cancel this one-time start before it begins.'}</p>
+      {!isRecurringRun && <form onSubmit={event => { event.preventDefault(); reschedule.mutate() }} className="form-stack">
         <div className="form-grid-two">
           <label className="field"><span>Date</span><input required type="date" value={scheduleDate} onChange={event => setScheduleDate(event.target.value)} /></label>
           <label className="field"><span>Time</span><input required type="time" value={scheduleTime} onChange={event => setScheduleTime(event.target.value)} /></label>
@@ -282,7 +299,14 @@ export function EscalationDetailPage() {
         <label className="field"><span>Timezone</span><input required value={scheduleTimezone} onChange={event => setScheduleTimezone(event.target.value)} /></label>
         {(reschedule.error || cancel.error) && <div className="form-error" role="alert">{(reschedule.error ?? cancel.error)?.message}</div>}
         <div className="button-row"><Button variant="secondary" disabled={reschedule.isPending || cancel.isPending}>{reschedule.isPending ? 'Saving…' : 'Reschedule'}</Button><Button type="button" variant="danger" disabled={reschedule.isPending || cancel.isPending} onClick={() => cancel.mutate()}>{cancel.isPending ? 'Cancelling…' : 'Cancel schedule'}</Button></div>
-      </form>
+      </form>}
+      {isRecurringRun && <Button type="button" variant="danger" disabled={cancel.isPending} onClick={() => cancel.mutate()}>{cancel.isPending ? 'Cancelling…' : 'Cancel this run'}</Button>}
+    </Card>}
+    {isOriginalRepeat && <Card className="schedule-management-card">
+      <div className="card-heading"><div><span className="eyebrow">REPEATING ESCALATION</span><h2>{repeatsStopped ? 'Future repeats are stopped' : `Repeats ${item.repeatType === 'DAILY' ? 'every day' : 'every week'}`}</h2></div></div>
+      <p className="form-intro">{repeatsStopped ? 'This escalation will not create any more runs.' : `The next run is scheduled for ${item.nextRepeatAt ? formatDate(item.nextRepeatAt) : 'a later time'}. Existing runs continue independently.`}</p>
+      {stopRepeat.error && <div className="form-error" role="alert">{stopRepeat.error.message}</div>}
+      {!repeatsStopped && <Button variant="danger" disabled={stopRepeat.isPending} onClick={() => stopRepeat.mutate()}>{stopRepeat.isPending ? 'Stopping…' : 'Stop future repeats'}</Button>}
     </Card>}
     {item.status === 'ACKNOWLEDGED' && <Card className="resolution-action-card">
       <div className="card-heading"><div><span className="eyebrow">ACTIVE RESOLUTION</span><h2>Someone is working on this escalation</h2></div><StatusBadge status="ACKNOWLEDGED" /></div>

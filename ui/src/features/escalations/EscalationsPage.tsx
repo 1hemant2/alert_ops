@@ -17,6 +17,7 @@ export function EscalationsPage() {
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleTime, setScheduleTime] = useState('')
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+  const [repeatType, setRepeatType] = useState<'NONE' | 'DAILY' | 'WEEKLY'>('NONE')
   const queryClient = useQueryClient()
   const escalations = useQuery({ queryKey: ['escalations', teamId], queryFn: getEscalations, refetchInterval: query => query.state.data?.some(item => item.status === 'OPEN') ? 4000 : false })
   const tasks = useQuery({ queryKey: ['tasks', teamId], queryFn: getTasks })
@@ -25,7 +26,7 @@ export function EscalationsPage() {
     mutationFn: async () => {
       const created = await createEscalation({ escalationName: name.trim(), taskId, flowId })
       if (startMode === 'SCHEDULED') {
-        return scheduleEscalation(created.id, { scheduleDate, scheduleTime, timezone })
+        return scheduleEscalation(created.id, { scheduleDate, scheduleTime, timezone, repeatType })
       }
       return startEscalation(created.id)
     },
@@ -34,6 +35,7 @@ export function EscalationsPage() {
       setStartMode('IMMEDIATE')
       setScheduleDate('')
       setScheduleTime('')
+      setRepeatType('NONE')
       await queryClient.invalidateQueries({ queryKey: ['escalations', teamId] })
     },
   })
@@ -49,7 +51,7 @@ export function EscalationsPage() {
     <div className="two-column-layout">
       <Card className="main-list-card">
         <div className="card-heading"><div><span className="eyebrow">LIVE + HISTORY</span><h2>Team escalations</h2></div><span className="count-pill">{escalations.data?.length ?? '—'}</span></div>
-        {escalations.isPending ? <LoadingRows count={4} /> : escalations.isError ? <ErrorState message={escalations.error.message} onRetry={() => void escalations.refetch()} /> : escalations.data.length === 0 ? <EmptyState title="No escalations have run" description="Choose a task and an escalation path to create your first team escalation." /> : <div className="table-scroll" role="region" aria-label="Escalations" tabIndex={0}><table><thead><tr><th>NAME</th><th>STATUS</th><th>CREATED</th><th /></tr></thead><tbody>{escalations.data.map(item => <tr key={item.id}><td><Link className="table-primary" to={`/app/${teamId}/escalations/${item.id}`}>{item.name}</Link><small className="table-subtext">{item.id.slice(0, 8)}</small></td><td><StatusBadge status={item.status} /></td><td>{formatDate(item.createdAt)}</td><td><Link className="table-arrow" to={`/app/${teamId}/escalations/${item.id}`}>→</Link></td></tr>)}</tbody></table></div>}
+        {escalations.isPending ? <LoadingRows count={4} /> : escalations.isError ? <ErrorState message={escalations.error.message} onRetry={() => void escalations.refetch()} /> : escalations.data.length === 0 ? <EmptyState title="No escalations have run" description="Choose a task and an escalation path to create your first team escalation." /> : <div className="table-scroll" role="region" aria-label="Escalations" tabIndex={0}><table><thead><tr><th>NAME</th><th>STATUS</th><th>CREATED</th><th /></tr></thead><tbody>{escalations.data.map(item => <tr key={item.id}><td><Link className="table-primary" to={`/app/${teamId}/escalations/${item.id}`}>{item.name}</Link><small className="table-subtext">{item.id.slice(0, 8)}</small>{item.repeatSourceId && <Link className="table-subtext" to={`/app/${teamId}/escalations/${item.repeatSourceId}`}>Repeat of {item.repeatSourceId.slice(0, 8)}</Link>}{item.repeatType && item.repeatType !== 'NONE' && item.nextRepeatAt && <small className="table-subtext">Next run {formatDate(item.nextRepeatAt)}</small>}</td><td><StatusBadge status={item.status} /></td><td>{formatDate(item.createdAt)}</td><td><Link className="table-arrow" to={`/app/${teamId}/escalations/${item.id}`}>→</Link></td></tr>)}</tbody></table></div>}
       </Card>
       <Card className="side-form-card">
         <div className="card-heading"><div><span className="eyebrow">NEW EXECUTION</span><h2>Configure a run</h2></div><span className="form-number">03</span></div>
@@ -65,12 +67,13 @@ export function EscalationsPage() {
               <Field label="Time"><input required type="time" value={scheduleTime} onChange={event => setScheduleTime(event.target.value)} /></Field>
             </div>
             <Field label="Timezone" hint="Use an IANA timezone, for example Asia/Kolkata."><input required value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="Asia/Kolkata" /></Field>
+            <Field label="Repeat" hint="The first run starts at the scheduled time. Later runs use the same local time."><select value={repeatType} onChange={event => setRepeatType(event.target.value as 'NONE' | 'DAILY' | 'WEEKLY')}><option value="NONE">Do not repeat</option><option value="DAILY">Every day</option><option value="WEEKLY">Every week</option></select></Field>
           </>}
           {!canCreate && <div className="form-hint">Create at least one task and one escalation path first.</div>}
           {create.error && <div className="form-error" role="alert">{create.error.message}</div>}
-          <Button disabled={create.isPending || !canCreate}>{create.isPending ? 'Creating…' : startMode === 'SCHEDULED' ? 'Schedule escalation' : 'Start escalation'} <span>→</span></Button>
+          <Button disabled={create.isPending || !canCreate}>{create.isPending ? 'Creating…' : startMode === 'SCHEDULED' ? repeatType === 'NONE' ? 'Schedule escalation' : 'Schedule repeating escalation' : 'Start escalation'} <span>→</span></Button>
         </form>
-        <div className="side-callout"><span>BEFORE STARTING</span><p>Make sure the selected path has at least one response step. Scheduled runs stay quiet until their configured time.</p></div>
+        <div className="side-callout"><span>BEFORE STARTING</span><p>Make sure the selected path has at least one response step. Scheduled runs stay quiet until their configured time, and repeating runs create a new escalation each day or week.</p></div>
       </Card>
     </div>
   </>
