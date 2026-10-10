@@ -206,6 +206,12 @@ The scheduling integration tests cover publication after commit, no publication 
 
 ## Release check
 
+- **Deployment decision (2026-10-11):** Version one targets a single AWS EC2 machine
+  with Docker Compose for the backend, PostgreSQL, RabbitMQ, and Redis, plus UI
+  hosting and HTTPS. Kubernetes is deferred and its learning materials are
+  preserved separately. See the [deployment guide](deployment/README.md).
+- [ ] Prepare and verify the production EC2/Compose setup, private dependency
+  ports, HTTPS, external database backups, and recovery after a host restart.
 - [x] Select and implement the public product identity using the [product rebranding plan](product-rebranding-plan.md). ReplyTrail is implemented locally; domain ownership, sender verification, and deployed rollout remain pending. Retain existing integration and storage identifiers during the initial rebrand.
 - [x] All four critical fixes above are complete locally.
 - [ ] A scheduled escalation that exhausts its start retries notifies the responsible user and team administrators. The pending notification survives an application crash and is recovered after restart.

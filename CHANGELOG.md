@@ -4,6 +4,17 @@ Completed repository changes, newest first. Tracking begins on 2026-10-05;
 earlier work has not been reconstructed. Planning and archive rules are in
 [AGENTS.md](AGENTS.md#task-plans-and-documentation).
 
+## 2026-10-11 — Separate Kubernetes materials from the first release
+
+- Move Kubernetes manifests and historical deployment learning guides into the
+  separate local repository `/Users/hemant/pers/replytrail-kubernetes`; retain
+  Docker, Compose, and CI here. Preserve the archive alongside the application
+  so the deployment learning journey can continue later.
+- Update the [deployment guide](docs/deployment/README.md) and release checklist
+  for the agreed EC2/Compose direction. Production setup and deployment remain pending.
+- Verification: all 18 archived files match Git history, updated links resolve,
+  backend packaging with tests skipped and diff checks pass.
+
 ## 2026-10-11 — Implement minimum recurring escalation runs
 
 - Implement daily/weekly repeat support on the existing escalation row with

@@ -1,50 +1,40 @@
 # Current task plan
 
-## Task: Implement minimum recurring escalation schedules
+## Task: Separate Kubernetes materials from the first-release deployment
 
 Started: 2026-10-11
-Status: Complete — local implementation finished; deployment remains pending
+Status: Complete — archive stored alongside the application; EC2 deployment remains pending
 
 ### Goal and scope
 
-Implement the minimum recurring schedule scope from the [feature plan](recurring-escalation-implementation-plan.md)
-while preserving one-time escalation behavior. This task includes backend,
-frontend, migrations, focused tests, and documentation updates; deployment remains
-excluded and is the final release step.
+Move Kubernetes manifests and the historical deployment learning guides into a
+separate local Git repository under `/Users/hemant/pers`. Keep the application, Docker Compose,
+Dockerfiles, and GitHub Actions in ReplyTrail. Update deployment links and the
+[release checklist](product-launch-readiness.md#release-check).
 
 ### Decision-compliance note
 
-- Preserve the existing one-time schedule and escalation lifecycle.
-- Each occurrence has a new escalation ID; overlapping runs are allowed.
-- The existing escalation table owns repeatType, nextRepeatAt, and repeatSourceId.
-  The original row owns repetition; children never own a repeating chain.
-- PostgreSQL owns calendar progress and run state; timers only provide wake-ups.
-- Reuse each run's scheduledStartAt and existing start/retry/publication path.
-- Exclude a new schedule entity/table, duplicate repeat boolean, separate schedule
-  lifecycle, and custom intervals unless separately agreed.
-- Minimum defaults are daily/weekly, scheduled first start, latest missed repeat
-  only, and stop without editing. Do not introduce repeat-after-completion,
-  monthly/yearly, custom intervals, or a separate schedule table.
+- The owner selected one EC2 machine with Docker Compose for version one.
+- Preserve the backend, PostgreSQL, RabbitMQ, and Redis dependencies.
+- Preserve moved files byte-for-byte before removing them from this working tree.
+- This cleanup does not implement or deploy the production Compose configuration.
+- Recurrence implementation is complete locally; its remaining verification is
+  tracked in the [recurrence plan](recurring-escalation-implementation-plan.md).
 
-### Acceptance criteria
+### Acceptance criteria and steps
 
-- [x] Add the three recurrence fields and daily/weekly calendar calculation.
-- [x] Create independent child runs atomically and recover repeat timers safely.
-- [x] Add stop-repeat and the existing-screen scheduling controls.
-- [x] Run focused backend/frontend checks and update readiness documentation.
-
-### Steps and verification
-
-- [x] Inspect existing scheduling, execution, timer guidance, and launch tracking.
-- [x] Confirm the canonical fields, minimum defaults, and excluded improvements.
-- [x] Implement backend persistence, occurrence creation, timer recovery, and API.
-- [x] Implement the existing UI controls and source-run context.
-- [x] Run focused tests, normal builds, and diff checks; record limitations.
+- [x] Inspect the working tree, deployment files, CI, and incoming links.
+- [x] Create a separate local repository and preserve the deployment materials.
+- [x] Remove the moved materials here and document the EC2/Compose direction.
+- [x] Verify archive contents, remaining links, packaging, and the final diff.
+- [x] Record the outcome and archive location in the changelog.
+- [x] Move the archive to `/Users/hemant/pers/replytrail-kubernetes` and update its location.
 
 ### Verification results
 
-`EscalationRepeatCalculatorTest` passes. Backend test compilation and packaging,
-UI build, UI lint, and `git diff --check` pass; UI lint retains two existing
-warnings in `FlowDetailPage.tsx`. The full Mockito-backed service suite could not
-start because Byte Buddy cannot self-attach on this local JDK/process environment.
-PostgreSQL, broker, SMTP, restart, and deployed checks remain intentionally last.
+All 18 archived files match their original tracked versions byte-for-byte.
+Updated-document links resolve, backend packaging with tests skipped passes, and
+`git diff --check` passes. Application code, CI, and Compose are unchanged.
+The archive repository is `/Users/hemant/pers/replytrail-kubernetes`; it has no
+remote or commits and is preserved alongside the application. Source files
+remain recoverable from Git history. No EC2 or deployed verification was performed.

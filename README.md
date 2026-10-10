@@ -112,7 +112,7 @@ PostgreSQL stores tasks, paths, events, runs, step states, and due times. The ba
 | Ready-work delivery | RabbitMQ; database-backed timers determine when work becomes ready |
 | Short-lived shared state | Redis for workflow intents and webhook rate limiting |
 | Email | Spring Mail with an SMTP provider |
-| Packaging and deployment | Docker Compose for local services; Kubernetes manifests and GitHub Actions for backend build, verification, and image scanning |
+| Packaging and deployment | Docker Compose for local services and the planned first EC2 release; GitHub Actions for backend build, verification, and image scanning |
 
 The UI can be deployed as static files separately from the backend. Existing `com.alertops` packages, `ALERTOPS_*` settings, container/resource names, and the `X-AlertOps-Webhook-Secret` header are retained compatibility identifiers from the earlier product name. Use these exact identifiers in configuration and integrations.
 
@@ -270,7 +270,7 @@ The backend command runs tests and packages the application; the UI build checks
 - `docker-compose.yml`: local backend and dependency stack.
 - `.github/workflows/ci.yml`: Maven verification, container build, and Trivy image scan on pull requests and configured branch pushes.
 - [`docs/product-launch-readiness.md`](docs/product-launch-readiness.md): release checklist and remaining end-to-end checks.
-- [`docs/deployment/README.md`](docs/deployment/README.md): staged deployment learning plan.
+- [`docs/deployment/README.md`](docs/deployment/README.md): first-release EC2 and Docker Compose deployment direction.
 - [`CHANGELOG.md`](CHANGELOG.md): completed repository changes and verification notes.
 
 Manual and webhook response flows, one-time scheduling, resolution timeouts, manual actions, and activity history are implemented locally. The release checklist still calls for deployed end-to-end runs, including restart and duplicate-delivery scenarios. Domain ownership, sender verification, and rebrand rollout are tracked in the [product rebranding plan](docs/product-rebranding-plan.md).
