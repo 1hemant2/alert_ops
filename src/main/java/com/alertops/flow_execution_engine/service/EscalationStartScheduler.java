@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,8 +26,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.alertops.flow_execution_engine.application.StartFlowExecutionUseCase;
 import com.alertops.flow_execution_engine.messaging.EscalationStartSchedule;
 import com.alertops.flow_execution_engine.messaging.EscalationStartCancelled;
+import com.alertops.flow_execution_engine.messaging.EscalationRepeatSchedule;
+import com.alertops.flow_execution_engine.messaging.EscalationRepeatStopped;
 import com.alertops.flow_execution_engine.model.Escalation;
 import com.alertops.flow_execution_engine.model.EscalationStatus;
+import com.alertops.flow_execution_engine.model.RepeatType;
 import com.alertops.flow_execution_engine.repository.EscalationRepository;
 
 /** Durable one-time timers for escalation starts. PostgreSQL remains the source of truth. */
@@ -42,10 +46,14 @@ public class EscalationStartScheduler {
     private final StartFlowExecutionUseCase startFlowExecutionUseCase;
     private final FlowExecutionStateService flowExecutionStateService;
     private final EscalationStartRetryService retryService;
+    private final EscalationRepeatService repeatService;
     private final Duration retryDelay;
     private final Map<UUID, TimerEntry> timers = new ConcurrentHashMap<>();
+    private final Map<UUID, TimerEntry> repeatTimers = new ConcurrentHashMap<>();
     private volatile boolean shuttingDown;
 
+    // Creates the scheduler with durable start and repeat wake-up dependencies.
+    @Autowired
     public EscalationStartScheduler(
             EscalationRepository escalationRepository,
             TaskScheduler taskScheduler,
@@ -53,6 +61,7 @@ public class EscalationStartScheduler {
             StartFlowExecutionUseCase startFlowExecutionUseCase,
             FlowExecutionStateService flowExecutionStateService,
             EscalationStartRetryService retryService,
+            EscalationRepeatService repeatService,
             @Value("${alertops.scheduler.start-retry-delay:5s}") Duration retryDelay) {
         if (retryDelay == null || retryDelay.isZero() || retryDelay.isNegative()) {
             throw new IllegalArgumentException("Scheduled-start retry delay must be positive");
@@ -64,9 +73,11 @@ public class EscalationStartScheduler {
         this.flowExecutionStateService = Objects.requireNonNull(
                 flowExecutionStateService, "flowExecutionStateService");
         this.retryService = Objects.requireNonNull(retryService, "retryService");
+        this.repeatService = Objects.requireNonNull(repeatService, "repeatService");
         this.retryDelay = retryDelay;
     }
 
+    // Registers one-time and repeat wake-ups after the schedule transaction commits.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onScheduled(EscalationStartSchedule schedule) {
         if (schedule == null) {
@@ -75,8 +86,10 @@ public class EscalationStartScheduler {
         UUID escalationId = schedule.escalationId();
         Instant scheduledStartAt = schedule.scheduledStartAt();
         schedule(escalationId, scheduledStartAt);
+        scheduleRepeatIfEnabled(escalationId);
     }
 
+    // Cancels the one-time wake-up after a scheduled run is cancelled.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCancelled(EscalationStartCancelled cancellation) {
         if (cancellation == null) {
@@ -85,6 +98,23 @@ public class EscalationStartScheduler {
         cancel(cancellation.escalationId());
     }
 
+    // Registers the next repeat wake-up after its durable boundary advances.
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onRepeatScheduled(EscalationRepeatSchedule schedule) {
+        if (schedule != null) {
+            scheduleRepeat(schedule.escalationId(), schedule.nextRepeatAt());
+        }
+    }
+
+    // Cancels only the future repeat wake-up and leaves saved runs untouched.
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onRepeatStopped(EscalationRepeatStopped stopped) {
+        if (stopped != null) {
+            cancelRepeat(stopped.escalationId());
+        }
+    }
+
+    // Recovers all durable one-time scheduled starts after application startup.
     @EventListener(ApplicationReadyEvent.class)
     public void recoverScheduledStarts() {
         List<Escalation> scheduled = escalationRepository.findAllScheduled();
@@ -103,6 +133,20 @@ public class EscalationStartScheduler {
                     ? nextRetryAt
                     : scheduledStartAt;
             schedule(escalationId, wakeAt);
+        }
+    }
+
+    // Recovers repeat wake-ups even when the original run is already terminal.
+    @EventListener(ApplicationReadyEvent.class)
+    public void recoverRepeatingEscalations() {
+        List<Escalation> repeating = escalationRepository.findAllRepeating();
+        if (repeating == null) {
+            return;
+        }
+        for (Escalation escalation : repeating) {
+            if (escalation != null) {
+                scheduleRepeat(escalation.getId(), escalation.getNextRepeatAt());
+            }
         }
     }
 
@@ -128,11 +172,43 @@ public class EscalationStartScheduler {
         }
     }
 
+    // Registers one repeat wake-up while keeping only its cancellable handle in memory.
+    public void scheduleRepeat(UUID escalationId, Instant nextRepeatAt) {
+        if (escalationId == null || nextRepeatAt == null || shuttingDown) {
+            return;
+        }
+        TimerEntry replacement = new TimerEntry();
+        TimerEntry previous = repeatTimers.put(escalationId, replacement);
+        if (previous != null) {
+            previous.cancel();
+        }
+        try {
+            ScheduledFuture<?> future = taskScheduler.schedule(
+                    () -> handleRepeatTimer(escalationId, replacement), nextRepeatAt);
+            replacement.future = future;
+        } catch (RuntimeException failure) {
+            retryRepeatRegistration(escalationId, replacement);
+            logger.warn("Could not register repeat wake-up for escalation {}; startup recovery will retry",
+                    escalationId, failure);
+        }
+    }
+
     public void cancel(UUID escalationId) {
         if (escalationId == null) {
             return;
         }
         TimerEntry entry = timers.remove(escalationId);
+        if (entry != null) {
+            entry.cancel();
+        }
+    }
+
+    // Cancels a repeat wake-up without changing the durable escalation history.
+    public void cancelRepeat(UUID escalationId) {
+        if (escalationId == null) {
+            return;
+        }
+        TimerEntry entry = repeatTimers.remove(escalationId);
         if (entry != null) {
             entry.cancel();
         }
@@ -161,6 +237,83 @@ public class EscalationStartScheduler {
     private boolean isCurrentTimer(UUID escalationId, TimerEntry entry) {
         return escalationId != null && entry != null
                 && timers.get(escalationId) == entry && !shuttingDown;
+    }
+
+    // Checks whether a repeat callback still owns the current in-memory handle.
+    private boolean isCurrentRepeatTimer(UUID escalationId, TimerEntry entry) {
+        return escalationId != null && entry != null
+                && repeatTimers.get(escalationId) == entry && !shuttingDown;
+    }
+
+    // Schedules a repeat only when the database still marks the original as repeating.
+    private void scheduleRepeatIfEnabled(UUID escalationId) {
+        if (escalationId == null || shuttingDown) {
+            return;
+        }
+        escalationRepository.findById(escalationId)
+                .filter(escalation -> escalation.getRepeatType() != null)
+                .filter(escalation -> escalation.getRepeatType() != RepeatType.NONE)
+                .map(Escalation::getNextRepeatAt)
+                .ifPresent(nextRepeatAt -> scheduleRepeat(escalationId, nextRepeatAt));
+    }
+
+    // Reloads the original and creates only the latest missed repeat.
+    private void handleRepeatTimer(UUID escalationId, TimerEntry entry) {
+        if (!isCurrentRepeatTimer(escalationId, entry)) {
+            return;
+        }
+        Instant now = clock.instant();
+        try {
+            Optional<Escalation> original = escalationRepository.findById(escalationId)
+                    .filter(escalation -> escalation.getRepeatType() != null)
+                    .filter(escalation -> escalation.getRepeatType() != RepeatType.NONE)
+                    .filter(escalation -> escalation.getNextRepeatAt() != null);
+            if (original.isEmpty()) {
+                repeatTimers.remove(escalationId, entry);
+                return;
+            }
+            if (original.get().getNextRepeatAt().isAfter(now)) {
+                scheduleRepeat(escalationId, original.get().getNextRepeatAt());
+                return;
+            }
+            Optional<Escalation> created = repeatService.createLatestDueRun(escalationId, now);
+            if (created.isEmpty()) {
+                scheduleRepeatFromDatabase(escalationId, entry);
+            }
+        } catch (RuntimeException failure) {
+            retryRepeatRegistration(escalationId, entry);
+            logger.warn("Could not create repeated escalation {}; retrying", escalationId, failure);
+        }
+    }
+
+    // Restores or removes a repeat wake-up after a concurrent state change wins.
+    private void scheduleRepeatFromDatabase(UUID escalationId, TimerEntry entry) {
+        if (!isCurrentRepeatTimer(escalationId, entry)) {
+            return;
+        }
+        escalationRepository.findById(escalationId)
+                .filter(escalation -> escalation.getRepeatType() != null)
+                .filter(escalation -> escalation.getRepeatType() != RepeatType.NONE)
+                .filter(escalation -> escalation.getNextRepeatAt() != null)
+                .ifPresentOrElse(
+                        escalation -> scheduleRepeat(escalationId, escalation.getNextRepeatAt()),
+                        () -> repeatTimers.remove(escalationId, entry));
+    }
+
+    // Retries repeat registration while retaining the unchanged durable boundary.
+    private void retryRepeatRegistration(UUID escalationId, TimerEntry entry) {
+        if (!isCurrentRepeatTimer(escalationId, entry)) {
+            return;
+        }
+        try {
+            ScheduledFuture<?> future = taskScheduler.schedule(
+                    () -> handleRepeatTimer(escalationId, entry), clock.instant().plus(retryDelay));
+            entry.future = future;
+        } catch (RuntimeException retryFailure) {
+            repeatTimers.remove(escalationId, entry);
+            logger.warn("Could not register repeat retry for escalation {}; startup recovery will retry",
+                    escalationId, retryFailure);
+        }
     }
 
     private Optional<Escalation> loadScheduledEscalation(UUID escalationId, TimerEntry entry, Instant now) {
@@ -284,10 +437,13 @@ public class EscalationStartScheduler {
     }
 
     @PreDestroy
+    // Cancels all in-memory start and repeat wake-ups during application shutdown.
     public void stop() {
         shuttingDown = true;
         timers.values().forEach(TimerEntry::cancel);
         timers.clear();
+        repeatTimers.values().forEach(TimerEntry::cancel);
+        repeatTimers.clear();
     }
 
     private static final class TimerEntry {
