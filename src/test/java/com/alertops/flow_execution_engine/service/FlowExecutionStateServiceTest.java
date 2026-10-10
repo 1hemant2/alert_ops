@@ -8,7 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,7 +37,8 @@ class FlowExecutionStateServiceTest {
     private final StepSchedulingService scheduling = mock(StepSchedulingService.class);
     private final AuditService audit = mock(AuditService.class);
     private final FlowExecutionStateService service = new FlowExecutionStateService(
-            states, escalations, scheduling, audit);
+            states, escalations, scheduling, audit,
+            Clock.fixed(Instant.parse("2026-10-10T12:00:00Z"), ZoneOffset.UTC));
 
     @AfterEach
     void clearContext() {
@@ -42,7 +46,7 @@ class FlowExecutionStateServiceTest {
     }
 
     @Test
-    // Verifies that early scheduled starts use the explicit step scheduler.
+    // Verifies that early scheduled starts publish the first step immediately.
     void manualScheduledStartClaimsWithoutCheckingSavedDueTimeAndAuditsActor() {
         UUID teamId = UUID.randomUUID();
         UUID escalationId = UUID.randomUUID();
@@ -62,7 +66,7 @@ class FlowExecutionStateServiceTest {
 
         verify(escalations).claimScheduledForManualStart(escalationId, teamId);
         verify(escalations, never()).claimScheduledForStart(eq(escalationId), eq(teamId), any());
-        verify(scheduling).scheduleStep(firstState);
+        verify(scheduling).scheduleStepImmediately(eq(firstState), eq(Instant.parse("2026-10-10T12:00:00Z")));
         ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
         verify(audit).record(event.capture());
         org.junit.jupiter.api.Assertions.assertEquals(actorId, event.getValue().userId());
